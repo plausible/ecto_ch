@@ -27,7 +27,7 @@ defmodule Chto.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, path: "../ch"},
+      {:ch, github: "ruslandoga/ch"},
       {:ecto_sql, "~> 3.9"},
       {:benchee, "~> 1.1", only: :bench},
       {:decimal, "~> 2.0"},
