@@ -1,0 +1,36 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  mix:
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: test
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.14.2"
+          otp-version: "25.1.1"
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ github.head_ref || github.ref }}-
+            ${{ runner.os }}-mix-refs/heads/master-
+
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix test
