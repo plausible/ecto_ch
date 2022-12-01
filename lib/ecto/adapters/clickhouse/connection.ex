@@ -1,7 +1,7 @@
 defmodule Ecto.Adapters.ClickHouse.Connection do
   @moduledoc false
   alias Ecto.{Query, SubQuery}
-  alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, FromExpr, Tagged}
+  alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, Tagged}
 
   @spec all(Ecto.Query.t()) :: iodata
   def all(query) do
