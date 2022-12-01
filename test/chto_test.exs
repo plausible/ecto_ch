@@ -283,7 +283,7 @@ defmodule ChtoTest do
         |> where([e], fragment("name = ?", type(^name, :string)))
         |> select([e], e.user_id)
 
-      assert to_sql(query, inspect: []) ==
+      assert to_sql(query) ==
                ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (name = {var:String})]
     end
   end
