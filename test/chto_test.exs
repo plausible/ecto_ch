@@ -66,9 +66,39 @@ defmodule ChtoTest do
       # TODO or SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" in ARRAY[{$0:String},{$1:String}])
       assert to_sql(query) ==
                ~s|SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" IN {$0:Array(String)})|
+
+      # subquery
+      name = "Jack"
+
+      query =
+        from e in Event,
+          order_by: [desc: :user_id],
+          limit: 10,
+          where: e.name == ^name,
+          select: e.user_id
+
+      query = from e in subquery(query), select: avg(e.user_id), where: e.user_id > 10
+      assert to_sql(query, inspect: []) == ""
     end
 
-    test "ix?"
-    test "subqueries don't reset params counter"
+    test "new" do
+      Rexbug.start(["Ecto.Query", "Ecto.Query.Builder", "Ecto.Query.Builder.Filter"], msgs: 10000)
+      name = "Jack"
+
+      query =
+        from e in Event,
+          order_by: [desc: :user_id],
+          limit: 10,
+          where: e.name == ^name,
+          select: e.user_id
+
+      query = from e in subquery(query), select: avg(e.user_id), where: e.user_id > 10
+      :timer.sleep(100)
+      IO.puts("done")
+      assert to_sql(query) == ""
+    end
+
+    # TODO
+    # test "ix?"
   end
 end

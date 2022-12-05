@@ -23,6 +23,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [select, from, join, where, group_by, having, order_by, limit, offset]
   end
 
+  def child_spec(opts) do
+    Ch.child_spec(opts)
+  end
+
   def delete(_prefix, _table, _filters, _returning) do
     raise "not implemented"
   end
