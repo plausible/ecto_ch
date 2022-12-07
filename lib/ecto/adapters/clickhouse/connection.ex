@@ -1,9 +1,45 @@
 defmodule Ecto.Adapters.ClickHouse.Connection do
   @moduledoc false
+  @behaviour Ecto.Adapters.SQL.Connection
   alias Ecto.{Query, SubQuery}
   alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, Tagged}
 
-  @spec all(Ecto.Query.t()) :: iodata
+  # TODO fix childspec type
+  @impl true
+  def child_spec(opts), do: Ch.child_spec(opts)
+
+  @impl true
+  def prepare_execute(conn, _name, statement, params, opts) do
+    query = Ch.Query.build(statement, opts)
+    DBConnection.prepare_execute(conn, query, params, opts)
+  end
+
+  @impl true
+  def execute(conn, query, params, opts) do
+    DBConnection.execute(conn, query, params, opts)
+  end
+
+  @impl true
+  def query(conn, statement, params, opts) do
+    Ch.query(conn, statement, params, opts)
+  end
+
+  @impl true
+  def query_many(_conn, _statement, _params, _opts) do
+    raise "not implemented"
+  end
+
+  @impl true
+  def stream(_conn, _statement, _params, _opts) do
+    raise "not implemented"
+  end
+
+  @impl true
+  def to_constraints(_exception, _opts) do
+    raise "not implemented"
+  end
+
+  @impl true
   def all(query) do
     sources = create_names(query)
     from = from(query, sources)
@@ -18,28 +54,50 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [select, from, join, where, group_by, having, order_by, limit, offset]
   end
 
-  def delete(_prefix, _table, _filters, _returning) do
+  @impl true
+  def update_all(_query) do
     raise "not implemented"
   end
 
+  @impl true
   def delete_all(_query) do
     raise "not implemented"
   end
 
+  # TODO support insert into ... select ... from
+  @impl true
   def insert(_prefix, _table, _header, _rows, _on_conflict, _returning, _placeholder) do
     # TODO note that insert_stream can be used instead?
     raise "not implemented"
   end
 
+  @impl true
   def update(_prefix, _table, _fields, _filters, _returning) do
     raise "not implemented"
   end
 
-  def update_all(_query) do
+  @impl true
+  def delete(_prefix, _table, _filters, _returning) do
     raise "not implemented"
   end
 
-  def stream(_conn, _prepared, _params, _opts) do
+  @impl true
+  def explain_query(_conn, _query, _params, _opts) do
+    raise "not implemented"
+  end
+
+  @impl true
+  def execute_ddl(_command) do
+    raise "not implemented"
+  end
+
+  @impl true
+  def ddl_logs(_result) do
+    raise "not implemented"
+  end
+
+  @impl true
+  def table_exists_query(_table) do
     raise "not implemented"
   end
 
