@@ -10,7 +10,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     # TODO this is a quick hack to see if it works at all
     Process.put(@counter, counter)
     sources = create_names(query)
-    select(query, sources)
     from = from(query, sources)
     select = select(query, sources)
     join = join(query, sources)
