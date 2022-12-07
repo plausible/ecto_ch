@@ -6,15 +6,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @spec all(Ecto.Query.t()) :: iodata
   def all(query) do
     sources = create_names(query)
-    # TODO there is no order_by_distinct
-    {select_distinct, order_by_distinct} = distinct(query.distinct, sources, query)
     from = from(query, sources)
-    select = select(query, select_distinct, sources)
+    select = select(query, sources)
     join = join(query, sources)
     where = where(query, sources)
     group_by = group_by(query, sources)
     having = having(query, sources)
-    order_by = order_by(query, order_by_distinct, sources)
+    order_by = order_by(query, sources)
     limit = limit(query, sources)
     offset = offset(query, sources)
     [select, from, join, where, group_by, having, order_by, limit, offset]
@@ -68,8 +66,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp handle_call(fun, _arity), do: {:fun, Atom.to_string(fun)}
 
-  defp select(%Query{select: %{fields: fields}} = query, select_distinct, sources) do
-    ["SELECT", select_distinct, ?\s | select_fields(fields, sources, query)]
+  defp select(%Query{select: %{fields: fields}} = query, sources) do
+    distinct = distinct(query.distinct, query)
+    ["SELECT ", distinct | select_fields(fields, sources, query)]
   end
 
   defp select_fields([], _sources, _query), do: "'TRUE'"
@@ -81,14 +80,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end)
   end
 
-  # TODO source are not used in any clause
-  defp distinct(nil, _source, _query), do: {[], []}
-  defp distinct(%QueryExpr{expr: []}, _sources, _query), do: {[], []}
-  # TODO can have space after?
-  defp distinct(%QueryExpr{expr: true}, _sources, _query), do: {" DISTINCT", []}
-  defp distinct(%QueryExpr{expr: false}, _sources, _query), do: {[], []}
+  defp distinct(nil, _query), do: []
+  defp distinct(%QueryExpr{expr: []}, _query), do: []
+  defp distinct(%QueryExpr{expr: true}, _query), do: "DISTINCT "
+  defp distinct(%QueryExpr{expr: false}, _query), do: []
 
-  defp distinct(%QueryExpr{}, _sources, query) do
+  defp distinct(%QueryExpr{}, query) do
     error!(
       query,
       "DISTINCT ON is not supported! Use `distinct: true`, for ex. `from rec in MyModel, distinct: true, select: rec.my_field`"
@@ -161,16 +158,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ]
   end
 
-  defp order_by(%Query{order_bys: []}, _distinct, _souces), do: []
+  defp order_by(%Query{order_bys: []}, _souces), do: []
 
-  # TODO distinct is always []
-  defp order_by(%Query{order_bys: order_bys} = query, distinct, sources) do
+  defp order_by(%Query{order_bys: order_bys} = query, sources) do
     order_bys = Enum.flat_map(order_bys, & &1.expr)
-
-    [
-      " ORDER BY "
-      | intersperce_map(distinct ++ order_bys, ", ", &order_by_expr(&1, sources, query))
-    ]
+    [" ORDER BY " | intersperce_map(order_bys, ", ", &order_by_expr(&1, sources, query))]
   end
 
   defp order_by_expr({dir, expr}, sources, query) do
@@ -209,8 +201,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp boolean(name, [%{expr: expr, op: op} | exprs], sources, query) do
     {_, op} =
-      exprs
-      |> Enum.reduce({op, paren_expr(expr, sources, query)}, fn
+      Enum.reduce(exprs, {op, paren_expr(expr, sources, query)}, fn
         %BooleanExpr{expr: expr, op: op}, {op, acc} ->
           {op, [acc, operator_to_boolean(op), paren_expr(expr, sources, query)]}
 
@@ -235,9 +226,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     expr(literal, sources, query)
   end
 
-  defp expr({:^, [], [_ix]}, _sources, _query) do
-    # TODO params
-    [??]
+  defp expr({:^, [], [_ix]}, _sources, query) do
+    error!(query, "untyped param")
   end
 
   defp expr({{:., _, [{:&, _, [idx]}, field]}, _, []}, sources, _query) when is_atom(field) do
@@ -269,10 +259,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_, 0]}]}, _sources, _query), do: "0"
 
-  defp expr({:in, _, [left, {:^, _, [_, length]}]}, sources, query) do
-    # TODO params
-    args = Enum.intersperse(List.duplicate(??, length), ?,)
-    [expr(left, sources, query), " IN(", args, ?)]
+  defp expr({:in, _, [left, %Tagged{value: {:^, [], [_ix]}, type: type}]}, sources, query) do
+    [expr(left, sources, query), " IN {var:Array(", tagged_to_db(type), ")}"]
+  end
+
+  defp expr({:in, _, [_left, {:^, [], [_ix]}]}, _sources, query) do
+    error!(query, "untyped array param")
   end
 
   defp expr({:in, _, [left, right]}, sources, query) do
@@ -290,21 +282,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  # TODO params?
   defp expr(%SubQuery{query: query, params: _}, _sources, _query) do
     all(query)
   end
 
   defp expr({:fragment, _, [kw]}, sources, query) when is_list(kw) or tuple_size(kw) == 3 do
     Enum.reduce(kw, query, fn {k, {op, v}}, query ->
-      # TODO
+      # TODO what's that?
       expr({op, nil, [k, v]}, sources, query)
     end)
   end
 
   defp expr({:fragment, _, parts}, sources, query) do
     Enum.map(parts, fn
-      # TODO
       {:raw, part} -> part
       {:expr, expr} -> expr(expr, sources, query)
     end)
@@ -342,7 +332,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["0x" | Base.encode16(binary, case: :lower)]
   end
 
-  defp expr(%Tagged{value: {:^, [], [0]}, type: type}, _sources, _query) do
+  defp expr(%Tagged{value: {:^, [], [_ix]}, type: type}, _sources, _query) do
     ["{var:", tagged_to_db(type), ?}]
   end
 
