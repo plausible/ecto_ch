@@ -259,8 +259,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_, 0]}]}, _sources, _query), do: "0"
 
-  defp expr({:in, _, [left, %Tagged{value: {:^, [], [_ix]}, type: type}]}, sources, query) do
-    [expr(left, sources, query), " IN {var:Array(", tagged_to_db(type), ")}"]
+  defp expr({:in, _, [left, %Tagged{value: {:^, [], [ix]}, type: type}]}, sources, query) do
+    [
+      expr(left, sources, query),
+      " IN {$",
+      Integer.to_string(ix),
+      ":Array(",
+      tagged_to_db(type),
+      ")}"
+    ]
   end
 
   defp expr({:in, _, [_left, {:^, [], [_ix]}]}, _sources, query) do
@@ -282,6 +289,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  # TODO counter?
   defp expr(%SubQuery{query: query, params: _}, _sources, _query) do
     all(query)
   end
@@ -332,8 +340,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["0x" | Base.encode16(binary, case: :lower)]
   end
 
-  defp expr(%Tagged{value: {:^, [], [_ix]}, type: type}, _sources, _query) do
-    ["{var:", tagged_to_db(type), ?}]
+  defp expr(%Tagged{value: {:^, [], [ix]}, type: type}, _sources, _query) do
+    ["{$", Integer.to_string(ix), ?:, tagged_to_db(type), ?}]
   end
 
   defp expr(%Tagged{value: value, type: type}, sources, query) do
