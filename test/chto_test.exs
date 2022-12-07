@@ -30,10 +30,16 @@ defmodule ChtoTest do
       assert to_sql(query) == ~s[SELECT e0."name" FROM "events" AS e0 LIMIT 1]
 
       name = "John"
-      query = "events" |> where(name: type(^name, :string)) |> select([e], e.user_id)
+      min_user_id = 10
+
+      query =
+        "events"
+        |> where(name: type(^name, :string))
+        |> where([e], e.user_id > type(^min_user_id, :integer))
+        |> select([e], e.user_id)
 
       assert to_sql(query) ==
-               ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" = {var:String})]
+               ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" = {$0:String}) AND (e0."user_id" > {$1:Int64})]
 
       query =
         "events"
@@ -41,7 +47,7 @@ defmodule ChtoTest do
         |> select([e], e.user_id)
 
       assert to_sql(query) ==
-               ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (name = {var:String})]
+               ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (name = {$0:String})]
     end
   end
 end
