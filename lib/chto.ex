@@ -2,8 +2,13 @@ defmodule Chto do
   @moduledoc false
 
   def insert_stream(repo, table, rows, opts \\ []) do
-    fields = intersperce_map(opts[:fields] || [], ?,, &quote_name/1)
-    statement = ["INSERT INTO ", quote_name(table), ?(, fields, ?)]
+    fields =
+      case opts[:fields] do
+        [_ | _] = fields -> [?(, intersperce_map(fields, ?,, &quote_name/1), ?)]
+        _none -> []
+      end
+
+    statement = ["INSERT INTO ", quote_name(table) | fields]
     repo.query(statement, rows, put_in(opts, [:command], :insert))
   end
 
@@ -27,9 +32,6 @@ defmodule Chto do
       raise "bad name #{inspect(name)}"
     end
 
-    wrap_in(name, quoter)
+    [quoter, name, quoter]
   end
-
-  defp wrap_in(value, nil), do: value
-  defp wrap_in(value, wrapper), do: [wrapper, value, wrapper]
 end
