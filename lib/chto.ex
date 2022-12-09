@@ -1,6 +1,8 @@
 defmodule Chto do
   @moduledoc false
 
+  @spec insert_stream(module, String.t(), Enumerable.t(), Keyword.t()) ::
+          {:ok, count :: non_neg_integer} | {:error, Exception.t()}
   def insert_stream(repo, table, rows, opts \\ []) do
     fields =
       case opts[:fields] do
@@ -9,7 +11,11 @@ defmodule Chto do
       end
 
     statement = ["INSERT INTO ", quote_name(table) | fields]
-    repo.query(statement, rows, put_in(opts, [:command], :insert))
+    opts = put_in(opts, [:command], :insert)
+
+    with {:ok, %{num_rows: num_rows}} <- repo.query(statement, rows, opts) do
+      {:ok, num_rows}
+    end
   end
 
   defp intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]
