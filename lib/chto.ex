@@ -4,6 +4,16 @@ defmodule Chto do
   @spec insert_stream(module, String.t(), Enumerable.t(), Keyword.t()) ::
           {:ok, count :: non_neg_integer} | {:error, Exception.t()}
   def insert_stream(repo, table, rows, opts \\ []) do
+    {statement, opts} = build_insert(table, opts)
+
+    with {:ok, %{num_rows: num_rows}} <- repo.query(statement, rows, opts) do
+      {:ok, num_rows}
+    end
+  end
+
+  # used for benchmarks
+  @doc false
+  def build_insert(table, opts) do
     fields =
       case opts[:fields] do
         [_ | _] = fields -> [?(, intersperce_map(fields, ?,, &quote_name/1), ?)]
@@ -12,10 +22,7 @@ defmodule Chto do
 
     statement = ["INSERT INTO ", quote_name(table) | fields]
     opts = put_in(opts, [:command], :insert)
-
-    with {:ok, %{num_rows: num_rows}} <- repo.query(statement, rows, opts) do
-      {:ok, num_rows}
-    end
+    {statement, opts}
   end
 
   defp intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]

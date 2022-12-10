@@ -1,3 +1,6 @@
+# measures the time required to build a simple select statement
+# TODO add more statements, base them on Plausible code
+
 import Ecto.Query
 
 prepare = fn query ->
