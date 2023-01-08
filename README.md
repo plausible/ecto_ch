@@ -20,9 +20,8 @@ iex> Chto.insert_stream(Repo, "example", rows, fields: [:a, :b, :c], types: [:u3
 # INSERT INTO "example"("a","b","c") [[1, "1", ~N[2022-11-26 09:38:24]], [2, "2", ~N[2022-11-26 09:38:25]], [3, "3", ~N[2022-11-26 09:38:26]]]
 {:ok, _written_rows = 3}
 
-# WIP type(..) will be unnecessary
 iex> min_a = 1
-iex> "example" |> where([e], e.a > type(^min_a, :integer)) |> select([e], map(e, [:b, :c])) |> Repo.all()
+iex> "example" |> where([e], e.a > ^min_a) |> select([e], map(e, [:b, :c])) |> Repo.all()
 # SELECT e0."b",e0."c" FROM "example" AS e0 WHERE (e0."a" > {$0:Int64}) [1]
 [%{b: "2", c: ~N[2022-11-26 09:38:25]}, %{b: "3", c: ~N[2022-11-26 09:38:26]}]
 
