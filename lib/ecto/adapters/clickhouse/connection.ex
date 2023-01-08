@@ -49,17 +49,17 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def all(query) do
+  def all(query, params \\ []) do
     sources = create_names(query)
-    from = from(query, sources)
-    select = select(query, sources)
-    join = join(query, sources)
-    where = where(query, sources)
-    group_by = group_by(query, sources)
-    having = having(query, sources)
-    order_by = order_by(query, sources)
-    limit = limit(query, sources)
-    offset = offset(query, sources)
+    from = from(query, sources, params)
+    select = select(query, sources, params)
+    join = join(query, sources, params)
+    where = where(query, sources, params)
+    group_by = group_by(query, sources, params)
+    having = having(query, sources, params)
+    order_by = order_by(query, sources, params)
+    limit = limit(query, sources, params)
+    offset = offset(query, sources, params)
 
     [
       select,
@@ -145,17 +145,17 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp handle_call(fun, _arity), do: {:fun, Atom.to_string(fun)}
 
-  defp select(%Query{select: %{fields: fields}} = query, sources) do
+  defp select(%Query{select: %{fields: fields}} = query, sources, params) do
     distinct = distinct(query.distinct, query)
-    ["SELECT ", distinct | select_fields(fields, sources, query)]
+    ["SELECT ", distinct | select_fields(fields, sources, params, query)]
   end
 
-  defp select_fields([], _sources, _query), do: "'TRUE'"
+  defp select_fields([], _sources, _params, _query), do: "'TRUE'"
 
-  defp select_fields(fields, sources, query) do
+  defp select_fields(fields, sources, params, query) do
     intersperce_map(fields, ",", fn
-      {k, v} -> [expr(v, sources, query), " AS " | quote_name(k)]
-      v -> expr(v, sources, query)
+      {k, v} -> [expr(v, sources, params, query), " AS " | quote_name(k)]
+      v -> expr(v, sources, params, query)
     end)
   end
 
@@ -171,19 +171,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     )
   end
 
-  defp from(%Query{from: %{source: source, hints: hints}} = query, sources) do
-    {from, name} = get_source(query, sources, 0, source)
+  defp from(%Query{from: %{source: source, hints: hints}} = query, sources, params) do
+    {from, name} = get_source(query, sources, params, 0, source)
     [" FROM ", from, " AS ", name | hints(hints)]
   end
 
-  defp join(%Query{joins: []}, _sources), do: []
+  defp join(%Query{joins: []}, _sources, _params), do: []
 
-  defp join(%Query{joins: joins} = query, sources) do
+  defp join(%Query{joins: joins} = query, sources, params) do
     [
       ?\s
       | intersperce_map(joins, ?\s, fn
           %JoinExpr{qual: qual, ix: ix, source: source, on: %QueryExpr{expr: on_exrp}} ->
-            {join, name} = get_source(query, sources, ix, source)
+            {join, name} = get_source(query, sources, params, ix, source)
             [join_qual(qual), join, " AS ", name, on_join_expr(on_exrp)]
         end)
     ]
@@ -218,34 +218,34 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join_qual(:left_array), do: " LEFT ARRAY JOIN "
   defp join_qual(:left), do: " LEFT OUTER JOIN "
 
-  defp where(%Query{wheres: wheres} = query, sources) do
-    boolean(" WHERE ", wheres, sources, query)
+  defp where(%Query{wheres: wheres} = query, sources, params) do
+    boolean(" WHERE ", wheres, sources, params, query)
   end
 
-  defp having(%Query{havings: havings} = query, sources) do
-    boolean(" HAVING ", havings, sources, query)
+  defp having(%Query{havings: havings} = query, sources, params) do
+    boolean(" HAVING ", havings, sources, params, query)
   end
 
-  defp group_by(%Query{group_bys: []}, _sources), do: []
+  defp group_by(%Query{group_bys: []}, _sources, _params), do: []
 
-  defp group_by(%Query{group_bys: group_bys} = query, sources) do
+  defp group_by(%Query{group_bys: group_bys} = query, sources, params) do
     [
       " GROUP UP "
       | intersperce_map(group_bys, ", ", fn %QueryExpr{expr: expr} ->
-          intersperce_map(expr, ", ", &expr(&1, sources, query))
+          intersperce_map(expr, ", ", &expr(&1, sources, params, query))
         end)
     ]
   end
 
-  defp order_by(%Query{order_bys: []}, _souces), do: []
+  defp order_by(%Query{order_bys: []}, _sources, _params), do: []
 
-  defp order_by(%Query{order_bys: order_bys} = query, sources) do
+  defp order_by(%Query{order_bys: order_bys} = query, sources, params) do
     order_bys = Enum.flat_map(order_bys, & &1.expr)
-    [" ORDER BY " | intersperce_map(order_bys, ", ", &order_by_expr(&1, sources, query))]
+    [" ORDER BY " | intersperce_map(order_bys, ", ", &order_by_expr(&1, sources, params, query))]
   end
 
-  defp order_by_expr({dir, expr}, sources, query) do
-    str = expr(expr, sources, query)
+  defp order_by_expr({dir, expr}, sources, params, query) do
+    str = expr(expr, sources, params, query)
 
     case dir do
       :asc -> str
@@ -253,16 +253,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  defp limit(%Query{limit: nil}, _sources), do: []
+  defp limit(%Query{limit: nil}, _sources, _params), do: []
 
-  defp limit(%Query{limit: %QueryExpr{expr: expr}} = query, sources) do
-    [" LIMIT ", expr(expr, sources, query)]
+  defp limit(%Query{limit: %QueryExpr{expr: expr}} = query, sources, params) do
+    [" LIMIT ", expr(expr, sources, params, query)]
   end
 
-  defp offset(%Query{offset: nil}, _sources), do: []
+  defp offset(%Query{offset: nil}, _sources, _params), do: []
 
-  defp offset(%Query{offset: %QueryExpr{expr: expr}} = query, sources) do
-    [" OFFSET ", expr(expr, sources, query)]
+  defp offset(%Query{offset: %QueryExpr{expr: expr}} = query, sources, params) do
+    [" OFFSET ", expr(expr, sources, params, query)]
   end
 
   defp hints([_ | _] = hints) do
@@ -276,16 +276,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp hint({k, v}) when is_atom(k) and is_integer(v),
     do: [Atom.to_string(k), " ", Integer.to_string(v)]
 
-  defp boolean(_name, [], _sources, _query), do: []
+  defp boolean(_name, [], _sources, _params, _query), do: []
 
-  defp boolean(name, [%{expr: expr, op: op} | exprs], sources, query) do
+  defp boolean(name, [%{expr: expr, op: op} | exprs], sources, params, query) do
     {_, op} =
-      Enum.reduce(exprs, {op, paren_expr(expr, sources, query)}, fn
+      Enum.reduce(exprs, {op, paren_expr(expr, sources, params, query)}, fn
         %BooleanExpr{expr: expr, op: op}, {op, acc} ->
-          {op, [acc, operator_to_boolean(op), paren_expr(expr, sources, query)]}
+          {op, [acc, operator_to_boolean(op), paren_expr(expr, sources, params, query)]}
 
         %BooleanExpr{expr: expr, op: op}, {_, acc} ->
-          {op, [?(, acc, ?), operator_to_boolean(op), paren_expr(expr, sources, query)]}
+          {op, [?(, acc, ?), operator_to_boolean(op), paren_expr(expr, sources, params, query)]}
       end)
 
     [name | op]
@@ -294,26 +294,27 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp operator_to_boolean(:and), do: " AND "
   defp operator_to_boolean(:or), do: " OR "
 
-  defp paren_expr(false, _sources, _query), do: "(0=1)"
-  defp paren_expr(true, _sources, _query), do: "(1=1)"
+  defp paren_expr(false, _sources, _params, _query), do: "(0=1)"
+  defp paren_expr(true, _sources, _params, _query), do: "(1=1)"
 
-  defp paren_expr(expr, sources, query) do
-    [?(, expr(expr, sources, query), ?)]
+  defp paren_expr(expr, sources, params, query) do
+    [?(, expr(expr, sources, params, query), ?)]
   end
 
-  defp expr({_type, [literal]}, sources, query) do
-    expr(literal, sources, query)
+  defp expr({_type, [literal]}, sources, params, query) do
+    expr(literal, sources, params, query)
   end
 
-  defp expr({:^, [], [_ix]}, _sources, query) do
-    error!(query, "untyped param")
+  defp expr({:^, [], [ix]}, _sources, params, _query) do
+    ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
   end
 
-  defp expr({{:., _, [{:&, _, [idx]}, field]}, _, []}, sources, _query) when is_atom(field) do
+  defp expr({{:., _, [{:&, _, [idx]}, field]}, _, []}, sources, _params, _query)
+       when is_atom(field) do
     quote_qualified_name(field, sources, idx)
   end
 
-  defp expr({:&, _, [idx, fields, _counter]}, sources, query) do
+  defp expr({:&, _, [idx, fields, _counter]}, sources, _params, query) do
     {_, name, schema} = elem(sources, idx)
 
     if is_nil(schema) and is_nil(fields) do
@@ -329,18 +330,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     intersperce_map(fields, ", ", &[name, ?. | quote_name(&1)])
   end
 
-  defp expr({:in, _, [_left, []]}, _sources, _query), do: "0"
+  defp expr({:in, _, [_left, []]}, _sources, _params, _query), do: "0"
 
-  defp expr({:in, _, [left, right]}, sources, query) when is_list(right) do
-    args = intersperce_map(right, ?,, &expr(&1, sources, query))
-    [expr(left, sources, query), " IN (", args, ?)]
+  defp expr({:in, _, [left, right]}, sources, params, query) when is_list(right) do
+    args = intersperce_map(right, ?,, &expr(&1, sources, params, query))
+    [expr(left, sources, params, query), " IN (", args, ?)]
   end
 
-  defp expr({:in, _, [_, {:^, _, [_, 0]}]}, _sources, _query), do: "0"
+  defp expr({:in, _, [_, {:^, _, [_, 0]}]}, _sources, _params, _query), do: "0"
 
-  defp expr({:in, _, [left, %Tagged{value: {:^, [], [ix]}, type: type}]}, sources, query) do
+  # TODO
+  defp expr({:in, _, [left, %Tagged{value: {:^, [], [ix]}, type: type}]}, sources, params, query) do
     [
-      expr(left, sources, query),
+      expr(left, sources, params, query),
       " IN {$",
       Integer.to_string(ix),
       ":Array(",
@@ -349,45 +351,52 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ]
   end
 
-  defp expr({:in, _, [_left, {:^, [], [_ix]}]}, _sources, query) do
-    error!(query, "untyped array param")
+  defp expr({:in, _, [left, {:^, [], [ix]}]}, sources, params, query) do
+    [
+      expr(left, sources, params, query),
+      " IN {$",
+      Integer.to_string(ix),
+      ?:,
+      param_type_at(params, ix),
+      ?}
+    ]
   end
 
-  defp expr({:in, _, [left, right]}, sources, query) do
-    [expr(left, sources, query), " =ANY(", expr(right, sources, query), ?)]
+  defp expr({:in, _, [left, right]}, sources, params, query) do
+    [expr(left, sources, params, query), " =ANY(", expr(right, sources, params, query), ?)]
   end
 
-  defp expr({:is_nil, _, [arg]}, sources, query) do
-    [expr(arg, sources, query) | " IS NULL"]
+  defp expr({:is_nil, _, [arg]}, sources, params, query) do
+    [expr(arg, sources, params, query) | " IS NULL"]
   end
 
-  defp expr({:not, _, [expr]}, sources, query) do
+  defp expr({:not, _, [expr]}, sources, params, query) do
     case expr do
-      {fun, _, _} when fun in @binary_ops -> ["NOT (", expr(expr, sources, query), ?)]
-      _ -> ["~(", expr(expr, sources, query), ?)]
+      {fun, _, _} when fun in @binary_ops -> ["NOT (", expr(expr, sources, params, query), ?)]
+      _ -> ["~(", expr(expr, sources, params, query), ?)]
     end
   end
 
-  # TODO counter?
-  defp expr(%SubQuery{query: query, params: _}, _sources, _query) do
+  defp expr(%SubQuery{query: query, params: _}, _sources, _params, _query) do
     all(query)
   end
 
-  defp expr({:fragment, _, [kw]}, sources, query) when is_list(kw) or tuple_size(kw) == 3 do
+  defp expr({:fragment, _, [kw]}, sources, params, query)
+       when is_list(kw) or tuple_size(kw) == 3 do
     Enum.reduce(kw, query, fn {k, {op, v}}, query ->
       # TODO what's that?
-      expr({op, nil, [k, v]}, sources, query)
+      expr({op, nil, [k, v]}, sources, params, query)
     end)
   end
 
-  defp expr({:fragment, _, parts}, sources, query) do
+  defp expr({:fragment, _, parts}, sources, params, query) do
     Enum.map(parts, fn
       {:raw, part} -> part
-      {:expr, expr} -> expr(expr, sources, query)
+      {:expr, expr} -> expr(expr, sources, params, query)
     end)
   end
 
-  defp expr({fun, _, args}, sources, query) when is_atom(fun) and is_list(args) do
+  defp expr({fun, _, args}, sources, params, query) when is_atom(fun) and is_list(args) do
     {modifier, args} =
       case args do
         [rest, :distinct] -> {"DISTINCT ", [rest]}
@@ -397,58 +406,66 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     case handle_call(fun, length(args)) do
       {:binary_op, op} ->
         [left, right] = args
-        [op_to_binary(left, sources, query), op | op_to_binary(right, sources, query)]
+
+        [
+          op_to_binary(left, sources, params, query),
+          op | op_to_binary(right, sources, params, query)
+        ]
 
       {:fun, fun} ->
-        [fun, ?(, modifier, intersperce_map(args, ", ", &expr(&1, sources, query)), ?)]
+        [fun, ?(, modifier, intersperce_map(args, ", ", &expr(&1, sources, params, query)), ?)]
     end
   end
 
-  defp expr({:count, _, []}, _sources, _query), do: "count(*)"
+  defp expr({:count, _, []}, _sources, _params, _query), do: "count(*)"
 
-  defp expr(list, sources, query) when is_list(list) do
-    ["ARRAY[", intersperce_map(list, ?,, &expr(&1, sources, query)), ?]]
+  defp expr(list, sources, params, query) when is_list(list) do
+    ["ARRAY[", intersperce_map(list, ?,, &expr(&1, sources, params, query)), ?]]
   end
 
-  defp expr(%Decimal{} = decimal, _sources, _query) do
+  defp expr(%Decimal{} = decimal, _sources, _params, _query) do
     Decimal.to_string(decimal, :normal)
   end
 
-  defp expr(%Tagged{value: binary, type: :binary}, _sources, _query)
+  defp expr(%Tagged{value: binary, type: :binary}, _sources, _params, _query)
        when is_binary(binary) do
     ["0x" | Base.encode16(binary, case: :lower)]
   end
 
-  defp expr(%Tagged{value: {:^, [], [ix]}, type: type}, _sources, _query) do
+  defp expr(%Tagged{value: {:^, [], [ix]}, type: type}, _sources, _params, _query) do
     ["{$", Integer.to_string(ix), ?:, tagged_to_db(type), ?}]
   end
 
-  defp expr(%Tagged{value: value, type: type}, sources, query) do
-    ["CAST(", expr(value, sources, query), " AS ", tagged_to_db(type), ?)]
+  defp expr(%Tagged{value: value, type: type}, sources, params, query) do
+    ["CAST(", expr(value, sources, params, query), " AS ", tagged_to_db(type), ?)]
   end
 
-  defp expr(nil, _sources, _query), do: "NULL"
-  defp expr(true, _sources, _query), do: "1"
-  defp expr(false, _sources, _query), do: "0"
+  defp expr(nil, _sources, _params, _query), do: "NULL"
+  defp expr(true, _sources, _params, _query), do: "1"
+  defp expr(false, _sources, _params, _query), do: "0"
 
-  defp expr(literal, _sources, _query) when is_binary(literal) do
+  defp expr(literal, _sources, _params, _query) when is_binary(literal) do
     [?\', escape_string(literal), ?\']
   end
 
-  defp expr(literal, _sources, _query) when is_integer(literal), do: Integer.to_string(literal)
-  defp expr(literal, _sources, _query) when is_float(literal), do: Float.to_string(literal)
-  defp expr(literal, _sources, _query) when is_atom(literal), do: Atom.to_string(literal)
+  defp expr(literal, _sources, _params, _query) when is_integer(literal),
+    do: Integer.to_string(literal)
+
+  defp expr(literal, _sources, _params, _query) when is_float(literal),
+    do: Float.to_string(literal)
+
+  defp expr(literal, _sources, _params, _query) when is_atom(literal), do: Atom.to_string(literal)
 
   # defp interal(count, _interval, sources, query) do
   #   [expr(count, sources, query)]
   # end
 
-  defp op_to_binary({op, _, [_, _]} = expr, sources, query) when op in @binary_ops do
-    paren_expr(expr, sources, query)
+  defp op_to_binary({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
+    paren_expr(expr, sources, params, query)
   end
 
-  defp op_to_binary(expr, sources, query) do
-    expr(expr, sources, query)
+  defp op_to_binary(expr, sources, params, query) do
+    expr(expr, sources, params, query)
   end
 
   defp create_names(%{sources: sources}) do
@@ -537,9 +554,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     raise Ecto.QueryError, query: query, message: message
   end
 
-  defp get_source(query, sources, ix, source) do
+  defp get_source(query, sources, params, ix, source) do
     {expr, name, _schema} = elem(sources, ix)
-    {expr || paren_expr(source, sources, query), name}
+    {expr || paren_expr(source, sources, params, query), name}
   end
 
   defp tagged_to_db(:integer), do: "Int64"
@@ -577,4 +594,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db(:naive_datetime), do: "DateTime"
   defp ecto_to_db(:timestamp), do: "DateTime"
   defp ecto_to_db(other), do: Atom.to_string(other)
+
+  defp param_type_at(params, ix) do
+    value = Enum.at(params, ix)
+    IO.inspect(value, label: "param at #{ix}")
+    ch_typeof(value)
+  end
+
+  defp ch_typeof(s) when is_binary(s), do: "String"
+  defp ch_typeof(i) when is_integer(i), do: "Int64"
+  defp ch_typeof(f) when is_float(f), do: "Float64"
+  defp ch_typeof(%DateTime{}), do: "DateTime"
+  defp ch_typeof(%Date{}), do: "Date"
+  defp ch_typeof(%NaiveDateTime{}), do: "DateTime"
+  defp ch_typeof([v | _]), do: ["Array(", ch_typeof(v), ?)]
 end
