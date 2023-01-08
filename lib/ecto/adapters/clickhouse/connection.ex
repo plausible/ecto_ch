@@ -11,12 +11,21 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
     query = Ch.Query.build(statement, opts)
-    DBConnection.prepare_execute(conn, query, params, opts)
+
+    with {:ok, query, [_status, _headers | data]} <-
+           DBConnection.prepare_execute(conn, query, params, opts) do
+      rows = data |> IO.iodata_to_binary() |> Ch.Protocol.decode_rows()
+      {:ok, query, %{rows: rows, num_rows: length(rows)}}
+    end
   end
 
   @impl true
   def execute(conn, query, params, opts) do
-    DBConnection.execute(conn, query, params, opts)
+    with {:ok, query, [_status, _headers | data]} <-
+           DBConnection.execute(conn, query, params, opts) do
+      rows = data |> IO.iodata_to_binary() |> Ch.Protocol.decode_rows()
+      {:ok, query, %{rows: rows, num_rows: length(rows)}}
+    end
   end
 
   @impl true
@@ -51,7 +60,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     order_by = order_by(query, sources)
     limit = limit(query, sources)
     offset = offset(query, sources)
-    [select, from, join, where, group_by, having, order_by, limit, offset]
+
+    [
+      select,
+      from,
+      join,
+      where,
+      group_by,
+      having,
+      order_by,
+      limit,
+      offset
+      | " FORMAT RowBinaryWithNamesAndTypes"
+    ]
   end
 
   @impl true

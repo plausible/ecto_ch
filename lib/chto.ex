@@ -5,6 +5,8 @@ defmodule Chto do
           {:ok, count :: non_neg_integer} | {:error, Exception.t()}
   def insert_stream(repo, table, rows, opts \\ []) do
     {statement, opts} = build_insert(table, opts)
+    types = opts[:types] || raise "missing :types for insert"
+    rows = Stream.map(rows, fn row -> Ch.Protocol.encode_row(row, types) end)
 
     with {:ok, %{num_rows: num_rows}} <- repo.query(statement, rows, opts) do
       {:ok, num_rows}
@@ -20,7 +22,7 @@ defmodule Chto do
         _none -> []
       end
 
-    statement = ["INSERT INTO ", quote_name(table) | fields]
+    statement = ["INSERT INTO ", quote_name(table), fields | " FORMAT RowBinary"]
     opts = put_in(opts, [:command], :insert)
     {statement, opts}
   end
