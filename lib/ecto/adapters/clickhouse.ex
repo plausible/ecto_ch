@@ -33,16 +33,21 @@ defmodule Ecto.Adapters.ClickHouse do
     ]
   end
 
-  def insert_stream(repo, table, rows, opts) when is_binary(table) do
-    prefix = opts[:prefix]
-    {statement, opts} = build_insert(prefix, table, opts)
+  def insert_stream(repo, table, rows, opts) do
+    {statement, opts} = build_insert(table, opts)
+    opts = put_in(opts, [:command], :insert)
 
     with {:ok, %{num_rows: num_rows}} <- Ecto.Adapters.SQL.query(repo, statement, rows, opts) do
       {:ok, num_rows}
     end
   end
 
-  def insert_stream(repo, schema, rows, opts) when is_atom(schema) do
+  defp build_insert(table, opts) when is_binary(table) do
+    statement = build_insert_statement(opts[:prefix], table, opts[:fields])
+    {statement, opts}
+  end
+
+  defp build_insert(schema, opts) when is_atom(schema) do
     prefix = schema.__schema__(:prefix)
     table = schema.__schema__(:source)
     fields = schema.__schema__(:fields)
@@ -52,11 +57,21 @@ defmodule Ecto.Adapters.ClickHouse do
         :type |> schema.__schema__(field) |> Ecto.Type.type() |> remap_type()
       end)
 
-    opts = [fields: fields, types: types] ++ opts
-    {statement, opts} = build_insert(prefix, table, opts)
+    statement = build_insert_statement(prefix, table, fields)
+    opts = put_in(opts, [:types], types)
+    {statement, opts}
+  end
 
-    with {:ok, %{num_rows: num_rows}} <- Ecto.Adapters.SQL.query(repo, statement, rows, opts) do
-      {:ok, num_rows}
+  # used in benchmark
+  @doc false
+  def build_insert_statement(prefix, table, fields) do
+    ["INSERT INTO ", quote_table(prefix, table) | encode_fields(fields)]
+  end
+
+  defp encode_fields(fields) do
+    case fields do
+      [_ | _] = fields -> [?(, intersperce_map(fields, ?,, &quote_name/1), ?)]
+      _none -> []
     end
   end
 
@@ -67,20 +82,6 @@ defmodule Ecto.Adapters.ClickHouse do
   # TODO
   defp remap_type(:naive_datetime), do: :datetime
   defp remap_type(other), do: other
-
-  # used in benchmark
-  @doc false
-  def build_insert(prefix, table, opts) do
-    fields =
-      case opts[:fields] do
-        [_ | _] = fields -> [?(, intersperce_map(fields, ?,, &quote_name/1), ?)]
-        _none -> []
-      end
-
-    statement = ["INSERT INTO ", quote_table(prefix, table) | fields]
-    opts = put_in(opts, [:command], :insert)
-    {statement, opts}
-  end
 
   defp intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]
 
