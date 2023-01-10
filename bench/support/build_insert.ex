@@ -13,7 +13,7 @@ defmodule Bench.BuildInsert do
         ],
         " FORMAT ",
         "RowBinary",
-        32,
+        10,
         [<<1>>, <<2>>]
       ]
 
@@ -23,7 +23,7 @@ defmodule Bench.BuildInsert do
     types = opts[:types] || raise "missing :types for #{inspect(statement)}"
     format = opts[:format] || "RowBinary"
     rows = Ch.RowBinary.encode_rows(rows, types)
-    [statement, " FORMAT ", format, ?\s | rows]
+    [statement, " FORMAT ", format, ?\n | rows]
   end
 
   @doc """
