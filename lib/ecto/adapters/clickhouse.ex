@@ -43,12 +43,13 @@ defmodule Ecto.Adapters.ClickHouse do
     end
   end
 
-  defp build_insert(table, opts) when is_binary(table) do
+  @doc false
+  def build_insert(table, opts) when is_binary(table) do
     statement = build_insert_statement(opts[:prefix], table, opts[:fields])
     {statement, opts}
   end
 
-  defp build_insert(schema, opts) when is_atom(schema) do
+  def build_insert(schema, opts) when is_atom(schema) do
     prefix = schema.__schema__(:prefix)
     table = schema.__schema__(:source)
     fields = schema.__schema__(:fields)
@@ -63,17 +64,14 @@ defmodule Ecto.Adapters.ClickHouse do
     {statement, opts}
   end
 
-  # used in benchmark
-  @doc false
-  def build_insert_statement(prefix, table, fields) do
-    ["INSERT INTO ", @conn.quote_table(prefix, table) | encode_fields(fields)]
-  end
+  defp build_insert_statement(prefix, table, fields) do
+    fields =
+      case fields do
+        [_ | _] = fields -> [?(, @conn.intersperce_map(fields, ?,, &@conn.quote_name/1), ?)]
+        _none -> []
+      end
 
-  defp encode_fields(fields) do
-    case fields do
-      [_ | _] = fields -> [?(, @conn.intersperce_map(fields, ?,, &@conn.quote_name/1), ?)]
-      _none -> []
-    end
+    ["INSERT INTO ", @conn.quote_table(prefix, table) | fields]
   end
 
   # TODO
