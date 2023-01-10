@@ -9,8 +9,7 @@ defmodule Dev do
       field :c, :naive_datetime
       field :d, {:array, :string}
       field :e, {:array, Ch.Types.Int8}
-      # or Ch.Types.FixedString, size: 2
-      field :f, {:string, 2}
+      field :f, Ch.Types.FixedString, size: 2
     end
   end
 end

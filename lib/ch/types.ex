@@ -29,7 +29,26 @@ for {type, name, base} <- basic_types do
   end
 end
 
-# TODO
 defmodule Ch.Types.FixedString do
   use Ecto.ParameterizedType
+
+  # TODO
+  @impl true
+  def type(size), do: {:string, size}
+
+  @impl true
+  def init(opts) do
+    size = Keyword.fetch!(opts, :size)
+    (is_integer(size) and size > 0) || raise ":size needs to be a positive integer"
+    size
+  end
+
+  @impl true
+  def cast(value, _size), do: Ecto.Type.cast(:string, value)
+
+  @impl true
+  def dump(value, _dumper, _size), do: Ecto.Type.dump(:string, value)
+
+  @impl true
+  def load(value, _loader, _size), do: Ecto.Type.load(:string, value)
 end
