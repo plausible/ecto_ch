@@ -1,2 +1,2 @@
 import_if_available(Ecto.Query)
-alias Dev.Repo
+alias Dev.{Repo, Example}

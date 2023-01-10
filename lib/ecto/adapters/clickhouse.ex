@@ -33,24 +33,51 @@ defmodule Ecto.Adapters.ClickHouse do
     ]
   end
 
-  def insert_stream(repo, table_or_schema, rows, opts) do
-    {statement, opts} = build_insert(table_or_schema, opts)
+  def insert_stream(repo, table, rows, opts) when is_binary(table) do
+    prefix = opts[:prefix]
+    {statement, opts} = build_insert(prefix, table, opts)
 
     with {:ok, %{num_rows: num_rows}} <- Ecto.Adapters.SQL.query(repo, statement, rows, opts) do
       {:ok, num_rows}
     end
   end
 
+  def insert_stream(repo, schema, rows, opts) when is_atom(schema) do
+    prefix = schema.__schema__(:prefix)
+    table = schema.__schema__(:source)
+    fields = schema.__schema__(:fields)
+
+    types =
+      Enum.map(fields, fn field ->
+        :type |> schema.__schema__(field) |> Ecto.Type.type() |> remap_type()
+      end)
+
+    opts = [fields: fields, types: types] ++ opts
+    {statement, opts} = build_insert(prefix, table, opts)
+
+    with {:ok, %{num_rows: num_rows}} <- Ecto.Adapters.SQL.query(repo, statement, rows, opts) do
+      {:ok, num_rows}
+    end
+  end
+
+  defp quote_table(prefix, name)
+  defp quote_table(nil, name), do: quote_name(name)
+  defp quote_table(prefix, name), do: [quote_name(prefix), ?., quote_name(name)]
+
+  # TODO
+  defp remap_type(:naive_datetime), do: :datetime
+  defp remap_type(other), do: other
+
   # used in benchmark
   @doc false
-  def build_insert(table, opts) do
+  def build_insert(prefix, table, opts) do
     fields =
       case opts[:fields] do
         [_ | _] = fields -> [?(, intersperce_map(fields, ?,, &quote_name/1), ?)]
         _none -> []
       end
 
-    statement = ["INSERT INTO ", quote_name(table) | fields]
+    statement = ["INSERT INTO ", quote_table(prefix, table) | fields]
     opts = put_in(opts, [:command], :insert)
     {statement, opts}
   end
