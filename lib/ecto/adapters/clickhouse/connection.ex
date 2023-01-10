@@ -478,29 +478,31 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp create_alias(_), do: ?t
 
-  defp intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]
+  @doc false
+  def intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]
 
-  defp intersperce_map([elem | rest], separator, mapper) do
+  def intersperce_map([elem | rest], separator, mapper) do
     [mapper.(elem), separator | intersperce_map(rest, separator, mapper)]
   end
 
-  defp intersperce_map([], _separator, _mapper), do: []
+  def intersperce_map([], _separator, _mapper), do: []
 
-  defp quote_name(name, quoter \\ ?")
-  defp quote_name(nil, _), do: []
+  @doc false
+  def quote_name(name, quoter \\ ?")
+  def quote_name(nil, _), do: []
 
-  defp quote_name(names, quoter) when is_list(names) do
+  def quote_name(names, quoter) when is_list(names) do
     names
     |> Enum.reject(&is_nil/1)
     |> intersperce_map(?., &quote_name(&1, nil))
     |> wrap_in(quoter)
   end
 
-  defp quote_name(name, quoter) when is_atom(name) do
+  def quote_name(name, quoter) when is_atom(name) do
     name |> Atom.to_string() |> quote_name(quoter)
   end
 
-  defp quote_name(name, quoter) do
+  def quote_name(name, quoter) do
     if String.contains?(name, <<quoter>>) do
       error!(nil, "bad name #{inspect(name)}")
     end
@@ -513,9 +515,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [source, ?. | quote_name(name)]
   end
 
-  defp quote_table(prefix, name)
-  defp quote_table(nil, name), do: quote_name(name)
-  defp quote_table(prefix, name), do: [quote_name(prefix), ?., quote_name(name)]
+  @doc false
+  def quote_table(prefix, name)
+  def quote_table(nil, name), do: quote_name(name)
+  def quote_table(prefix, name), do: [quote_name(prefix), ?., quote_name(name)]
 
   defp wrap_in(value, nil), do: value
   # defp wrap_in(value, {left, right}), do: [left, value, right]

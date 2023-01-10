@@ -1,5 +1,6 @@
 defmodule Ecto.Adapters.ClickHouse do
   use Ecto.Adapters.SQL, driver: :ch
+  @conn __MODULE__.Connection
 
   @impl Ecto.Adapter.Migration
   def supports_ddl_transaction?, do: false
@@ -65,44 +66,17 @@ defmodule Ecto.Adapters.ClickHouse do
   # used in benchmark
   @doc false
   def build_insert_statement(prefix, table, fields) do
-    ["INSERT INTO ", quote_table(prefix, table) | encode_fields(fields)]
+    ["INSERT INTO ", @conn.quote_table(prefix, table) | encode_fields(fields)]
   end
 
   defp encode_fields(fields) do
     case fields do
-      [_ | _] = fields -> [?(, intersperce_map(fields, ?,, &quote_name/1), ?)]
+      [_ | _] = fields -> [?(, @conn.intersperce_map(fields, ?,, &@conn.quote_name/1), ?)]
       _none -> []
     end
   end
 
-  defp quote_table(prefix, name)
-  defp quote_table(nil, name), do: quote_name(name)
-  defp quote_table(prefix, name), do: [quote_name(prefix), ?., quote_name(name)]
-
   # TODO
   defp remap_type(:naive_datetime), do: :datetime
   defp remap_type(other), do: other
-
-  defp intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]
-
-  defp intersperce_map([elem | rest], separator, mapper) do
-    [mapper.(elem), separator | intersperce_map(rest, separator, mapper)]
-  end
-
-  defp intersperce_map([], _separator, _mapper), do: []
-
-  defp quote_name(name, quoter \\ ?")
-  defp quote_name(nil, _), do: []
-
-  defp quote_name(name, quoter) when is_atom(name) do
-    name |> Atom.to_string() |> quote_name(quoter)
-  end
-
-  defp quote_name(name, quoter) do
-    if String.contains?(name, <<quoter>>) do
-      raise "bad name #{inspect(name)}"
-    end
-
-    [quoter, name, quoter]
-  end
 end
