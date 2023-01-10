@@ -12,5 +12,5 @@ end
 simple = prepare.(select("events", [e], e.id))
 
 Benchee.run(%{
-  "simple" => fn -> Ecto.Adapters.ClickHouse.Connection.all(simple) end
+  "simple" => fn -> Ecto.Adapters.ClickHouse.Connection.all(simple, []) end
 })

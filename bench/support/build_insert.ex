@@ -22,7 +22,7 @@ defmodule Bench.BuildInsert do
     {statement, opts} = Chto.build_insert("example", opts)
     types = opts[:types] || raise "missing :types for #{inspect(statement)}"
     format = opts[:format] || "RowBinary"
-    rows = Ch.Protocol.encode_rows(rows, types)
+    rows = Ch.RowBinary.encode_rows(rows, types)
     [statement, " FORMAT ", format, ?\s | rows]
   end
 

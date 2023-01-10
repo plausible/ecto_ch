@@ -35,16 +35,13 @@ defmodule Ecto.Adapters.ClickHouse do
 
   def insert_stream(repo, table_or_schema, rows, opts) do
     {statement, opts} = build_insert(table_or_schema, opts)
-    types = opts[:types] || raise "missing :types for insert"
-    rows = Stream.map(rows, fn row -> Ch.Protocol.encode_row(row, types) end)
 
-    with {:ok, %{num_rows: num_rows}} <-
-           Ecto.Adapters.SQL.query(repo, statement, rows, opts) do
+    with {:ok, %{num_rows: num_rows}} <- Ecto.Adapters.SQL.query(repo, statement, rows, opts) do
       {:ok, num_rows}
     end
   end
 
-  # used for benchmarks
+  # used in benchmark
   @doc false
   def build_insert(table, opts) do
     fields =
@@ -53,7 +50,7 @@ defmodule Ecto.Adapters.ClickHouse do
         _none -> []
       end
 
-    statement = ["INSERT INTO ", quote_name(table), fields | " FORMAT RowBinary"]
+    statement = ["INSERT INTO ", quote_name(table) | fields]
     opts = put_in(opts, [:command], :insert)
     {statement, opts}
   end

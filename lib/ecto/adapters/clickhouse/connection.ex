@@ -11,21 +11,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
     query = Ch.Query.build(statement, opts)
-
-    with {:ok, query, [_status, _headers | data]} <-
-           DBConnection.prepare_execute(conn, query, params, opts) do
-      rows = data |> IO.iodata_to_binary() |> Ch.Protocol.decode_rows()
-      {:ok, query, %{rows: rows, num_rows: length(rows)}}
-    end
+    DBConnection.prepare_execute(conn, query, params, opts)
   end
 
   @impl true
   def execute(conn, query, params, opts) do
-    with {:ok, query, [_status, _headers | data]} <-
-           DBConnection.execute(conn, query, params, opts) do
-      rows = data |> IO.iodata_to_binary() |> Ch.Protocol.decode_rows()
-      {:ok, query, %{rows: rows, num_rows: length(rows)}}
-    end
+    DBConnection.execute(conn, query, params, opts)
   end
 
   @impl true
@@ -33,6 +24,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Ch.query(conn, statement, params, opts)
   end
 
+  # TODO possible to drop it?
   @impl true
   def query_many(_conn, _statement, _params, _opts) do
     raise "not implemented"
@@ -60,19 +52,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     order_by = order_by(query, sources, params)
     limit = limit(query, sources, params)
     offset = offset(query, sources, params)
-
-    [
-      select,
-      from,
-      join,
-      where,
-      group_by,
-      having,
-      order_by,
-      limit,
-      offset
-      | " FORMAT RowBinaryWithNamesAndTypes"
-    ]
+    [select, from, join, where, group_by, having, order_by, limit, offset]
   end
 
   @impl true
@@ -88,8 +68,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # TODO support insert into ... select ... from
   @impl true
   def insert(_prefix, _table, _header, _rows, _on_conflict, _returning, _placeholder) do
-    # TODO note that insert_stream can be used instead?
-    raise "not implemented"
+    raise "not implemented, please use `insert_stream/2` instead"
   end
 
   @impl true
@@ -597,7 +576,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type_at(params, ix) do
     value = Enum.at(params, ix)
-    IO.inspect(value, label: "param at #{ix}")
+    # IO.inspect(value, label: "param at #{ix}")
     ch_typeof(value)
   end
 
