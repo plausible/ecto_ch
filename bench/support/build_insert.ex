@@ -19,7 +19,7 @@ defmodule Bench.BuildInsert do
 
   """
   def chto(rows, opts) do
-    {statement, opts} = Chto.build_insert("example", opts)
+    {statement, opts} = Ecto.Adapters.ClickHouse.build_insert("example", opts)
     types = opts[:types] || raise "missing :types for #{inspect(statement)}"
     format = opts[:format] || "RowBinary"
     rows = Ch.RowBinary.encode_rows(rows, types)
