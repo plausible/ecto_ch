@@ -41,10 +41,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     offset = offset(query, sources, params)
 
     sql = [select, from, join, where, group_by, having, order_by, limit, offset]
-    to_collect = @param_collect |> Process.get() |> :lists.reverse()
-    params = collect_params(to_collect, 0, params)
 
-    {sql, params}
+    if first? do
+      to_collect = @param_collect |> Process.get() |> :lists.reverse()
+      params = collect_params(to_collect, 0, params)
+      {sql, params}
+    else
+      sql
+    end
   end
 
   defp collect_params([{ix, count} | rest], ix, params) do
@@ -540,13 +544,17 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   # TODO
   defp ecto_to_db(:id), do: "UInt32"
+  # TODO
   defp ecto_to_db(:binary_id), do: "FixedString(36)"
+  # TODO
   defp ecto_to_db(:uuid), do: "FixedString(36)"
   defp ecto_to_db(:string), do: "String"
   # TODO
   defp ecto_to_db(:binary), do: "FixedString(4000)"
+  # TODO
   defp ecto_to_db(:integer), do: "Int32"
   defp ecto_to_db(:bigint), do: "Int64"
+  # TODO
   defp ecto_to_db(:float), do: "Float32"
   defp ecto_to_db(:decimal), do: "Float64"
   defp ecto_to_db(:boolean), do: "UInt8"
