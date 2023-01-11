@@ -1,47 +1,34 @@
 defmodule Ecto.Adapters.ClickHouse.Connection do
   @moduledoc false
-  @behaviour Ecto.Adapters.SQL.Connection
   alias Ecto.{Query, SubQuery}
   alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, Tagged}
 
-  # TODO fix childspec type
-  @impl true
-  def child_spec(opts), do: Ch.child_spec(opts)
+  def child_spec(opts) do
+    Ch.child_spec(opts)
+  end
 
-  @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
     query = Ch.Query.build(statement, opts)
     DBConnection.prepare_execute(conn, query, params, opts)
   end
 
-  @impl true
   def execute(conn, query, params, opts) do
     DBConnection.execute(conn, query, params, opts)
   end
 
-  @impl true
   def query(conn, statement, params, opts) do
     Ch.query(conn, statement, params, opts)
   end
 
-  # TODO possible to drop it?
-  @impl true
-  def query_many(_conn, _statement, _params, _opts) do
-    raise "not implemented"
-  end
+  @param_offset :__param_offset
+  @param_collect :__param_collect
 
-  @impl true
-  def stream(_conn, _statement, _params, _opts) do
-    raise "not implemented"
-  end
+  def all(query, params, first? \\ true) do
+    if first? do
+      Process.put(@param_offset, 0)
+      Process.put(@param_collect, [])
+    end
 
-  @impl true
-  def to_constraints(_exception, _opts) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def all(query, params \\ []) do
     sources = create_names(query)
     from = from(query, sources, params)
     select = select(query, sources, params)
@@ -52,63 +39,29 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     order_by = order_by(query, sources, params)
     limit = limit(query, sources, params)
     offset = offset(query, sources, params)
-    [select, from, join, where, group_by, having, order_by, limit, offset]
+
+    sql = [select, from, join, where, group_by, having, order_by, limit, offset]
+    to_collect = @param_collect |> Process.get() |> :lists.reverse()
+    params = collect_params(to_collect, 0, params)
+
+    {sql, params}
   end
 
-  @impl true
-  def update_all(_query) do
-    raise "not implemented"
+  defp collect_params([{ix, count} | rest], ix, params) do
+    {collected, params} = Enum.split(params, count)
+    [collected | collect_params(rest, ix + count, params)]
   end
 
-  @impl true
-  def delete_all(_query) do
-    raise "not implemented"
+  defp collect_params(to_collect, ix, [param | rest]) do
+    [param | collect_params(to_collect, ix + 1, rest)]
   end
+
+  defp collect_params([], _ix, params), do: params
 
   # TODO support insert into ... select ... from
-  @doc false
   def insert(prefix, table, header) do
-    # TODO optimise
-    # included_fields =
-    #   Enum.filter(header, fn value -> Enum.any?(rows, fn row -> value in row end) end)
-
     fields = [?(, intersperce_map(header, ?,, &quote_name/1), ?)]
     ["INSERT INTO ", quote_table(prefix, table) | fields]
-  end
-
-  @impl true
-  def insert(_prefix, _table, _header, _rows, _on_conflict, _returning, _placeholders) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def update(_prefix, _table, _fields, _filters, _returning) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def delete(_prefix, _table, _filters, _returning) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def explain_query(_conn, _query, _params, _opts) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def execute_ddl(_command) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def ddl_logs(_result) do
-    raise "not implemented"
-  end
-
-  @impl true
-  def table_exists_query(_table) do
-    raise "not implemented"
   end
 
   binary_ops = [
@@ -296,7 +249,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:^, [], [ix]}, _sources, params, _query) do
-    ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
+    ["{$", Integer.to_string(ix - Process.get(@param_offset)), ?:, param_type_at(params, ix), ?}]
+  end
+
+  # TODO
+  defp expr({:^, [], [ix, count]}, _sources, params, _query) do
+    to_collect = Process.get(@param_collect)
+    Process.put(@param_collect, [{ix, count} | to_collect])
+    offset = Process.get(@param_offset)
+    Process.put(@param_offset, offset + count - 1)
+    ["{$", Integer.to_string(ix - offset), ":Array(", param_type_at(params, ix), ")}"]
   end
 
   defp expr({{:., _, [{:&, _, [idx]}, field]}, _, []}, sources, _params, _query)
@@ -334,7 +296,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [
       expr(left, sources, params, query),
       " IN {$",
-      Integer.to_string(ix),
+      Integer.to_string(ix - Process.get(@param_offset)),
       ":Array(",
       tagged_to_db(type),
       ")}"
@@ -345,15 +307,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [
       expr(left, sources, params, query),
       " IN {$",
-      Integer.to_string(ix),
+      Integer.to_string(ix - Process.get(@param_offset)),
       ?:,
       param_type_at(params, ix),
       ?}
     ]
   end
 
+  # TODO vs =ANY()
   defp expr({:in, _, [left, right]}, sources, params, query) do
-    [expr(left, sources, params, query), " =ANY(", expr(right, sources, params, query), ?)]
+    [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
   end
 
   defp expr({:is_nil, _, [arg]}, sources, params, query) do
@@ -368,8 +331,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  defp expr(%SubQuery{query: query, params: _}, _sources, _params, _query) do
-    all(query)
+  # TODO params or params?
+  defp expr(%SubQuery{query: query, params: _}, _sources, params, _query) do
+    all(query, params, false)
   end
 
   defp expr({:fragment, _, [kw]}, sources, params, query)
@@ -426,7 +390,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr(%Tagged{value: {:^, [], [ix]}, type: type}, _sources, _params, _query) do
-    ["{$", Integer.to_string(ix), ?:, tagged_to_db(type), ?}]
+    ["{$", Integer.to_string(ix - Process.get(@param_offset)), ?:, tagged_to_db(type), ?}]
   end
 
   defp expr(%Tagged{value: value, type: type}, sources, params, query) do
@@ -594,7 +558,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type_at(params, ix) do
     value = Enum.at(params, ix)
-    # IO.inspect(value, label: "param at #{ix}")
     ch_typeof(value)
   end
 

@@ -7,17 +7,17 @@ defmodule ChtoTest do
     test "select one column" do
       query = select("events", [e], e.name)
       # TODO drop AS?
-      assert all(query) == ~s[SELECT e0."name" FROM "events" AS e0]
+      assert all(query) == {~s[SELECT e0."name" FROM "events" AS e0], []}
     end
 
     test "select two columns" do
       query = select("events", [e], map(e, [:name, :user_id]))
-      assert all(query) == ~s[SELECT e0."name",e0."user_id" FROM "events" AS e0]
+      assert all(query) == {~s[SELECT e0."name",e0."user_id" FROM "events" AS e0], []}
     end
 
     test "limit" do
       query = "events" |> select([e], e.name) |> limit(1)
-      assert all(query) == ~s[SELECT e0."name" FROM "events" AS e0 LIMIT 1]
+      assert all(query) == {~s[SELECT e0."name" FROM "events" AS e0 LIMIT 1], []}
     end
 
     test "where with typed param" do
@@ -31,7 +31,8 @@ defmodule ChtoTest do
         |> select([e], e.user_id)
 
       assert all(query) ==
-               ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" = {$0:String}) AND (e0."user_id" > {$1:Int64})]
+               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" = {$0:String}) AND (e0."user_id" > {$1:Int64})],
+                ["John", 10]}
     end
 
     test "where with fragment" do
@@ -42,7 +43,28 @@ defmodule ChtoTest do
         |> where([e], fragment("name = ?", ^name))
         |> select([e], e.user_id)
 
-      assert all(query) == ~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (name = {$0:String})]
+      assert all(query) ==
+               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (name = {$0:String})], ["John"]}
+    end
+
+    test "where in" do
+      domains = ["dummy.site", "dummy2.site"]
+      date_range = %{first: ~D[2020-10-10], last: ~D[2021-01-01]}
+
+      query =
+        from e in "events",
+          where: e.domain in ^domains,
+          where: fragment("toDate(?)", e.timestamp) >= ^date_range.first,
+          where: fragment("toDate(?)", e.timestamp) <= ^date_range.last,
+          select: {
+            fragment("countIf(? = 'pageview')", e.name),
+            fragment("countIf(? != 'pageview')", e.name)
+          }
+
+      # TODO =ANY() vs in
+      assert all(query) ==
+               {"SELECT countIf(e0.\"name\" = 'pageview'),countIf(e0.\"name\" != 'pageview') FROM \"events\" AS e0 WHERE (e0.\"domain\" IN {$0:Array(String)}) AND (toDate(e0.\"timestamp\") >= {$1:Date}) AND (toDate(e0.\"timestamp\") <= {$2:Date})",
+                [["dummy.site", "dummy2.site"], ~D[2020-10-10], ~D[2021-01-01]]}
     end
   end
 
@@ -184,7 +206,8 @@ defmodule ChtoTest do
     {query, params, _key} = Ecto.Query.Planner.plan(query, :all, Ecto.Adapters.ClickHouse)
     {query, _} = Ecto.Query.Planner.normalize(query, :all, Ecto.Adapters.ClickHouse, _counter = 0)
     {dump_params, _} = Enum.unzip(params)
-    IO.iodata_to_binary(f.(query, dump_params))
+    {sql, params} = f.(query, dump_params)
+    {IO.iodata_to_binary(sql), params}
   end
 
   def i(query) do

@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.ClickHouse do
+  @moduledoc "TODO"
   # TODO fix warnings
   use Ecto.Adapters.SQL, driver: :ch
   @conn __MODULE__.Connection
@@ -18,9 +19,10 @@ defmodule Ecto.Adapters.ClickHouse do
   def prepare(_operation, query), do: {:nocache, query}
 
   @impl Ecto.Adapter.Queryable
-  def execute(adapter_meta, query_meta, {:nocache, query} = q, params, opts) do
-    q = put_elem(q, 1, {_id = 0, @conn.all(query, params)})
-    Ecto.Adapters.SQL.execute(:unnamed, adapter_meta, query_meta, q, params, opts)
+  def execute(adapter_meta, query_meta, {:nocache, query} = prepared, params, opts) do
+    {sql, params} = @conn.all(query, params)
+    prepared = put_elem(prepared, 1, {_id = 0, sql})
+    Ecto.Adapters.SQL.execute(:unnamed, adapter_meta, query_meta, prepared, params, opts)
   end
 
   @impl Ecto.Adapter
@@ -52,7 +54,7 @@ defmodule Ecto.Adapters.ClickHouse do
       if schema do
         extract_types(schema, header)
       else
-        opts[:types] || "missing :types"
+        opts[:types] || raise "missing :types"
       end
 
     # TODO support queries like INSERT INTO ... SELECT FROM
