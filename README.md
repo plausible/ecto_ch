@@ -39,6 +39,9 @@ iex> defmodule Example do
 iex> Repo.insert_stream(Example, rows)
 {:ok, _written_rows = 3}
 
+iex> Repo.insert_all(Example, [%{a: 5, b: "5"}, %{a: 6}])
+{2, nil}
+
 iex> Example |> limit(2) |> Repo.all()
 [
   %Example{

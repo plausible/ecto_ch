@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.ClickHouse do
+  # TODO fix warnings
   use Ecto.Adapters.SQL, driver: :ch
   @conn __MODULE__.Connection
 
@@ -34,6 +35,67 @@ defmodule Ecto.Adapters.ClickHouse do
     ]
   end
 
+  @impl Ecto.Adapter.Schema
+  def insert_all(
+        adapter_meta,
+        schema_meta,
+        header,
+        rows,
+        _on_conflict,
+        _returning,
+        _placeholders,
+        opts
+      ) do
+    %{source: source, prefix: prefix, schema: schema} = schema_meta
+
+    types =
+      if schema do
+        extract_types(schema, header)
+      else
+        opts[:types] || "missing :types"
+      end
+
+    # TODO support queries like INSERT INTO ... SELECT FROM
+    rows = unzip_insert(rows, header)
+    sql = @conn.insert(prefix, source, header)
+    opts = [{:types, types}, {:command, :insert} | opts]
+
+    %{num_rows: num, rows: rows} = Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+    {num, rows}
+  end
+
+  # TODO support queries and placeholders, benchmark
+  defp unzip_insert([row | rows], header) do
+    [unzip_row(header, row) | unzip_insert(rows, header)]
+  end
+
+  defp unzip_insert([], _header), do: []
+
+  defp unzip_row([field | fields], row) do
+    case :lists.keyfind(field, 1, row) do
+      {_, value} -> [value | unzip_row(fields, row)]
+      false -> [nil | unzip_row(fields, row)]
+    end
+  end
+
+  defp unzip_row([], _row), do: []
+
+  # TODO
+  @impl Ecto.Adapter.Schema
+  def insert(_adapter_meta, _schema_meta, _params, _on_conflict, _returning, _opts) do
+    raise "not implemented, please use insert_all/2 or insert_stream/2 instead"
+  end
+
+  @impl Ecto.Adapter.Schema
+  def update(_adapter_meta, _schema_meta, _fields, _params, _returning, _opts) do
+    raise "not implemented"
+  end
+
+  @impl Ecto.Adapter.Schema
+  def delete(_adapter_meta, _schema_meta, _params, _opts) do
+    raise "not implemented"
+  end
+
   def insert_stream(repo, table, rows, opts) do
     {statement, opts} = build_insert(table, opts)
     opts = put_in(opts, [:command], :insert)
@@ -53,12 +115,7 @@ defmodule Ecto.Adapters.ClickHouse do
     prefix = schema.__schema__(:prefix)
     table = schema.__schema__(:source)
     fields = schema.__schema__(:fields)
-
-    types =
-      Enum.map(fields, fn field ->
-        :type |> schema.__schema__(field) |> Ecto.Type.type() |> remap_type()
-      end)
-
+    types = extract_types(schema, fields)
     statement = build_insert_statement(prefix, table, fields)
     opts = put_in(opts, [:types], types)
     {statement, opts}
@@ -72,6 +129,12 @@ defmodule Ecto.Adapters.ClickHouse do
       end
 
     ["INSERT INTO ", @conn.quote_table(prefix, table) | fields]
+  end
+
+  defp extract_types(schema, fields) do
+    Enum.map(fields, fn field ->
+      :type |> schema.__schema__(field) |> Ecto.Type.type() |> remap_type()
+    end)
   end
 
   # TODO

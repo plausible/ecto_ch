@@ -32,7 +32,7 @@ end
 defmodule Ch.Types.FixedString do
   use Ecto.ParameterizedType
 
-  # TODO
+  # TODO fix warning
   @impl true
   def type(size), do: {:string, size}
 

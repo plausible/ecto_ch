@@ -66,9 +66,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   # TODO support insert into ... select ... from
+  @doc false
+  def insert(prefix, table, header) do
+    # TODO optimise
+    # included_fields =
+    #   Enum.filter(header, fn value -> Enum.any?(rows, fn row -> value in row end) end)
+
+    fields = [?(, intersperce_map(header, ?,, &quote_name/1), ?)]
+    ["INSERT INTO ", quote_table(prefix, table) | fields]
+  end
+
   @impl true
-  def insert(_prefix, _table, _header, _rows, _on_conflict, _returning, _placeholder) do
-    raise "not implemented, please use `insert_stream/2` instead"
+  def insert(_prefix, _table, _header, _rows, _on_conflict, _returning, _placeholders) do
+    raise "not implemented"
   end
 
   @impl true
@@ -228,6 +238,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
     case dir do
       :asc -> str
+      # TODO silence warning
       :desc -> [str | " DESC"]
     end
   end
@@ -346,6 +357,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:is_nil, _, [arg]}, sources, params, query) do
+    # TODO silence warning
     [expr(arg, sources, params, query) | " IS NULL"]
   end
 
@@ -406,8 +418,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Decimal.to_string(decimal, :normal)
   end
 
+  # TOOD needed?
   defp expr(%Tagged{value: binary, type: :binary}, _sources, _params, _query)
        when is_binary(binary) do
+    # TODO silence warning
     ["0x" | Base.encode16(binary, case: :lower)]
   end
 
@@ -457,6 +471,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp create_names(_sources, size, size), do: []
 
+  # TODO silence warnings
   defp create_name(sources, pos) do
     case elem(sources, pos) do
       {:fragment, _, _} ->
