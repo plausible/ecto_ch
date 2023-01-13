@@ -20,14 +20,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Ch.query(conn, statement, params, opts)
   end
 
-  @param_offset :__param_offset
-  @param_collect :__param_collect
-
-  def all(query, params, first? \\ true) do
-    if first? do
-      Process.put(@param_offset, 0)
-      Process.put(@param_collect, [])
-    end
+  def all(query, params, counter_offset \\ 0) do
+    {query, params} = restore_params(:all, query, params, counter_offset)
 
     sources = create_names(query)
     from = from(query, sources, params)
@@ -41,11 +35,225 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     offset = offset(query, sources, params)
 
     sql = [select, from, join, where, group_by, having, order_by, limit, offset]
-    to_collect = @param_collect |> Process.get() |> :lists.reverse()
-    params = collect_params(to_collect, 0, params)
-
     {sql, params}
   end
+
+  @all_exprs [
+    with_cte: :with_ctes,
+    distinct: :distinct,
+    select: :select,
+    from: :from,
+    join: :joins,
+    where: :wheres,
+    group_by: :group_bys,
+    having: :havings,
+    windows: :windows,
+    combination: :combinations,
+    order_by: :order_bys,
+    limit: :limit,
+    offset: :offset
+  ]
+
+  # Although joins come before updates in the actual query,
+  # the on fields are moved to where, so they effectively
+  # need to come later for MySQL. This means subqueries
+  # with parameters are not supported as a join on MySQL.
+  # The only way to address it is by splitting how join
+  # and their on expressions are processed.
+  @update_all_exprs [
+    with_cte: :with_ctes,
+    from: :from,
+    update: :updates,
+    join: :joins,
+    where: :wheres,
+    select: :select
+  ]
+
+  @delete_all_exprs [
+    with_cte: :with_ctes,
+    from: :from,
+    join: :joins,
+    where: :wheres,
+    select: :select
+  ]
+
+  # Traverse all query components with expressions.
+  # Therefore from, preload, assocs and lock are not traversed.
+  defp traverse_exprs(query, operation, acc, fun) do
+    exprs =
+      case operation do
+        :all -> @all_exprs
+        :insert_all -> @all_exprs
+        :update_all -> @update_all_exprs
+        :delete_all -> @delete_all_exprs
+      end
+
+    Enum.reduce(exprs, {query, acc}, fn {kind, key}, {query, acc} ->
+      {traversed, acc} = fun.(kind, query, Map.fetch!(query, key), acc)
+      {%{query | key => traversed}, acc}
+    end)
+  end
+
+  def restore_params(operation, query, params, counter_offset) do
+    {collect, _offset} =
+      traverse_exprs(query, operation, {[], counter_offset}, fn kind, _, expr, acc ->
+        {collect, offset} = acc
+
+        case expr do
+          %{expr: expr} -> restore_expr(expr, collect, offset)
+          exprs when is_list(exprs) -> restore_exprs(exprs, collect, offset, [])
+          nil -> {expr, acc}
+        end
+      end)
+
+    collect_params(collect, 0, params)
+  end
+
+  defp restore_exprs([expr | rest], collect, offset, acc) do
+    {expr, collect, offset} = restore_expr(expr, collect, offset)
+    restore_expr(rest, collect, offset, [expr | acc])
+  end
+
+  defp restore_exprs([], collect, offset, acc) do
+    {:lists.reverse(acc), collect, offset}
+  end
+
+  defp restore_expr({:^, [], [ix]}, collect, offset) do
+    {{:^, [], [ix - offset]}, {collect, offset}}
+  end
+
+  defp restore_expr({:^, [], [ix, count]}, collect, offset) do
+    {{:^, [], [ix - offset, count]}, {[{ix, count} | collect], offset + count - 1}}
+  end
+
+  # TODO
+  defp restore_expr(
+         {:in, _, [_left, %Tagged{value: {:^, [], [ix]}, type: type} = tagged]} = expr,
+         collect,
+         offset
+       ) do
+    expr = put_elem(expr, 2, [left, %{tagged | value: {:^, [], [idx - offset]}}])
+    {expr, {collect, offset}}
+
+    [
+      expr(left, sources, params, query),
+      " IN {$",
+      Integer.to_string(ix - Process.get(@param_offset)),
+      ":Array(",
+      tagged_to_db(type),
+      ")}"
+    ]
+  end
+
+  defp expr({:in, _, [left, {:^, [], [ix]}]}, sources, params, query) do
+    [
+      expr(left, sources, params, query),
+      " IN {$",
+      Integer.to_string(ix - Process.get(@param_offset)),
+      ?:,
+      param_type_at(params, ix),
+      ?}
+    ]
+  end
+
+  # TODO vs =ANY()
+  defp expr({:in, _, [left, right]}, sources, params, query) do
+    [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
+  end
+
+  defp expr({:is_nil, _, [arg]}, sources, params, query) do
+    # TODO silence warning
+    [expr(arg, sources, params, query) | " IS NULL"]
+  end
+
+  defp expr({:not, _, [expr]}, sources, params, query) do
+    case expr do
+      {fun, _, _} when fun in @binary_ops -> ["NOT (", expr(expr, sources, params, query), ?)]
+      _ -> ["~(", expr(expr, sources, params, query), ?)]
+    end
+  end
+
+  # TODO params or params?
+  defp expr(%SubQuery{query: query, params: _}, _sources, params, _query) do
+    all(query, params, false)
+  end
+
+  defp expr({:fragment, _, [kw]}, sources, params, query)
+       when is_list(kw) or tuple_size(kw) == 3 do
+    Enum.reduce(kw, query, fn {k, {op, v}}, query ->
+      # TODO what's that?
+      expr({op, nil, [k, v]}, sources, params, query)
+    end)
+  end
+
+  defp expr({:fragment, _, parts}, sources, params, query) do
+    Enum.map(parts, fn
+      {:raw, part} -> part
+      {:expr, expr} -> expr(expr, sources, params, query)
+    end)
+  end
+
+  defp expr({fun, _, args}, sources, params, query) when is_atom(fun) and is_list(args) do
+    {modifier, args} =
+      case args do
+        [rest, :distinct] -> {"DISTINCT ", [rest]}
+        _ -> {[], args}
+      end
+
+    case handle_call(fun, length(args)) do
+      {:binary_op, op} ->
+        [left, right] = args
+
+        [
+          op_to_binary(left, sources, params, query),
+          op | op_to_binary(right, sources, params, query)
+        ]
+
+      {:fun, fun} ->
+        [fun, ?(, modifier, intersperce_map(args, ", ", &expr(&1, sources, params, query)), ?)]
+    end
+  end
+
+  defp expr({:count, _, []}, _sources, _params, _query), do: "count(*)"
+
+  defp expr(list, sources, params, query) when is_list(list) do
+    ["ARRAY[", intersperce_map(list, ?,, &expr(&1, sources, params, query)), ?]]
+  end
+
+  defp expr(%Decimal{} = decimal, _sources, _params, _query) do
+    Decimal.to_string(decimal, :normal)
+  end
+
+  # TOOD needed?
+  defp expr(%Tagged{value: binary, type: :binary}, _sources, _params, _query)
+       when is_binary(binary) do
+    # TODO silence warning
+    ["0x" | Base.encode16(binary, case: :lower)]
+  end
+
+  defp expr(%Tagged{value: {:^, [], [ix]}, type: type}, _sources, _params, _query) do
+    ["{$", Integer.to_string(ix - Process.get(@param_offset)), ?:, tagged_to_db(type), ?}]
+  end
+
+  defp expr(%Tagged{value: value, type: type}, sources, params, query) do
+    ["CAST(", expr(value, sources, params, query), " AS ", tagged_to_db(type), ?)]
+  end
+
+  defp expr(nil, _sources, _params, _query), do: "NULL"
+  defp expr(true, _sources, _params, _query), do: "1"
+  defp expr(false, _sources, _params, _query), do: "0"
+
+  defp expr(literal, _sources, _params, _query) when is_binary(literal) do
+    [?\', escape_string(literal), ?\']
+  end
+
+  defp expr(literal, _sources, _params, _query) when is_integer(literal),
+    do: Integer.to_string(literal)
+
+  defp expr(literal, _sources, _params, _query) when is_float(literal),
+    do: Float.to_string(literal)
+
+  defp expr(literal, _sources, _params, _query) when is_atom(literal), do: Atom.to_string(literal)
 
   defp collect_params([{ix, count} | rest], ix, params) do
     {collected, params} = Enum.split(params, count)
