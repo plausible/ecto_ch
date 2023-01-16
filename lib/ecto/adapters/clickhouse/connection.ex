@@ -219,7 +219,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp group_by(%Query{group_bys: group_bys} = query, sources, params) do
     [
-      " GROUP UP "
+      " GROUP BY "
       | intersperce_map(group_bys, ", ", fn %QueryExpr{expr: expr} ->
           intersperce_map(expr, ", ", &expr(&1, sources, params, query))
         end)
