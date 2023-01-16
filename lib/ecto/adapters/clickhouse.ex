@@ -26,9 +26,76 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter
-  defmacro __before_compile__(env) do
+  defmacro __before_compile__(_env) do
     [
-      Ecto.Adapters.SQL.__before_compile__(@driver, env),
+      # can't use it directly because to_sql doesn't work with the prepare/execute hack above
+      # Ecto.Adapters.SQL.__before_compile__(@driver, env),
+      quote do
+        @doc """
+        A convenience function for SQL-based repositories that executes the given query.
+
+        See `Ecto.Adapters.SQL.query/4` for more information.
+        """
+        def query(sql, params \\ [], opts \\ []) do
+          Ecto.Adapters.SQL.query(get_dynamic_repo(), sql, params, opts)
+        end
+
+        @doc """
+        A convenience function for SQL-based repositories that executes the given query.
+
+        See `Ecto.Adapters.SQL.query!/4` for more information.
+        """
+        def query!(sql, params \\ [], opts \\ []) do
+          Ecto.Adapters.SQL.query!(get_dynamic_repo(), sql, params, opts)
+        end
+
+        @doc """
+        A convenience function for SQL-based repositories that executes the given multi-result query.
+
+        See `Ecto.Adapters.SQL.query_many/4` for more information.
+        """
+        def query_many(sql, params \\ [], opts \\ []) do
+          Ecto.Adapters.SQL.query_many(get_dynamic_repo(), sql, params, opts)
+        end
+
+        @doc """
+        A convenience function for SQL-based repositories that executes the given multi-result query.
+
+        See `Ecto.Adapters.SQL.query_many!/4` for more information.
+        """
+        def query_many!(sql, params \\ [], opts \\ []) do
+          Ecto.Adapters.SQL.query_many!(get_dynamic_repo(), sql, params, opts)
+        end
+
+        @doc """
+        A convenience function for SQL-based repositories that translates the given query to SQL.
+
+        See `Ecto.Adapters.SQL.to_sql/3` for more information.
+        """
+        def to_sql(operation, queryable) do
+          Ecto.Adapters.ClickHouse.to_sql(operation, get_dynamic_repo(), queryable)
+        end
+
+        @doc """
+        A convenience function for SQL-based repositories that executes an EXPLAIN statement or similar
+        depending on the adapter to obtain statistics for the given query.
+
+        See `Ecto.Adapters.SQL.explain/4` for more information.
+        """
+        def explain(operation, queryable, opts \\ []) do
+          Ecto.Adapters.SQL.explain(get_dynamic_repo(), operation, queryable, opts)
+        end
+
+        @doc """
+        A convenience function for SQL-based repositories that forces all connections in the
+        pool to disconnect within the given interval.
+
+        See `Ecto.Adapters.SQL.disconnect_all/3` for more information.
+        """
+        def disconnect_all(interval, opts \\ []) do
+          Ecto.Adapters.SQL.disconnect_all(get_dynamic_repo(), interval, opts)
+        end
+      end,
       quote do
         def insert_stream(table_or_schema, rows, opts \\ []) do
           Ecto.Adapters.ClickHouse.insert_stream(get_dynamic_repo(), table_or_schema, rows, opts)
@@ -142,4 +209,10 @@ defmodule Ecto.Adapters.ClickHouse do
   # TODO
   defp remap_type(:naive_datetime), do: :datetime
   defp remap_type(other), do: other
+
+  def to_sql(:all = kind, repo, queryable) do
+    {{:nocache, query}, params} = Ecto.Adapter.Queryable.prepare_query(kind, repo, queryable)
+    {sql, _params} = result = @conn.all(query, params)
+    put_elem(result, 0, IO.iodata_to_binary(sql))
+  end
 end

@@ -213,4 +213,15 @@ defmodule ChtoTest do
   def i(query) do
     IO.inspect(Map.from_struct(query), limit: :infinity)
   end
+
+  @tag db: true
+  test "to_sql" do
+    start_supervised!(Repo)
+
+    user_id = 1
+    query = "example" |> where([e], e.user_id == ^user_id) |> select([e], e.name)
+    assert {sql, params} = Repo.to_sql(:all, query)
+    assert sql == ~s[SELECT e0."name" FROM "example" AS e0 WHERE (e0."user_id" = {$0:Int64})]
+    assert params == [1]
+  end
 end
