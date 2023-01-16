@@ -153,6 +153,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     " USING " <> Atom.to_string(col)
   end
 
+  defp on_join_expr(true), do: ""
+
   defp join_qual(:inner), do: " INNER JOIN "
   defp join_qual(:inner_lateral), do: " ARRAY JOIN "
   # TODO can it be this way? is yes, "deprecate" inner_lateral and left_lateral
