@@ -2,6 +2,8 @@ defmodule Ecto.Adapters.ClickHouse do
   @moduledoc "TODO"
   # TODO fix warnings
   use Ecto.Adapters.SQL, driver: :ch
+  @behaviour Ecto.Adapter.Storage
+  @behaviour Ecto.Adapter.Structure
   @conn __MODULE__.Connection
 
   @impl Ecto.Adapter.Migration
@@ -133,6 +135,159 @@ defmodule Ecto.Adapters.ClickHouse do
     {num, rows}
   end
 
+  @impl Ecto.Adapter.Storage
+  def storage_up(opts) do
+    alias Ch.{Query, Error}
+    alias Ch.Connection, as: Conn
+
+    {database, opts} = Keyword.pop!(opts, :database)
+    statement = "CREATE DATABASE {database:Identifier}"
+    params = %{"database" => database}
+    query = Query.build(statement, command: :create)
+
+    with {:ok, conn} <- Conn.connect(opts),
+         {:ok, _query, _result, _conn} <- Conn.handle_execute(query, params, [], conn) do
+      :ok
+    else
+      {:disconnect, reason, _conn} -> {:error, reason}
+      {:error, %Error{code: 82}, _conn} -> {:error, :already_up}
+      {:error, reason, _conn} -> {:error, reason}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @impl Ecto.Adapter.Storage
+  def storage_down(opts) do
+    alias Ch.{Query, Error}
+    alias Ch.Connection, as: Conn
+
+    {database, opts} = Keyword.pop!(opts, :database)
+    statement = "DROP DATABASE {database:Identifier}"
+    params = %{"database" => database}
+    query = Query.build(statement, command: :drop)
+
+    with {:ok, conn} <- Conn.connect(opts),
+         {:ok, _query, _result, _conn} <- Conn.handle_execute(query, params, [], conn) do
+      :ok
+    else
+      {:disconnect, reason, _conn} -> {:error, reason}
+      {:error, %Error{code: 81}, _conn} -> {:error, :already_down}
+      {:error, reason, _conn} -> {:error, reason}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @impl Ecto.Adapter.Storage
+  def storage_status(opts) do
+    alias Ch.Query
+    alias Ch.Connection, as: Conn
+
+    {database, opts} = Keyword.pop!(opts, :database)
+    statement = "SELECT 1 FROM system.databases WHERE name = {database:String}"
+    params = %{"database" => database}
+    query = Query.build(statement, command: :select)
+
+    with {:ok, conn} <- Conn.connect(opts),
+         {:ok, _query, %{num_rows: num_rows}, _conn} <-
+           Conn.handle_execute(query, params, [], conn) do
+      case num_rows do
+        1 -> :up
+        0 -> :down
+      end
+    else
+      {:disconnect, reason, _conn} -> {:error, reason}
+      {:error, reason, _conn} -> {:error, reason}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @impl Ecto.Adapter.Structure
+  def structure_dump(default, config) do
+    alias Ch.Query
+    alias Ch.Connection, as: Conn
+
+    path = config[:dump_path] || Path.join(default, "structure.sql")
+    migration_source = config[:migration_source] || "schema_migrations"
+
+    with {:ok, conn} <- Conn.connect(config),
+         {:ok, contents, conn} <- structure_dump_schema(conn),
+         {:ok, versions, _conn} <- structure_dump_versions(conn, migration_source) do
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, [contents, ?\n, versions])
+      {:ok, path}
+    end
+  end
+
+  # TODO show dictionaries, views
+  defp structure_dump_schema(conn) do
+    alias Ch.Query
+    alias Ch.Connection, as: Conn
+
+    show_tables_q = Query.build("SHOW TABLES", command: :show)
+
+    case Conn.handle_execute(show_tables_q, [], [], conn) do
+      {:ok, _query, %{rows: rows}, conn} ->
+        tables = Enum.map(rows, fn [table] -> table end)
+        {:ok, _schema, _conn} = structure_dump_tables(conn, tables)
+
+      {:disconnect, reason, _conn} ->
+        {:error, reason}
+
+      {:error, reason, _conn} ->
+        {:error, reason}
+    end
+  end
+
+  defp structure_dump_tables(conn, tables) do
+    alias Ch.Query
+    alias Ch.Connection, as: Conn
+
+    query = Query.build("SHOW CREATE TABLE {table:Identifier}", command: :show)
+
+    result =
+      Enum.reduce_while(tables, {[], conn}, fn table, {schemas, conn} ->
+        case Conn.handle_execute(query, %{"table" => table}, [], conn) do
+          {:ok, _query, %{rows: [[schema]]}, conn} -> {:cont, {[schema, ?\n | schemas], conn}}
+          {:error, reason, _conn} -> {:halt, {:error, reason}}
+          {:disconnect, reason, _conn} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case result do
+      {:error, _reason} = error -> error
+      success -> {:ok, success, conn}
+    end
+  end
+
+  defp structure_dump_versions(conn, table) do
+    alias Ch.Query
+    alias Ch.Connection, as: Conn
+
+    query = Query.build("SELECT * FROM {table:Identifier} FORMAT CSVWithNames", command: :select)
+
+    case Conn.handle_execute(query, %{"table" => table}, [format: "VALUES"], conn) do
+      {:ok, _query, %{rows: rows}, conn} ->
+        versions = ["INSERT INTO ", table, "(version, inserted_at) VALUES " | rows]
+        {:ok, versions, conn}
+
+      {:error, reason, _conn} ->
+        {:error, reason}
+
+      {:disconnect, reason, _conn} ->
+        {:error, reason}
+    end
+  end
+
+  @impl Ecto.Adapter.Structure
+  def dump_cmd(_args, _opts, _config) do
+    raise "not implemented"
+  end
+
+  @impl Ecto.Adapter.Structure
+  def structure_load(_default, _config) do
+    raise "not implemented"
+  end
+
   # TODO support queries and placeholders, benchmark
   defp unzip_insert([row | rows], header) do
     [unzip_row(header, row) | unzip_insert(rows, header)]
@@ -149,10 +304,28 @@ defmodule Ecto.Adapters.ClickHouse do
 
   defp unzip_row([], _row), do: []
 
-  # TODO
   @impl Ecto.Adapter.Schema
-  def insert(_adapter_meta, _schema_meta, _params, _on_conflict, _returning, _opts) do
-    raise "not implemented, please use insert_all/2 or insert_stream/2 instead"
+  def insert(adapter_meta, schema_meta, params, on_conflict, _returning, opts) do
+    %{source: source, prefix: prefix, schema: schema} = schema_meta
+    {header, row} = Enum.unzip(params)
+
+    types =
+      if schema do
+        extract_types(schema, header)
+      else
+        opts[:types] || raise "missing :types"
+      end
+
+    sql = @conn.insert(prefix, source, header)
+    opts = [{:types, types}, {:command, :insert} | opts]
+
+    case Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts) do
+      %{num_rows: 1} ->
+        {:ok, []}
+
+      %{num_rows: 0} ->
+        if on_conflict == :nothing, do: {:ok, []}, else: {:error, :stale}
+    end
   end
 
   @impl Ecto.Adapter.Schema
@@ -193,7 +366,7 @@ defmodule Ecto.Adapters.ClickHouse do
   defp build_insert_statement(prefix, table, fields) do
     fields =
       case fields do
-        [_ | _] = fields -> [?(, @conn.intersperce_map(fields, ?,, &@conn.quote_name/1), ?)]
+        [_ | _] = fields -> [?(, @conn.intersperse_map(fields, ?,, &@conn.quote_name/1), ?)]
         _none -> []
       end
 
@@ -208,6 +381,7 @@ defmodule Ecto.Adapters.ClickHouse do
 
   # TODO
   defp remap_type(:naive_datetime), do: :datetime
+  defp remap_type(:integer), do: :i64
   defp remap_type(other), do: other
 
   def to_sql(:all = kind, repo, queryable) do

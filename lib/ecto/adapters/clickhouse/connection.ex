@@ -1,7 +1,5 @@
 defmodule Ecto.Adapters.ClickHouse.Connection do
   @moduledoc false
-  alias Ecto.{Query, SubQuery}
-  alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, Tagged}
 
   def child_spec(opts) do
     Ch.child_spec(opts)
@@ -19,6 +17,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def query(conn, statement, params, opts) do
     Ch.query(conn, statement, params, opts)
   end
+
+  alias Ecto.{Query, SubQuery}
+  alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, Tagged}
 
   @param_offset :__param_offset
   @param_collect :__param_collect
@@ -51,6 +52,225 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  alias Ecto.Migration.{Table, Reference}
+
+  def ddl_logs(_), do: []
+
+  @spec execute_ddl(Ecto.Adapter.Migration.command()) :: iodata
+  def execute_ddl({command, %Table{} = table, columns})
+      when command in [:create, :create_if_not_exists] do
+    columns =
+      case columns do
+        [{_, :id, _, _} | columns] -> columns
+        _ -> columns
+      end
+
+    [
+      [
+        if command == :create_if_not_exists do
+          "CREATE TABLE IF NOT EXISTS "
+        else
+          "CREATE TABLE "
+        end,
+        quote_table(table.prefix, table.name),
+        ?(,
+        intersperse_map(columns, ", ", &ddl_column_definition/1),
+        ?),
+        ddl_options_expr(table.options),
+        " ENGINE=",
+        table.engine || "TinyLog"
+      ]
+    ]
+  end
+
+  def execute_ddl({command, %Table{} = table}) when command in [:drop, :drop_if_exists] do
+    [
+      [
+        if command == :drop_if_exists do
+          "DROP TABLE IF EXISTS "
+        else
+          "DROP TABLE "
+        end,
+        quote_table(table.prefix, table.name)
+      ]
+    ]
+  end
+
+  def execute_ddl({:alter, %Table{} = table, changes}) do
+    Enum.map(changes, fn change ->
+      ["ALTER TABLE ", quote_table(table.prefix, table.name), ?\s | ddl_column_change(change)]
+    end)
+  end
+
+  # TODO from clickhouse_ecto: Add 'ON CLUSTER' option.
+  # https://github.com/clickhouse-elixir/clickhouse_ecto/blob/bc963d3f53bf4264e6fa2b7345c7e3c3dc49d6ee/lib/clickhouse_ecto/migration.ex#L56
+  def execute_ddl({:rename, %Table{} = current_table, %Table{} = new_table}) do
+    [
+      [
+        "RENAME TABLE ",
+        quote_name([current_table.prefix, current_table.name]),
+        " TO ",
+        quote_name(new_table.name)
+      ]
+    ]
+  end
+
+  def execute_ddl({:rename, %Table{} = table, current_column, new_column}) do
+    [
+      [
+        "ALTER TABLE ",
+        quote_table(table.prefix, table.name),
+        " RENAME COLUMN ",
+        current_column,
+        " TO ",
+        new_column
+      ]
+    ]
+  end
+
+  def execute_ddl(string) when is_binary(string) do
+    [string]
+  end
+
+  def execute_ddl(keyword) when is_list(keyword) do
+    error!(nil, "Ecto.Adapters.ClickHouse does not support keyword lists in execute_ddl")
+  end
+
+  defp ddl_column_definition({:add, name, %Reference{} = ref, opts}) do
+    [quote_name(name), ?\s | ddl_column_options(ref.type, opts)]
+  end
+
+  defp ddl_column_definition({:add, name, type, opts}) do
+    [
+      quote_name(name),
+      ?\s,
+      ddl_column_type(type, opts),
+      ?\s
+      | ddl_column_options(type, opts)
+    ]
+  end
+
+  defp ddl_options_expr(nil), do: []
+  defp ddl_options_expr(options) when is_binary(options), do: options
+
+  defp ddl_options_expr([{_k, _v} | _]) do
+    error!(nil, "Ecto.Adapter.ClickHouse does not support keyword lists in :options")
+  end
+
+  defp ddl_column_options(type, opts) do
+    default = Keyword.fetch(opts, :default)
+    null = Keyword.get(opts, :null)
+    [ddl_default_expr(default, type), ?\s | ddl_null_expr(null)]
+  end
+
+  defp ddl_null_expr(true), do: "NULL"
+  defp ddl_null_expr(_), do: []
+
+  defp ddl_default_expr(:error, _), do: []
+
+  defp ddl_default_expr({:ok, nil}, _type), do: error!(nil, "NULL is not supported")
+  defp ddl_default_expr({:ok, []}, _type), do: error!(nil, "arrays are not supported")
+
+  defp ddl_default_expr({:ok, literal}, _type) when is_binary(literal) do
+    ["DEFAULT '", escape_string(literal), ?']
+  end
+
+  defp ddl_default_expr({:ok, literal}, _type) when is_number(literal) do
+    ["DEFAULT " | to_string(literal)]
+  end
+
+  defp ddl_default_expr({:ok, literal}, _type) when is_boolean(literal) do
+    ["DEFAULT " | to_string(if literal, do: 1, else: 0)]
+  end
+
+  defp ddl_default_expr({:ok, {:fragment, expr}}, _type) do
+    ["DEFAULT ", expr]
+  end
+
+  defp ddl_default_expr({:ok, expr}, type) do
+    raise ArgumentError,
+          "unknown default `#{inspect(expr)}` for type `#{inspect(type)}`. " <>
+            ":default may be a string, number, boolean, empty list or a fragment(...)"
+  end
+
+  # TODO
+  defp ddl_column_type({:array, type}, opts) do
+    [ddl_column_type(type, opts) | "[]"]
+  end
+
+  defp ddl_column_type(type, opts) do
+    size = Keyword.get(opts, :size)
+    precision = Keyword.get(opts, :precision)
+    scale = Keyword.get(opts, :scale)
+    type_name = ecto_to_db(type)
+
+    cond do
+      size -> [type_name, ?(, to_string(size), ?)]
+      precision -> [type_name, ?(, to_string(precision), ?,, to_string(scale || 0), ?)]
+      true -> type_name
+    end
+  end
+
+  defp ddl_column_change({:add, name, %Reference{} = ref, opts}) do
+    ["ADD COLUMN ", quote_name(name), ?\s | ddl_column_options(ref.type, opts)]
+  end
+
+  defp ddl_column_change({:add, name, type, opts}) do
+    [
+      "ADD COLUMN ",
+      quote_name(name),
+      ?\s,
+      ddl_column_type(type, opts),
+      ?\s
+      | ddl_column_options(type, opts)
+    ]
+  end
+
+  defp ddl_column_change({:modify, name, %Reference{} = ref, opts}) do
+    [
+      "MODIFY COLUMN ",
+      quote_name(name),
+      ?\s,
+      ddl_modify_null(name, opts),
+      ?\s
+      | ddl_modify_default(name, ref.type, opts)
+    ]
+  end
+
+  defp ddl_column_change({:modify, name, type, opts}) do
+    [
+      "MODIFY COLUMN ",
+      quote_name(name),
+      ?\s,
+      ddl_column_type(type, opts),
+      ?\s,
+      ddl_modify_null(name, opts),
+      ?\s
+      | ddl_modify_default(name, type, opts)
+    ]
+  end
+
+  defp ddl_column_change({:remove, name}) do
+    ["DROP COLUMN ", quote_name(name)]
+  end
+
+  defp ddl_modify_null(_name, opts) do
+    case Keyword.get(opts, :null) do
+      nil -> []
+      val -> ddl_null_expr(val)
+    end
+  end
+
+  defp ddl_modify_default(name, type, opts) do
+    case Keyword.fetch(opts, :default) do
+      {:ok, val} ->
+        [" ADD ", ddl_default_expr({:ok, val}, type), " FOR ", quote_name(name)]
+
+      :error ->
+        []
+    end
+  end
+
   defp collect_params([{ix, count} | rest], ix, params) do
     {collected, params} = Enum.split(params, count)
     [collected | collect_params(rest, ix + count, params)]
@@ -64,7 +284,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   # TODO support insert into ... select ... from
   def insert(prefix, table, header) do
-    fields = [?(, intersperce_map(header, ?,, &quote_name/1), ?)]
+    fields = [?(, intersperse_map(header, ?,, &quote_name/1), ?)]
     ["INSERT INTO ", quote_table(prefix, table) | fields]
   end
 
@@ -99,7 +319,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp select_fields([], _sources, _params, _query), do: "'TRUE'"
 
   defp select_fields(fields, sources, params, query) do
-    intersperce_map(fields, ",", fn
+    intersperse_map(fields, ",", fn
       {k, v} -> [expr(v, sources, params, query), " AS " | quote_name(k)]
       v -> expr(v, sources, params, query)
     end)
@@ -127,7 +347,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join(%Query{joins: joins} = query, sources, params) do
     [
       ?\s
-      | intersperce_map(joins, ?\s, fn
+      | intersperse_map(joins, ?\s, fn
           %JoinExpr{qual: qual, ix: ix, source: source, on: %QueryExpr{expr: on_exrp}} ->
             {join, name} = get_source(query, sources, params, ix, source)
             [join_qual(qual), join, " AS ", name, on_join_expr(on_exrp)]
@@ -179,8 +399,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp group_by(%Query{group_bys: group_bys} = query, sources, params) do
     [
       " GROUP BY "
-      | intersperce_map(group_bys, ", ", fn %QueryExpr{expr: expr} ->
-          intersperce_map(expr, ", ", &expr(&1, sources, params, query))
+      | intersperse_map(group_bys, ", ", fn %QueryExpr{expr: expr} ->
+          intersperse_map(expr, ", ", &expr(&1, sources, params, query))
         end)
     ]
   end
@@ -189,7 +409,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp order_by(%Query{order_bys: order_bys} = query, sources, params) do
     order_bys = Enum.flat_map(order_bys, & &1.expr)
-    [" ORDER BY " | intersperce_map(order_bys, ", ", &order_by_expr(&1, sources, params, query))]
+    [" ORDER BY " | intersperse_map(order_bys, ", ", &order_by_expr(&1, sources, params, query))]
   end
 
   defp order_by_expr({dir, expr}, sources, params, query) do
@@ -215,7 +435,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp hints([_ | _] = hints) do
-    [" " | intersperce_map(hints, ", ", &hint/1)]
+    [" " | intersperse_map(hints, ", ", &hint/1)]
   end
 
   defp hints([]), do: []
@@ -285,13 +505,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       )
     end
 
-    intersperce_map(fields, ", ", &[name, ?. | quote_name(&1)])
+    intersperse_map(fields, ", ", &[name, ?. | quote_name(&1)])
   end
 
   defp expr({:in, _, [_left, []]}, _sources, _params, _query), do: "0"
 
   defp expr({:in, _, [left, right]}, sources, params, query) when is_list(right) do
-    args = intersperce_map(right, ?,, &expr(&1, sources, params, query))
+    args = intersperse_map(right, ?,, &expr(&1, sources, params, query))
     [expr(left, sources, params, query), " IN (", args, ?)]
   end
 
@@ -374,14 +594,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         ]
 
       {:fun, fun} ->
-        [fun, ?(, modifier, intersperce_map(args, ", ", &expr(&1, sources, params, query)), ?)]
+        [fun, ?(, modifier, intersperse_map(args, ", ", &expr(&1, sources, params, query)), ?)]
     end
   end
 
   defp expr({:count, _, []}, _sources, _params, _query), do: "count(*)"
 
   defp expr(list, sources, params, query) when is_list(list) do
-    ["ARRAY[", intersperce_map(list, ?,, &expr(&1, sources, params, query)), ?]]
+    ["ARRAY[", intersperse_map(list, ?,, &expr(&1, sources, params, query)), ?]]
   end
 
   defp expr(%Decimal{} = decimal, _sources, _params, _query) do
@@ -464,13 +684,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp create_alias(_), do: ?t
 
   @doc false
-  def intersperce_map([elem], _separator, mapper), do: [mapper.(elem)]
+  def intersperse_map([elem], _separator, mapper), do: [mapper.(elem)]
 
-  def intersperce_map([elem | rest], separator, mapper) do
-    [mapper.(elem), separator | intersperce_map(rest, separator, mapper)]
+  def intersperse_map([elem | rest], separator, mapper) do
+    [mapper.(elem), separator | intersperse_map(rest, separator, mapper)]
   end
 
-  def intersperce_map([], _separator, _mapper), do: []
+  def intersperse_map([], _separator, _mapper), do: []
 
   @doc false
   def quote_name(name, quoter \\ ?")
@@ -479,7 +699,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def quote_name(names, quoter) when is_list(names) do
     names
     |> Enum.reject(&is_nil/1)
-    |> intersperce_map(?., &quote_name(&1, nil))
+    |> intersperse_map(?., &quote_name(&1, nil))
     |> wrap_in(quoter)
   end
 
