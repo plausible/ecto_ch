@@ -309,7 +309,7 @@ defmodule Ecto.Adapters.ClickHouse do
   defp unzip_row([], _row), do: []
 
   @impl Ecto.Adapter.Schema
-  def insert(adapter_meta, schema_meta, params, on_conflict, _returning, opts) do
+  def insert(adapter_meta, schema_meta, params, _on_conflict, _returning, opts) do
     %{source: source, prefix: prefix, schema: schema} = schema_meta
     {header, row} = Enum.unzip(params)
 
@@ -327,8 +327,10 @@ defmodule Ecto.Adapters.ClickHouse do
       %{num_rows: 1} ->
         {:ok, []}
 
+      # TODO workaround for v21.11 not retrning written_rows in summary
       %{num_rows: 0} ->
-        if on_conflict == :nothing, do: {:ok, []}, else: {:error, :stale}
+        # if on_conflict == :nothing, do: {:ok, []}, else: {:error, :stale}
+        {:ok, []}
     end
   end
 
