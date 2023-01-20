@@ -140,13 +140,12 @@ defmodule Ecto.Adapters.ClickHouse do
     alias Ch.{Query, Error}
     alias Ch.Connection, as: Conn
 
+    # TODO use Identifier later
     {database, opts} = Keyword.pop!(opts, :database)
-    statement = "CREATE DATABASE {database:Identifier}"
-    params = %{"database" => database}
-    query = Query.build(statement, command: :create)
+    query = Query.build("CREATE DATABASE #{@conn.quote_name(database)}", command: :create)
 
     with {:ok, conn} <- Conn.connect(opts),
-         {:ok, _query, _result, _conn} <- Conn.handle_execute(query, params, [], conn) do
+         {:ok, _query, _result, _conn} <- Conn.handle_execute(query, [], [], conn) do
       :ok
     else
       {:disconnect, reason, _conn} -> {:error, reason}
@@ -161,13 +160,12 @@ defmodule Ecto.Adapters.ClickHouse do
     alias Ch.{Query, Error}
     alias Ch.Connection, as: Conn
 
+    # TODO use Identifier later
     {database, opts} = Keyword.pop!(opts, :database)
-    statement = "DROP DATABASE {database:Identifier}"
-    params = %{"database" => database}
-    query = Query.build(statement, command: :drop)
+    query = Query.build("DROP DATABASE #{@conn.quote_name(database)}", command: :drop)
 
     with {:ok, conn} <- Conn.connect(opts),
-         {:ok, _query, _result, _conn} <- Conn.handle_execute(query, params, [], conn) do
+         {:ok, _query, _result, _conn} <- Conn.handle_execute(query, [], [], conn) do
       :ok
     else
       {:disconnect, reason, _conn} -> {:error, reason}
@@ -242,11 +240,14 @@ defmodule Ecto.Adapters.ClickHouse do
     alias Ch.Query
     alias Ch.Connection, as: Conn
 
-    query = Query.build("SHOW CREATE TABLE {table:Identifier}", command: :show)
+    # TODO use Identifier later
+    query = fn table ->
+      Query.build("SHOW CREATE TABLE #{@conn.quote_name(table)}", command: :show)
+    end
 
     result =
       Enum.reduce_while(tables, {[], conn}, fn table, {schemas, conn} ->
-        case Conn.handle_execute(query, %{"table" => table}, [], conn) do
+        case Conn.handle_execute(query.(table), [], [], conn) do
           {:ok, _query, %{rows: [[schema]]}, conn} -> {:cont, {[schema, ?\n | schemas], conn}}
           {:error, reason, _conn} -> {:halt, {:error, reason}}
           {:disconnect, reason, _conn} -> {:halt, {:error, reason}}
@@ -263,9 +264,12 @@ defmodule Ecto.Adapters.ClickHouse do
     alias Ch.Query
     alias Ch.Connection, as: Conn
 
-    query = Query.build("SELECT * FROM {table:Identifier} FORMAT CSVWithNames", command: :select)
+    table = @conn.quote_name(table)
 
-    case Conn.handle_execute(query, %{"table" => table}, [format: "VALUES"], conn) do
+    # TODO use Identifier later
+    query = Query.build("SELECT * FROM #{table} FORMAT CSVWithNames", command: :select)
+
+    case Conn.handle_execute(query, [], [format: "VALUES"], conn) do
       {:ok, _query, %{rows: rows}, conn} ->
         versions = ["INSERT INTO ", table, "(version, inserted_at) VALUES " | rows]
         {:ok, versions, conn}
