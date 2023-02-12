@@ -29,6 +29,24 @@ for {type, name, base} <- basic_types do
   end
 end
 
+defmodule Ch.Types.Boolean do
+  use Ecto.Type
+
+  @impl true
+  def type, do: :boolean
+
+  @impl true
+  def cast(value), do: Ecto.Type.cast(:boolean, value)
+
+  @impl true
+  def dump(value), do: Ecto.Type.dump(:boolean, value)
+
+  @impl true
+  def load(0), do: {:ok, false}
+  def load(1), do: {:ok, true}
+  def load(value), do: Ecto.Type.load(:boolean, value)
+end
+
 defmodule Ch.Types.FixedString do
   use Ecto.ParameterizedType
 
