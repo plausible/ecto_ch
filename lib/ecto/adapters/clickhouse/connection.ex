@@ -21,15 +21,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   alias Ecto.{Query, SubQuery}
   alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, Tagged}
 
-  @param_offset :__param_offset
-  @param_collect :__param_collect
-
-  def all(query, params, first? \\ true) do
-    if first? do
-      Process.put(@param_offset, 0)
-      Process.put(@param_collect, [])
-    end
-
+  def all(query, params) do
     sources = create_names(query)
     from = from(query, sources, params)
     select = select(query, sources, params)
@@ -40,16 +32,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     order_by = order_by(query, sources, params)
     limit = limit(query, sources, params)
     offset = offset(query, sources, params)
-
-    sql = [select, from, join, where, group_by, having, order_by, limit, offset]
-
-    if first? do
-      to_collect = @param_collect |> Process.get() |> :lists.reverse()
-      params = collect_params(to_collect, 0, params)
-      {sql, params}
-    else
-      sql
-    end
+    [select, from, join, where, group_by, having, order_by, limit, offset]
   end
 
   alias Ecto.Migration.{Table, Reference}
@@ -166,6 +149,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ddl_null_expr(true), do: "NULL"
   defp ddl_null_expr(_), do: []
 
+  @dialyzer {:no_improper_lists, ddl_default_expr: 2}
   defp ddl_default_expr(:error, _), do: []
 
   defp ddl_default_expr({:ok, nil}, _type), do: error!(nil, "NULL is not supported")
@@ -193,7 +177,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
             ":default may be a string, number, boolean, empty list or a fragment(...)"
   end
 
-  # TODO
+  @dialyzer {:no_improper_lists, ddl_column_type: 2}
   defp ddl_column_type({:array, type}, opts) do
     [ddl_column_type(type, opts) | "[]"]
   end
@@ -270,17 +254,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         []
     end
   end
-
-  defp collect_params([{ix, count} | rest], ix, params) do
-    {collected, params} = Enum.split(params, count)
-    [collected | collect_params(rest, ix + count, params)]
-  end
-
-  defp collect_params(to_collect, ix, [param | rest]) do
-    [param | collect_params(to_collect, ix + 1, rest)]
-  end
-
-  defp collect_params([], _ix, params), do: params
 
   # TODO support insert into ... select ... from
   def insert(prefix, table, header) do
@@ -412,12 +385,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [" ORDER BY " | intersperse_map(order_bys, ", ", &order_by_expr(&1, sources, params, query))]
   end
 
+  @dialyzer {:no_improper_lists, order_by_expr: 4}
   defp order_by_expr({dir, expr}, sources, params, query) do
     str = expr(expr, sources, params, query)
 
     case dir do
       :asc -> str
-      # TODO silence warning
       :desc -> [str | " DESC"]
     end
   end
@@ -470,21 +443,17 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?(, expr(expr, sources, params, query), ?)]
   end
 
+  @dialyzer {:no_improper_lists, expr: 4}
   defp expr({_type, [literal]}, sources, params, query) do
     expr(literal, sources, params, query)
   end
 
   defp expr({:^, [], [ix]}, _sources, params, _query) do
-    ["{$", Integer.to_string(ix - Process.get(@param_offset)), ?:, param_type_at(params, ix), ?}]
+    ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
   end
 
-  # TODO
-  defp expr({:^, [], [ix, count]}, _sources, params, _query) do
-    to_collect = Process.get(@param_collect)
-    Process.put(@param_collect, [{ix, count} | to_collect])
-    offset = Process.get(@param_offset)
-    Process.put(@param_offset, offset + count - 1)
-    ["{$", Integer.to_string(ix - offset), ":Array(", param_type_at(params, ix), ")}"]
+  defp expr({:^, [], [ix, _]}, _sources, params, _query) do
+    ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
   end
 
   defp expr({{:., _, [{:&, _, [idx]}, field]}, _, []}, sources, _params, _query)
@@ -517,15 +486,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_, 0]}]}, _sources, _params, _query), do: "0"
 
-  # TODO
   defp expr({:in, _, [left, %Tagged{value: {:^, [], [ix]}, type: type}]}, sources, params, query) do
     [
       expr(left, sources, params, query),
       " IN {$",
-      Integer.to_string(ix - Process.get(@param_offset)),
-      ":Array(",
+      Integer.to_string(ix),
+      ?:,
       tagged_to_db(type),
-      ")}"
+      ?}
     ]
   end
 
@@ -533,20 +501,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [
       expr(left, sources, params, query),
       " IN {$",
-      Integer.to_string(ix - Process.get(@param_offset)),
+      Integer.to_string(ix),
       ?:,
       param_type_at(params, ix),
       ?}
     ]
   end
 
-  # TODO vs =ANY()
   defp expr({:in, _, [left, right]}, sources, params, query) do
     [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
   end
 
   defp expr({:is_nil, _, [arg]}, sources, params, query) do
-    # TODO silence warning
     [expr(arg, sources, params, query) | " IS NULL"]
   end
 
@@ -557,9 +523,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  # TODO params or params?
   defp expr(%SubQuery{query: query, params: _}, _sources, params, _query) do
-    all(query, params, false)
+    all(query, params)
   end
 
   defp expr({:fragment, _, [kw]}, sources, params, query)
@@ -616,7 +581,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr(%Tagged{value: {:^, [], [ix]}, type: type}, _sources, _params, _query) do
-    ["{$", Integer.to_string(ix - Process.get(@param_offset)), ?:, tagged_to_db(type), ?}]
+    ["{$", Integer.to_string(ix), ?:, tagged_to_db(type), ?}]
   end
 
   defp expr(%Tagged{value: value, type: type}, sources, params, query) do
@@ -661,7 +626,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp create_names(_sources, size, size), do: []
 
-  # TODO silence warnings
+  @dialyzer {:no_improper_lists, create_name: 2}
   defp create_name(sources, pos) do
     case elem(sources, pos) do
       {:fragment, _, _} ->

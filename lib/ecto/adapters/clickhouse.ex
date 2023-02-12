@@ -392,7 +392,23 @@ defmodule Ecto.Adapters.ClickHouse do
 
   def to_sql(:all = kind, repo, queryable) do
     {{:nocache, query}, params} = Ecto.Adapter.Queryable.prepare_query(kind, repo, queryable)
-    {sql, _params} = result = @conn.all(query, params)
-    put_elem(result, 0, IO.iodata_to_binary(sql))
+    sql = @conn.all(query, params)
+    {IO.iodata_to_binary(sql), params}
+  end
+
+  @impl true
+  def dumpers({:map, _}, type), do: [&Ecto.Type.embedded_dump(type, &1, :json)]
+  def dumpers(:binary_id, type), do: [type, Ecto.UUID]
+
+  def dumpers({:in, _}, type) do
+    [&array_dump(type, &1)]
+  end
+
+  def dumpers(_, type) do
+    [type]
+  end
+
+  def array_dump(_type, value) when is_list(value) do
+    {:ok, value}
   end
 end

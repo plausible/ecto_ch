@@ -61,141 +61,10 @@ defmodule ChtoTest do
             fragment("countIf(? != 'pageview')", e.name)
           }
 
-      # TODO =ANY() vs in
       assert all(query) ==
                {"SELECT countIf(e0.\"name\" = 'pageview'),countIf(e0.\"name\" != 'pageview') FROM \"events\" AS e0 WHERE (e0.\"domain\" IN {$0:Array(String)}) AND (toDate(e0.\"timestamp\") >= {$1:Date}) AND (toDate(e0.\"timestamp\") <= {$2:Date})",
                 [["dummy.site", "dummy2.site"], ~D[2020-10-10], ~D[2021-01-01]]}
     end
-  end
-
-  @tag skip: true
-  test "dev" do
-    user_id = 10
-
-    query =
-      "users"
-      |> where(id: ^user_id)
-      |> select([e], e.name)
-
-    assert {query, params, key} = Ecto.Query.Planner.plan(query, :all, Ecto.Adapters.ClickHouse)
-    assert params == [{10, 10}]
-
-    assert key == [
-             :all,
-             {:where,
-              [and: {:==, [], [{{:., [], [{:&, [], [0]}, :id]}, [], []}, {:^, [], [0]}]}]},
-             {:from, {{"users", nil}, nil}, []},
-             {:select, {{:., [], [{:&, [], [0]}, :name]}, [], []}}
-           ]
-
-    assert query == %Ecto.Query{
-             aliases: %{},
-             assocs: [],
-             combinations: [],
-             distinct: nil,
-             from: %Ecto.Query.FromExpr{
-               source: {"users", nil},
-               file: nil,
-               line: nil,
-               as: nil,
-               prefix: nil,
-               params: [],
-               hints: []
-             },
-             group_bys: [],
-             havings: [],
-             joins: [],
-             limit: nil,
-             lock: nil,
-             offset: nil,
-             order_bys: [],
-             prefix: nil,
-             preloads: [],
-             select: %Ecto.Query.SelectExpr{
-               expr: {{:., [], [{:&, [], [0]}, :name]}, [], []},
-               file: "/Users/q/Developer/chto/test/chto_test.exs",
-               line: 56,
-               fields: nil,
-               params: [],
-               take: %{},
-               subqueries: [],
-               aliases: %{}
-             },
-             sources: {{"users", nil, nil}},
-             updates: [],
-             wheres: [
-               %Ecto.Query.BooleanExpr{
-                 op: :and,
-                 expr: {:==, [], [{{:., [], [{:&, [], [0]}, :id]}, [], []}, {:^, [], [0]}]},
-                 file: "/Users/q/Developer/chto/test/chto_test.exs",
-                 line: 55,
-                 params: [{10, {0, :id}}],
-                 subqueries: []
-               }
-             ],
-             windows: [],
-             with_ctes: nil
-           }
-
-    assert {query, select} =
-             Ecto.Query.Planner.normalize(query, :all, Ecto.Adapters.ClickHouse, _counter = 0)
-
-    assert select == %{
-             assocs: [],
-             from: :none,
-             postprocess: {:value, :any},
-             preprocess: [],
-             take: []
-           }
-
-    assert query == %Ecto.Query{
-             aliases: %{},
-             assocs: [],
-             combinations: [],
-             distinct: nil,
-             from: %Ecto.Query.FromExpr{
-               source: {"users", nil},
-               file: nil,
-               line: nil,
-               as: nil,
-               prefix: nil,
-               params: [],
-               hints: []
-             },
-             group_bys: [],
-             havings: [],
-             joins: [],
-             limit: nil,
-             lock: nil,
-             offset: nil,
-             order_bys: [],
-             prefix: nil,
-             preloads: [],
-             select: %Ecto.Query.SelectExpr{
-               expr: {{:., [{:type, :any}], [{:&, [], [0]}, :name]}, [], []},
-               file: "/Users/q/Developer/chto/test/chto_test.exs",
-               line: 56,
-               fields: [{{:., [type: :any], [{:&, [], [0]}, :name]}, [], []}],
-               params: nil,
-               take: %{},
-               subqueries: [],
-               aliases: %{}
-             },
-             sources: {{"users", nil, nil}},
-             updates: [],
-             wheres: [
-               %Ecto.Query.BooleanExpr{
-                 op: :and,
-                 expr: {:==, [], [{{:., [], [{:&, [], [0]}, :id]}, [], []}, {:^, [], [0]}]},
-                 file: "/Users/q/Developer/chto/test/chto_test.exs",
-                 line: 55,
-                 params: nil,
-                 subqueries: []
-               }
-             ],
-             windows: [],
-             with_ctes: nil
-           }
   end
 
   defp all(query) do
@@ -206,8 +75,7 @@ defmodule ChtoTest do
     {query, params, _key} = Ecto.Query.Planner.plan(query, :all, Ecto.Adapters.ClickHouse)
     {query, _} = Ecto.Query.Planner.normalize(query, :all, Ecto.Adapters.ClickHouse, _counter = 0)
     {dump_params, _} = Enum.unzip(params)
-    {sql, params} = f.(query, dump_params)
-    {IO.iodata_to_binary(sql), params}
+    {IO.iodata_to_binary(f.(query, dump_params)), dump_params}
   end
 
   def i(query) do
