@@ -32,8 +32,7 @@ defmodule Chto.MixProject do
       {:ecto_sql, "~> 3.9"},
       {:decimal, "~> 2.0"},
       {:rexbug, "~> 1.0", only: [:dev, :test]},
-      {:benchee, "~> 1.1", only: :bench},
-      {:clickhouse_ecto, github: "plausible/clickhouse_ecto", only: [:bench]}
+      {:benchee, "~> 1.1", only: :bench}
     ]
   end
 end

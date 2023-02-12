@@ -2,6 +2,7 @@ defmodule ChtoTest do
   use ExUnit.Case
   import Ecto.Query
   alias Ecto.Adapters.ClickHouse.Connection, as: SQL
+  alias EctoClickHouse.Integration.Event
 
   describe "all" do
     test "select one column" do
@@ -49,21 +50,59 @@ defmodule ChtoTest do
 
     test "where in" do
       domains = ["dummy.site", "dummy2.site"]
+      tags = ["1", "2", "3"]
       date_range = %{first: ~D[2020-10-10], last: ~D[2021-01-01]}
 
       query =
-        from e in "events",
+        from e in Event,
           where: e.domain in ^domains,
-          where: fragment("toDate(?)", e.timestamp) >= ^date_range.first,
-          where: fragment("toDate(?)", e.timestamp) <= ^date_range.last,
+          where: e.tags == ^tags,
+          where: fragment("toDate(?)", e.inserted_at) >= ^date_range.first,
+          where: fragment("toDate(?)", e.inserted_at) <= ^date_range.last,
           select: {
-            fragment("countIf(? = 'pageview')", e.name),
-            fragment("countIf(? != 'pageview')", e.name)
+            fragment("countIf(? = 'pageview')", e.type),
+            fragment("countIf(? != 'pageview')", e.type)
           }
 
       assert all(query) ==
-               {"SELECT countIf(e0.\"name\" = 'pageview'),countIf(e0.\"name\" != 'pageview') FROM \"events\" AS e0 WHERE (e0.\"domain\" IN {$0:Array(String)}) AND (toDate(e0.\"timestamp\") >= {$1:Date}) AND (toDate(e0.\"timestamp\") <= {$2:Date})",
-                [["dummy.site", "dummy2.site"], ~D[2020-10-10], ~D[2021-01-01]]}
+               {
+                 """
+                 SELECT \
+                 countIf(e0."type" = 'pageview'),\
+                 countIf(e0."type" != 'pageview') \
+                 FROM "events" AS e0 \
+                 WHERE (\
+                 e0."domain" IN {$0:Array(String)}) AND \
+                 (e0."tags" = {$1:Array(String)}) AND \
+                 (toDate(e0."inserted_at") >= {$2:Date}) AND \
+                 (toDate(e0."inserted_at") <= {$3:Date}\
+                 )\
+                 """,
+                 [
+                   ["dummy.site", "dummy2.site"],
+                   ["1", "2", "3"],
+                   ~D[2020-10-10],
+                   ~D[2021-01-01]
+                 ]
+               }
+    end
+
+    test "where array =" do
+      domains = ["dummy.site", "dummy2.site"]
+      query = "events" |> where(domains: ^domains) |> select([e], e.user_id)
+
+      assert all(query) ==
+               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."domains" = {$0:Array(String)})],
+                [["dummy.site", "dummy2.site"]]}
+    end
+
+    test "where schema.array =" do
+      tags = ["a", "b"]
+      query = Event |> where(tags: ^tags) |> select([e], e.domain)
+
+      assert all(query) ==
+               {~s[SELECT e0."domain" FROM "events" AS e0 WHERE (e0."tags" = {$0:Array(String)})],
+                [["a", "b"]]}
     end
   end
 
@@ -82,13 +121,10 @@ defmodule ChtoTest do
     IO.inspect(Map.from_struct(query), limit: :infinity)
   end
 
-  @tag db: true
   test "to_sql" do
-    start_supervised!(Repo)
-
     user_id = 1
     query = "example" |> where([e], e.user_id == ^user_id) |> select([e], e.name)
-    assert {sql, params} = Repo.to_sql(:all, query)
+    assert {sql, params} = Ecto.Integration.TestRepo.to_sql(:all, query)
     assert sql == ~s[SELECT e0."name" FROM "example" AS e0 WHERE (e0."user_id" = {$0:Int64})]
     assert params == [1]
   end
