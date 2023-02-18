@@ -10,20 +10,7 @@ iex> defmodule Repo do
 iex> import Ecto.Query
 iex> Repo.start_link()
 
-iex> Repo.query("CREATE TABLE default.example(a UInt32, b String, c DateTime) engine=Memory")
-{:ok, %{num_rows: 0, rows: []}}
-
-iex> rows = [[1, "1", ~N[2022-11-26 09:38:24]], [2, "2", ~N[2022-11-26 09:38:25]], [3, "3", ~N[2022-11-26 09:38:26]]]
-iex> Repo.insert_stream("example", rows, fields: [:a, :b, :c], types: [:u32, :string, :datetime])
-{:ok, _written_rows = 3}
-
-iex> min_a = 1
-iex> "example" |> where([e], e.a > ^min_a) |> select([e], map(e, [:b, :c])) |> Repo.all()
-[%{b: "2", c: ~N[2022-11-26 09:38:25]}, %{b: "3", c: ~N[2022-11-26 09:38:26]}]
-
-iex> File.write!("example.csv", "a,b,c\n1,1,2022-11-26 09:38:24\n2,2,2022-11-26 09:38:25\n3,3,2022-11-26 09:38:26")
-iex> Repo.insert_stream("example", File.stream!("example.csv"), format: "CSVWithNames")
-{:ok, _written_rows = 3}
+iex> {:ok, _} = Repo.query("CREATE TABLE default.example(a UInt32, b String, c DateTime) engine=Memory")
 
 iex> defmodule Example do
        use Ecto.Schema
@@ -36,26 +23,34 @@ iex> defmodule Example do
        end
      end
 
-iex> Repo.insert_stream(Example, rows)
-{:ok, _written_rows = 3}
-
 iex> Repo.insert_all(Example, [%{a: 5, b: "5"}, %{a: 6}])
+{2, nil}
+
+iex> Repo.insert_all(Example, select(Example, [e], %{a: e.a, b: e.b}))
 {2, nil}
 
 iex> Example |> limit(2) |> Repo.all()
 [
   %Example{
-    a: 1,
-    b: "1",
-    c: ~N[2022-11-26 09:38:24]
+    a: 5,
+    b: "5",
+    c: ~N[1970-01-01 00:00:00]
   },
   %Example{
-    a: 2,
-    b: "2",
-    c: ~N[2022-11-26 09:38:25]
+    a: 6,
+    b: "",
+    c: ~N[1970-01-01 00:00:00]
   }
 ]
 
-iex> File.rm!("example.csv")
-iex> Repo.query("DROP TABLE default.example")
+iex> Repo.update_all(Example, set: [a: 2])
+# ** (Ecto.QueryError) ClickHouse does not support UPDATE statements -- use ALTER TABLE instead in query:
+# from e0 in Dev.Example,
+#   update: [set: [a: ^...]]
+
+iex> {_, _} = Repo.delete_all(Example, settings: [allow_experimental_lightweight_delete: 1])
+iex> Repo.aggregate(Example, :count)
+0
+
+iex> Repo.query!("DROP TABLE default.example")
 ```
