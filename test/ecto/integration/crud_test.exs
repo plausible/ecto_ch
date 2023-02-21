@@ -1,193 +1,278 @@
 defmodule Ecto.Integration.CrudTest do
-  use ExUnit.Case
+  use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo
-  alias EctoClickHouse.Integration.{Event, Session}
+  alias EctoClickHouse.Integration.{Account, AccountUser, Product, User}
 
   import Ecto.Query
 
-  setup do
-    on_exit(fn ->
-      TestRepo.query!("truncate table events")
-      TestRepo.query!("truncate table sessions")
-    end)
-  end
-
-  # TODO :async_insert (check if experimental delete works while insert is async)
-  # TODO insert_stream
-  # TODO insert_all with stream?
-  # TODO alter_update_all
-  # TODO alter_delete_all
-
   describe "insert" do
-    test "insert event" do
-      {:ok, event1} = TestRepo.insert(%Event{domain: "dummy.site"}, [])
-      assert event1
+    test "insert user" do
+      {:ok, user1} = TestRepo.insert(%User{id: 1, name: "John"}, [])
+      assert user1
 
-      {:ok, event2} = TestRepo.insert(%Event{domain: "example.com"}, [])
-      assert event2
+      {:ok, user2} = TestRepo.insert(%User{id: 2, name: "James"}, [])
+      assert user2
 
-      event =
-        Event
-        |> where(domain: ^event1.domain)
+      assert user1.id != user2.id
+
+      user =
+        User
+        |> select([u], u)
+        |> where([u], u.id == ^user1.id)
         |> TestRepo.one()
 
-      assert event.domain == "dummy.site"
+      assert user.name == "John"
+    end
 
-      # defaults
-      assert event.type == ""
-      assert event.session_id == 0
+    test "handles nulls when querying correctly" do
+      {:ok, account} =
+        %Account{id: 1, name: "Something"}
+        |> TestRepo.insert()
+
+      {:ok, product} =
+        %Product{
+          id: 1,
+          name: "Thing",
+          account_id: account.id,
+          approved_at: nil
+        }
+        |> TestRepo.insert()
+
+      found = TestRepo.get(Product, product.id)
+      assert found.id == product.id
+      assert found.approved_at == ~N[1970-01-01 00:00:00]
+      assert found.description == ""
+      assert found.name == "Thing"
+      assert found.tags == []
     end
 
     test "insert_all" do
       timestamp = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
-      event = %{
-        domain: "dummy.site",
-        inserted_at: timestamp
+      account = %{
+        name: "John",
+        inserted_at: timestamp,
+        updated_at: timestamp
       }
 
-      {1, nil} = TestRepo.insert_all(Event, [event], [])
+      {1, nil} = TestRepo.insert_all(Account, [account], [])
     end
   end
 
   describe "delete" do
-    @delete_opts [settings: [allow_experimental_lightweight_delete: 1]]
+    @delete_opts [settings: [allow_experimental_lightweight_delete: 1, mutations_sync: 1]]
 
-    test "deletes session" do
-      {:ok, session} = TestRepo.insert(%Session{id: 0}, [])
-      assert {:ok, %Session{}} = TestRepo.delete(session, @delete_opts)
-      # assert TestRepo.aggregate(Event, :count) == 0
+    test "deletes user" do
+      {:ok, user} = TestRepo.insert(%User{id: 1, name: "John"}, [])
+      {:ok, _} = TestRepo.delete(user, @delete_opts)
+      assert TestRepo.aggregate(User, :count) == 0
     end
 
-    test "delete_all deletes one event" do
-      TestRepo.insert!(%Event{domain: "dummy.site"}, [])
-      assert {1, nil} = TestRepo.delete_all(Event, @delete_opts)
-      # assert TestRepo.aggregate(Event, :count) == 0
+    test "delete_all deletes one product" do
+      TestRepo.insert!(%Product{name: "hello"})
+      assert {0, _} = TestRepo.delete_all(Product, @delete_opts)
+      assert TestRepo.aggregate(Product, :count) == 0
     end
 
-    test "delete_all deletes all events" do
-      TestRepo.insert!(%Event{domain: "dummy.site"}, [])
-      TestRepo.insert!(%Event{domain: "example.com"}, [])
-      # TODO {2, nil} but we don't seem to have any info from clickhouse
-      # as to how many rows have been "deleted"
-      assert {1, nil} = TestRepo.delete_all(Event, @delete_opts)
-      # assert TestRepo.aggregate(Event, :count) == 0
+    test "delete_all deletes all products" do
+      TestRepo.insert!(%Product{name: "hello"})
+      TestRepo.insert!(%Product{name: "hello again"})
+      assert {0, _} = TestRepo.delete_all(Product, @delete_opts)
+      assert TestRepo.aggregate(Product, :count) == 0
     end
 
-    test "delete_all deletes selected events" do
-      TestRepo.insert!(%Event{domain: "dummy.site"}, [])
-      TestRepo.insert!(%Event{domain: "example.com"}, [])
-      assert {1, nil} = TestRepo.delete_all(where(Event, domain: "example.com"), @delete_opts)
-      # assert TestRepo.aggregate(Event, :count) == 1
+    test "delete_all deletes selected products" do
+      TestRepo.insert!(%Product{name: "hello"})
+      TestRepo.insert!(%Product{name: "hello again"})
+      assert {0, nil} = TestRepo.delete_all(where(Product, name: "hello"), @delete_opts)
+      assert TestRepo.aggregate(Product, :count) == 1
     end
   end
 
   describe "update" do
-    test "not supported" do
-      {:ok, session} = TestRepo.insert(%Session{id: 0, domain: "dummy.site"}, [])
-      changeset = Session.changeset(session, %{domain: "example.com"})
+    test "updates user" do
+      {:ok, user} = TestRepo.insert(%User{id: 1, name: "John"}, [])
+      changeset = User.changeset(user, %{name: "Bob"})
 
       assert_raise ArgumentError, ~r/ClickHouse does not support UPDATE statements/, fn ->
         TestRepo.update(changeset)
       end
     end
 
-    test "update_all not supported" do
+    test "update_all returns correct rows format" do
       assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(Event, set: [domain: "wow.com"])
+        # update with no return value should have nil rows
+        TestRepo.update_all(User, set: [name: "WOW"])
+      end
+
+      {:ok, _lj} = TestRepo.insert(%User{name: "Lebron James"}, [])
+
+      # update with returning that updates nothing should return [] rows
+      no_match_query =
+        from(
+          u in User,
+          where: u.name == "Michael Jordan",
+          select: %{name: u.name}
+        )
+
+      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
+        TestRepo.update_all(no_match_query, set: [name: "G.O.A.T"])
+      end
+
+      # update with returning that updates something should return resulting RETURNING clause correctly
+      match_query =
+        from(
+          u in User,
+          where: u.name == "Lebron James",
+          select: %{name: u.name}
+        )
+
+      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
+        TestRepo.update_all(match_query, set: [name: "G.O.A.T"])
+      end
+    end
+
+    test "update_all handles null<->nil conversion correctly" do
+      _account = TestRepo.insert!(%Account{name: "hello"})
+
+      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
+        TestRepo.update_all(Account, set: [name: nil])
+        # assert %Account{name: nil} = TestRepo.reload(account)
       end
     end
   end
 
-  describe "alter_update_all" do
-    @tag skip: true
-    test "todo"
-  end
-
+  # TODO raise on transaction, but allow checkout
   describe "transaction" do
-    test "not really supported, but no exceptions either" do
-      # we are not raising an expection since db_connection is using the same
-      # transaction interface for Repo.checkout (to run multiple statements on a single connection)
-      # which we __do__ want to support
+    test "successful user and account creation" do
+      {:ok, _} =
+        Ecto.Multi.new()
+        |> Ecto.Multi.insert(:account, fn _ ->
+          Account.changeset(%Account{id: 1}, %{name: "Foo"})
+        end)
+        |> Ecto.Multi.insert(:user, fn _ ->
+          User.changeset(%User{id: 1}, %{name: "Bob"})
+        end)
+        |> Ecto.Multi.insert(:account_user, fn %{account: account, user: user} ->
+          AccountUser.changeset(%AccountUser{id: 1}, %{
+            account_id: account.id,
+            user_id: user.id
+          })
+        end)
+        |> TestRepo.transaction()
+    end
 
-      assert {:ok, _changes} =
-               Ecto.Multi.new()
-               |> Ecto.Multi.insert(:session, fn _ ->
-                 Session.changeset(%Session{id: 0}, %{domain: "test.com"})
-               end)
-               |> Ecto.Multi.insert(:event, fn %{session: %{id: session_id}} ->
-                 Event.changeset(%Event{session_id: session_id}, %{
-                   domain: "test.com",
-                   type: "view"
-                 })
-               end)
-               |> TestRepo.transaction()
+    test "unsuccessful account creation" do
+      {:error, _, _, _} =
+        Ecto.Multi.new()
+        |> Ecto.Multi.insert(:account, fn _ ->
+          Account.changeset(%Account{id: 1}, %{name: nil})
+        end)
+        |> Ecto.Multi.insert(:user, fn _ ->
+          User.changeset(%User{id: 1}, %{name: "Bob"})
+        end)
+        |> Ecto.Multi.insert(:account_user, fn %{account: account, user: user} ->
+          AccountUser.changeset(%AccountUser{id: 1}, %{
+            account_id: account.id,
+            user_id: user.id
+          })
+        end)
+        |> TestRepo.transaction()
+    end
+
+    test "unsuccessful user creation" do
+      {:error, _, _, _} =
+        Ecto.Multi.new()
+        |> Ecto.Multi.insert(:account, fn _ ->
+          Account.changeset(%Account{id: 1}, %{name: "Foo"})
+        end)
+        |> Ecto.Multi.insert(:user, fn _ ->
+          User.changeset(%User{id: 1}, %{name: nil})
+        end)
+        |> Ecto.Multi.insert(:account_user, fn %{account: account, user: user} ->
+          AccountUser.changeset(%AccountUser{id: 1}, %{
+            account_id: account.id,
+            user_id: user.id
+          })
+        end)
+        |> TestRepo.transaction()
     end
   end
 
   describe "preloading" do
-    test "preloads has_many relation" do
-      session1 = TestRepo.insert!(%Session{id: 1, domain: "1.com"})
-      session2 = TestRepo.insert!(%Session{id: 2, domain: "2.com"})
-      TestRepo.insert!(%Event{session_id: session1.id, domain: "1.com", type: "view"})
-      TestRepo.insert!(%Event{session_id: session2.id, domain: "2.com", type: "view"})
+    test "preloads many to many relation" do
+      account1 = TestRepo.insert!(%Account{id: 1, name: "Main"})
+      account2 = TestRepo.insert!(%Account{id: 2, name: "Secondary"})
+      user1 = TestRepo.insert!(%User{id: 1, name: "John"}, [])
+      user2 = TestRepo.insert!(%User{id: 2, name: "Shelly"}, [])
+      TestRepo.insert!(%AccountUser{id: 1, user_id: user1.id, account_id: account1.id})
+      TestRepo.insert!(%AccountUser{id: 2, user_id: user1.id, account_id: account2.id})
+      TestRepo.insert!(%AccountUser{id: 3, user_id: user2.id, account_id: account2.id})
 
-      sessions = from(s in Session, preload: [:events]) |> TestRepo.all()
-      assert length(sessions) == 2
+      accounts = from(a in Account, preload: [:users]) |> TestRepo.all()
 
-      Enum.each(sessions, fn session ->
-        assert Ecto.assoc_loaded?(session.events)
+      assert Enum.count(accounts) == 2
+
+      Enum.each(accounts, fn account ->
+        assert Ecto.assoc_loaded?(account.users)
       end)
     end
-
-    @tag skip: true
-    test "preloads many_to_many relation"
   end
 
   describe "select" do
     test "can handle in" do
-      TestRepo.insert!(%Event{domain: "dummy.site"})
-      assert [] = TestRepo.all(from(e in Event, where: e.domain in ["example.com"]))
-      assert [_] = TestRepo.all(from(e in Event, where: e.domain in ["dummy.site"]))
+      TestRepo.insert!(%Account{id: 1, name: "hi"})
+      assert [] = TestRepo.all(from(a in Account, where: a.name in ["404"]))
+      assert [_] = TestRepo.all(from(a in Account, where: a.name in ["hi"]))
     end
 
     test "handles case sensitive text" do
-      TestRepo.insert!(%Event{domain: "dummy.site"})
-      assert [_] = TestRepo.all(from(e in Event, where: e.domain == "dummy.site"))
-      assert [] = TestRepo.all(from(e in Event, where: e.domain == "DUMMY.SITE"))
+      TestRepo.insert!(%Account{id: 1, name: "hi"})
+      assert [_] = TestRepo.all(from(a in Account, where: a.name == "hi"))
+      assert [] = TestRepo.all(from(a in Account, where: a.name == "HI"))
     end
 
+    # TODO
+    @tag skip: true
+    test "handles case insensitive text" do
+      TestRepo.insert!(%Account{id: 1, name: "hi", email: "hi@hi.com"})
+      assert [_] = TestRepo.all(from(a in Account, where: a.email == "hi@hi.com"))
+      assert [_] = TestRepo.all(from(a in Account, where: a.email == "HI@HI.COM"))
+    end
+
+    # TODO
     @tag skip: true
     test "handles exists subquery" do
-      TestRepo.insert!(%Session{id: 0})
-      TestRepo.insert!(%Event{session_id: 0}, [])
+      account1 = TestRepo.insert!(%Account{id: 1, name: "Main"})
+      user1 = TestRepo.insert!(%User{name: "John"}, [])
+      TestRepo.insert!(%AccountUser{user_id: user1.id, account_id: account1.id})
 
-      subquery = from(e in Event, where: e.session_id == parent_as(:session).id, select: 1)
+      subquery = from(au in AccountUser, where: au.user_id == parent_as(:user).id, select: 1)
 
-      assert [_] = TestRepo.all(from(s in Session, as: :session, where: exists(subquery)))
+      assert [_] = TestRepo.all(from(a in Account, as: :user, where: exists(subquery)))
     end
 
     test "can handle fragment literal" do
-      event1 = TestRepo.insert!(%Event{domain: "dummy.site"})
+      account1 = TestRepo.insert!(%Account{id: 1, name: "Main"})
 
-      domain = "domain"
-      query = from(e in Event, where: fragment("? = ?", literal(^domain), "dummy.site"))
+      name = "name"
+      query = from(a in Account, where: fragment("? = ?", literal(^name), "Main"))
 
-      assert [event] = TestRepo.all(query)
-      assert event.domain == event1.domain
+      assert [account] = TestRepo.all(query)
+      assert account.id == account1.id
     end
 
     test "can handle selected_as" do
-      TestRepo.insert!(%Event{domain: "dummy.site"})
-      TestRepo.insert!(%Event{domain: "dummy.site"})
-      TestRepo.insert!(%Event{domain: "dummy2.site"})
-      TestRepo.insert!(%Event{domain: "dummy3.site"})
+      TestRepo.insert!(%Account{id: 1, name: "Main"})
+      TestRepo.insert!(%Account{id: 2, name: "Main"})
+      TestRepo.insert!(%Account{id: 3, name: "Main2"})
+      TestRepo.insert!(%Account{id: 4, name: "Main3"})
 
       query =
-        from(e in Event,
+        from(a in Account,
           select: %{
-            domain: selected_as(e.domain, :name2),
+            name: selected_as(a.name, :name2),
             count: count()
           },
           group_by: selected_as(:name2),
@@ -195,20 +280,20 @@ defmodule Ecto.Integration.CrudTest do
         )
 
       assert [
-               %{domain: "dummy.site", count: 2},
-               %{domain: "dummy2.site", count: 1},
-               %{domain: "dummy3.site", count: 1}
+               %{name: "Main", count: 2},
+               %{name: "Main2", count: 1},
+               %{name: "Main3", count: 1}
              ] = TestRepo.all(query)
     end
 
     test "can handle floats" do
-      TestRepo.insert!(%Event{domain: "dummy.site"})
+      TestRepo.insert!(%Account{id: 1, name: "Main"})
 
       one = 1.0
       two = 2.0
 
       query =
-        from(a in Event,
+        from(a in Account,
           select: %{
             sum: ^one + ^two
           }

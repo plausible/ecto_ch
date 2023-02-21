@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Ecto.Adapters.ClickHouse
   alias Ecto.Adapters.ClickHouse.Connection
@@ -643,14 +643,24 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" = (s0."y" IS NULL) FROM "schema" AS s0]
   end
 
+  @decimal Ecto.ParameterizedType.init(Ch.Types.Decimal, precision: 18, scale: 2)
   test "order_by and types" do
     query =
       "schema3"
       |> order_by([e], type(fragment("?", e.binary), :decimal))
       |> select(true)
 
+    assert_raise ArgumentError, ~r/cast to :decimal is not supported/, fn ->
+      all(query)
+    end
+
+    query =
+      "schema3"
+      |> order_by([e], type(fragment("?", e.binary), ^@decimal))
+      |> select(true)
+
     assert all(query) ==
-             ~s[SELECT true FROM "schema3" AS s0 ORDER BY CAST(s0."binary" AS Decimal64(10))]
+             ~s[SELECT true FROM "schema3" AS s0 ORDER BY CAST(s0."binary" AS Decimal(18,2))]
   end
 
   test "fragments" do
@@ -1731,7 +1741,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
          {:add, :token, :binary, [null: false]},
          # TODO
          #  {:add, :price, :numeric, [precision: 8, scale: 2, default: {:fragment, "expr"}]},
-         {:add, :on_hand, :integer, [default: 0, size: 32, null: true]},
+         {:add, :on_hand, :integer, [default: 0, null: true]},
          {:add, :likes, :integer, [default: 0, null: false]},
          {:add, :published_at, :utc_datetime, [null: true, primary_key: true]},
          {:add, :is_active, :boolean, [default: true]},
@@ -1745,7 +1755,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              "name" String DEFAULT 'Untitled' NOT NULL,\
              "token" String NOT NULL,\
              "on_hand" Int32 DEFAULT 0 NULL,\
-             "likes" Int64 DEFAULT 0 NOT NULL,\
+             "likes" Int32 DEFAULT 0 NOT NULL,\
              "published_at" DateTime('UTC') NULL,\
              "is_active" Bool DEFAULT 1,\
              "notes" text,\
@@ -1787,7 +1797,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
        ]}
 
     assert_raise ArgumentError,
-                 "ClickHouse does not support PRIMARY KEY AUTOINCREMENT, consider using a type other than :serial or :bigserial",
+                 "type :serial is not supported as ClickHouse does not support AUTOINCREMENT",
                  fn -> execute_ddl(create) end
   end
 
@@ -1816,7 +1826,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "create table with options" do
     create =
-      {:create, table(:posts, options: "WITH FOO=BAR"),
+      {:create, table(:posts, engine: "MergeTree", options: "ORDER BY tuple()"),
        [
          {:add, :content, :string, []}
        ]}
@@ -1824,8 +1834,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(create) == [
              """
              CREATE TABLE "posts"("content" String) \
-             WITH FOO=BAR \
-             ENGINE=TinyLog\
+             ENGINE=MergeTree \
+             ORDER BY tuple()\
              """
            ]
   end
@@ -1854,8 +1864,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(create) == [
              """
              CREATE TABLE "posts"(\
-             "a" Int64,\
-             "b" Int64,\
+             "a" Int32,\
+             "b" Int32,\
              "name" String,\
              PRIMARY KEY ("a","b")\
              ) ENGINE=MergeTree\
@@ -1870,22 +1880,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
          {:add, :a, :map, [default: %{foo: "bar", baz: "boom"}]}
        ]}
 
-    assert_raise ArgumentError, ~r/Ambiguous :map type declaration/, fn -> execute_ddl(create) end
+    assert_raise ArgumentError, ~r/type :map is ambiguous/, fn -> execute_ddl(create) end
 
     create =
       {:create, table(:posts),
        [
-         {:add, :a, :map, [json: true, default: %{foo: "bar", baz: "boom"}]}
-       ]}
-
-    assert_raise ArgumentError,
-                 ~r/ClickHouse adapter does not support maps in :default, use fragments instead/,
-                 fn -> execute_ddl(create) end
-
-    create =
-      {:create, table(:posts),
-       [
-         {:add, :a, :map, [json: true]}
+         {:add, :a, :JSON, []}
        ]}
 
     assert execute_ddl(create) == [
@@ -1895,8 +1895,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     create =
       {:create, table(:posts),
        [
-         {:add, :a, :map,
-          [key: :string, value: :string, default: Ecto.Migration.fragment("Map('foo','bar')")]}
+         {:add, :a, :"Map(String,String)", [default: Ecto.Migration.fragment("Map('foo','bar')")]}
        ]}
 
     assert execute_ddl(create) == [
@@ -1912,7 +1911,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     create = {:create, table(:posts), [{:add, :order, :integer, []}]}
 
     assert execute_ddl(create) == [
-             ~s[CREATE TABLE "posts"("order" Int64) ENGINE=TinyLog]
+             ~s[CREATE TABLE "posts"("order" Int32) ENGINE=TinyLog]
            ]
   end
 
@@ -1921,14 +1920,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       {:create, table(:posts),
        [{:add, :published_at, :time, []}, {:add, :submitted_at, :time, []}]}
 
-    assert execute_ddl(create) == [
-             """
-             CREATE TABLE "posts"(\
-             "published_at" Time,\
-             "submitted_at" Time\
-             ) ENGINE=TinyLog\
-             """
-           ]
+    assert_raise ArgumentError, "type :time is not supported", fn ->
+      execute_ddl(create)
+    end
   end
 
   test "create table with utc_datetime columns" do
@@ -1954,14 +1948,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       {:create, table(:posts),
        [
          {:add, :published_at, :naive_datetime_usec, []},
-         {:add, :submitted_at, :naive_datetime, [timezone: "MSK"]}
+         {:add, :submitted_at, :naive_datetime, []}
        ]}
 
     assert execute_ddl(create) == [
              """
              CREATE TABLE "posts"(\
              "published_at" DateTime64(6),\
-             "submitted_at" DateTime('MSK')\
+             "submitted_at" DateTime\
              ) ENGINE=TinyLog\
              """
            ]
@@ -2032,7 +2026,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ADD COLUMN "title" String DEFAULT 'Untitled' NOT NULL\
              """,
              """
-             ALTER TABLE "posts" ADD COLUMN "author_id" Int64\
+             ALTER TABLE "posts" ADD COLUMN "author_id" Int32\
              """
            ]
   end
@@ -2048,7 +2042,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(alter) == [
              """
              ALTER TABLE "posts" \
-             ADD COLUMN "title" FixedString(100) DEFAULT 'Untitled' NOT NULL\
+             ADD COLUMN "title" String DEFAULT 'Untitled' NOT NULL\
              """,
              """
              ALTER TABLE "posts" \
@@ -2068,11 +2062,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(alter) == [
              """
              ALTER TABLE "foo"."posts" \
-             ADD COLUMN "title" FixedString(100) DEFAULT 'Untitled' NOT NULL\
+             ADD COLUMN "title" String DEFAULT 'Untitled' NOT NULL\
              """,
              """
              ALTER TABLE "foo"."posts" \
-             ADD COLUMN "author_id" Int64\
+             ADD COLUMN "author_id" Int32\
              """
            ]
   end
@@ -2081,7 +2075,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     alter =
       {:alter, table(:posts),
        [
-         {:modify, :price, :integer, [size: 128, unsigned: true]}
+         {:modify, :price, :UInt128, []}
        ]}
 
     assert execute_ddl(alter) == [
@@ -2111,7 +2105,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(alter) == [
              """
              ALTER TABLE "posts" \
-             ADD COLUMN "my_pk" Int64\
+             ADD COLUMN "my_pk" Int32\
              """
            ]
   end
@@ -2416,18 +2410,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     id = {:create, table, [{:add, :id, :id, [primary_key: true]}]}
     integer = {:create, table, [{:add, :id, :integer, [primary_key: true]}]}
 
-    error =
-      "ClickHouse does not support PRIMARY KEY AUTOINCREMENT, consider using a type other than :serial or :bigserial"
+    assert_raise ArgumentError, ~r/type :serial is not supported/, fn -> execute_ddl(serial) end
 
-    assert_raise ArgumentError, error, fn -> execute_ddl(serial) end
-    assert_raise ArgumentError, error, fn -> execute_ddl(bigserial) end
+    assert_raise ArgumentError, ~r/type :bigserial is not supported/, fn ->
+      execute_ddl(bigserial)
+    end
 
-    assert execute_ddl(id) == [
-             ~s/CREATE TABLE "posts"("id" Int64,PRIMARY KEY ("id")) ENGINE=MergeTree/
-           ]
+    assert_raise ArgumentError, ~r/type :id is ambiguous/, fn -> execute_ddl(id) end
 
     assert execute_ddl(integer) == [
-             ~s/CREATE TABLE "posts"("id" Int64,PRIMARY KEY ("id")) ENGINE=MergeTree/
+             ~s/CREATE TABLE "posts"("id" Int32,PRIMARY KEY ("id")) ENGINE=MergeTree/
            ]
   end
 end
