@@ -2,14 +2,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @moduledoc false
   @conn Ecto.Adapters.ClickHouse.Connection
 
-  # def insert_stream(schema_or_source, stream, {adapter_meta, opts}) do
-  #   {sql, opts} = build_insert(schema_or_source, opts)
-  #   opts = [{:command, :insert} | opts]
-  #   %{num_rows: num_rows} = Ecto.Adapters.SQL.query!(adapter_meta, sql, stream, opts)
-  #   return = if opts[:returning], do: []
-  #   {num_rows, return}
-  # end
-
   def insert_all(
         adapter_meta,
         schema_meta,
@@ -30,12 +22,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
 
         rows when is_list(rows) ->
-          types =
-            if schema do
-              extract_types(schema, header)
-            else
-              opts[:types] || raise "missing :types"
-            end
+          types = prepare_types(schema, header, opts)
 
           rows =
             rows
@@ -54,15 +41,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   def insert(adapter_meta, schema_meta, params, opts) do
     %{source: source, prefix: prefix, schema: schema} = schema_meta
-    {header, row} = Enum.unzip(params)
+    {header, row} = :lists.unzip(params)
 
-    types =
-      if schema do
-        extract_types(schema, header)
-      else
-        opts[:types] || raise "missing :types"
-      end
-
+    types = prepare_types(schema, header, opts)
     sql = @conn.insert(prefix, source, header, [])
     opts = [{:command, :insert}, {:format, "RowBinary"} | opts]
     row = Ch.RowBinary.encode_row(row, types)
@@ -74,7 +55,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   def delete(adapter_meta, %{source: source, prefix: prefix}, params, opts) do
     filter_values = Keyword.values(params)
     sql = @conn.delete(prefix, source, params, [])
-
     Ecto.Adapters.SQL.query!(adapter_meta, sql, filter_values, opts)
     {:ok, []}
   end
@@ -87,40 +67,26 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     end)
   end
 
-  # TODO
+  defp prepare_types(schema, header, opts) do
+    cond do
+      schema ->
+        extract_types(schema, header)
+
+      types = opts[:types] ->
+        Enum.map(header, fn field -> Access.fetch!(types, field) end)
+
+      true ->
+        raise ArgumentError, "missing :types"
+    end
+  end
+
   defp remap_type(:naive_datetime), do: :datetime
+  defp remap_type(:utc_datetime), do: :datetime
+  defp remap_type(:naive_datetime_usec), do: {:datetime64, :microsecond}
+  defp remap_type(:utc_datetime_usec), do: {:datetime64, :microsecond}
+  # TODO :integer is used in schema_versions schema
   defp remap_type(:integer), do: :i64
   defp remap_type(other), do: other
-
-  # defp build_insert(source, opts) when is_binary(source) do
-  #   prefix = Keyword.get(opts, :prefix)
-  #   fields = Keyword.get(opts, :fields)
-  #   sql = @conn.insert(prefix, source, fields, [])
-  #   {sql, opts}
-  # end
-
-  # defp build_insert(schema, opts) when is_atom(schema) do
-  #   prefix = schema.__schema__(:prefix)
-  #   table = schema.__schema__(:source)
-  #   fields = schema.__schema__(:fields)
-  #   types = extract_types(schema, fields)
-
-  #   sql = @conn.insert(prefix, table, fields, [])
-  #   opts = [{:types, types} | opts]
-
-  #   {sql, opts}
-  # end
-
-  # defp build_insert({source, schema}, opts) when is_atom(schema) do
-  #   prefix = schema.__schema__(:prefix)
-  #   fields = schema.__schema__(:fields)
-  #   types = extract_types(schema, fields)
-
-  #   sql = @conn.insert(prefix, source, fields, [])
-  #   opts = [{:types, types} | opts]
-
-  #   {sql, opts}
-  # end
 
   defp unzip_insert([row | rows], header) do
     [unzip_row(header, row) | unzip_insert(rows, header)]

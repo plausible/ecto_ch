@@ -42,7 +42,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @impl true
   def to_constraints(_exception, _opts) do
-    raise "ClickHouse does not support constraints"
+    raise "not implemented"
   end
 
   @impl true
@@ -849,11 +849,34 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db(:integer), do: "Int32"
   defp ecto_to_db(:bigint), do: "Int64"
   defp ecto_to_db(:float), do: "Float64"
-  defp ecto_to_db(:decimal), do: "Decimal64(10)"
+
+  defp ecto_to_db(:decimal) do
+    raise ArgumentError,
+          "cast to :decimal is not supported, please use Ch.Types.Decimal instead"
+  end
+
+  defp ecto_to_db({:decimal, precision, scale}) do
+    ["Decimal(", Integer.to_string(precision), ?,, Integer.to_string(scale), ?)]
+  end
+
   defp ecto_to_db(:boolean), do: "Bool"
   defp ecto_to_db(:date), do: "Date"
   defp ecto_to_db(:utc_datetime), do: "DateTime('UTC')"
   defp ecto_to_db(:naive_datetime), do: "DateTime"
+  # for belongs_to / has_many castings of Ch.Types.* primary keys
+  defp ecto_to_db(:u8), do: "UInt8"
+  defp ecto_to_db(:u16), do: "UInt16"
+  defp ecto_to_db(:u32), do: "UInt32"
+  defp ecto_to_db(:u64), do: "UInt64"
+  defp ecto_to_db(:u128), do: "UInt128"
+  defp ecto_to_db(:u256), do: "UInt256"
+  defp ecto_to_db(:i8), do: "Int8"
+  defp ecto_to_db(:i16), do: "Int16"
+  defp ecto_to_db(:i32), do: "Int32"
+  defp ecto_to_db(:i64), do: "Int64"
+  defp ecto_to_db(:i128), do: "Int128"
+  defp ecto_to_db(:i256), do: "Int256"
+  defp ecto_to_db({:string, size}), do: ["FixedString(", Integer.to_string(size), ?)]
   defp ecto_to_db(other), do: Atom.to_string(other)
 
   defp param_type_at(params, ix) do

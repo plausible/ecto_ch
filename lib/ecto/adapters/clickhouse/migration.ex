@@ -29,9 +29,9 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
         columns,
         pk,
         ?),
-        options,
-        " ENGINE="
-        | engine
+        " ENGINE=",
+        engine,
+        options
       ]
     ]
   end
@@ -151,26 +151,33 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   end
 
   defp pk_definition(columns) do
-    pk_expr =
-      columns
-      |> Enum.filter(fn {_, _, _, opts} ->
+    pk_columns =
+      Enum.filter(columns, fn {_, _, _, opts} ->
         case Keyword.get(opts, :primary_key, false) do
           true = t -> t
           false = f -> f
         end
       end)
-      |> Enum.map(fn {_, name, type, _} ->
-        if type in [:serial, :bigserial] do
-          raise ArgumentError,
-                "ClickHouse does not support PRIMARY KEY AUTOINCREMENT, " <>
-                  "consider using a type other than :serial or :bigserial"
-        end
 
-        @conn.quote_name(name)
-      end)
-      |> Enum.intersperse(?,)
+    case pk_columns do
+      [] = empty ->
+        empty
 
-    [",PRIMARY KEY (", pk_expr, ?)]
+      pk_columns ->
+        pk_expr =
+          pk_columns
+          |> Enum.map(fn {_, name, type, _} ->
+            if type in [:serial, :bigserial] do
+              raise ArgumentError,
+                    "type #{inspect(type)} is not supported as ClickHouse does not support AUTOINCREMENT"
+            end
+
+            @conn.quote_name(name)
+          end)
+          |> Enum.intersperse(?,)
+
+        [",PRIMARY KEY (", pk_expr, ?)]
+    end
   end
 
   defp column_definition({:add, _name, %Reference{}, _opts}) do
@@ -309,197 +316,77 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   defp column_type(type, _opts) when type in [:serial, :bigserial] do
     raise ArgumentError,
-          "ClickHouse does not support AUTOINCREMENT (:serial, :bigserial)"
+          "type #{inspect(type)} is not supported as ClickHouse does not support AUTOINCREMENT"
   end
 
-  defp column_type(:uuid = type, opts) do
-    validate_type_opts!(type, opts, [])
+  defp column_type(:uuid, _opts) do
     "UUID"
   end
 
-  defp column_type(:boolean = type, opts) do
-    validate_type_opts!(type, opts, [])
+  defp column_type(:boolean, _opts) do
     "Bool"
   end
 
-  defp column_type(type, opts) when type in [:id, :bigint, :integer] do
-    [size, unsigned, low_cardinality] =
-      validate_type_opts!(type, opts, [:size, :unsigned, :low_cardinality])
-
-    size = size || 64
-    base = if unsigned, do: "UInt", else: "Int"
-    validate_size!(size, [8, 16, 32, 64, 128, 256])
-    maybe_wrap_type(low_cardinality, "LowCardinality", "#{base}#{size}")
+  defp column_type(:id, _opts) do
+    raise ArgumentError, "type :id is ambiguous, use a literal (e.g. :Int64 or :UInt64) instead"
   end
 
-  defp column_type(type, opts) when type in [:string, :binary, :binary_id] do
-    [size, low_cardinality] = validate_type_opts!(type, opts, [:size, :low_cardinality])
-
-    type =
-      if size do
-        unless is_integer(size) and size > 0 do
-          raise ArgumentError, "expected :size to be positive integer, got: #{inspect(size)}"
-        end
-
-        "FixedString(#{size})"
-      else
-        "String"
-      end
-
-    maybe_wrap_type(low_cardinality, "LowCardinality", type)
+  defp column_type(:integer, _opts) do
+    "Int32"
   end
 
-  defp column_type(type, opts) when type in [:float, :numeric] do
-    [size, low_cardinality] = validate_type_opts!(type, opts, [:size, :low_cardinality])
-    size = size || 64
-    validate_size!(size, [32, 64])
-    maybe_wrap_type(low_cardinality, "LowCardinality", "Float#{size}")
+  defp column_type(:bigint, _opts) do
+    "Int64"
+  end
+
+  # TODO collate: bool
+  defp column_type(type, _opts) when type in [:string, :binary, :binary_id] do
+    "String"
+  end
+
+  defp column_type(:float, _opts) do
+    "Float64"
+  end
+
+  defp column_type(:numeric, _opts) do
+    raise "type :numeric is not supported"
   end
 
   defp column_type({:array, type}, opts) do
     ["Array(", column_type(type, opts), ?)]
   end
 
-  defp column_type(:map = type, opts) do
-    [k, v, json] = validate_type_opts!(type, opts, [:key, :value, :json])
-
-    cond do
-      k && v ->
-        k = column_type_map_kv(k)
-        v = column_type_map_kv(v)
-        "Map(#{k},#{v})"
-
-      json ->
-        "JSON"
-
-      true ->
-        raise ArgumentError, """
-        Ambiguous :map type declaration.
-
-        Please provide either:
-
-          - :key and :value options
-
-            add :map, :map, key: :string, value: {:integer, size: 64}
-            # Map(String, Int64)
-
-          - json: true
-
-            add :map, :map, json: true
-            # JSON
-        """
-    end
+  defp column_type(:map, _opts) do
+    raise ArgumentError,
+          ~s[type :map is ambiguous, use a literal (e.g. :JSON or :"Map(String, UInt8)") instead]
   end
 
-  defp column_type(:utc_datetime = type, opts) do
-    [low_cardinality] = validate_type_opts!(type, opts, [:low_cardinality])
-    maybe_wrap_type(low_cardinality, "LowCardinality", "DateTime('UTC')")
+  defp column_type(:utc_datetime, _opts) do
+    "DateTime('UTC')"
   end
 
-  defp column_type(:utc_datetime_usec = type, opts) do
-    [low_cardinality] = validate_type_opts!(type, opts, [:low_cardinality])
-    maybe_wrap_type(low_cardinality, "LowCardinality", "DateTime64(6,'UTC')")
+  defp column_type(:utc_datetime_usec, _opts) do
+    "DateTime64(6,'UTC')"
   end
 
-  defp column_type(:naive_datetime = type, opts) do
-    [timezone, low_cardinality] = validate_type_opts!(type, opts, [:timezone, :low_cardinality])
-
-    type =
-      if timezone do
-        "DateTime('#{timezone}')"
-      else
-        "DateTime"
-      end
-
-    maybe_wrap_type(low_cardinality, "LowCardinality", type)
+  defp column_type(:naive_datetime, _opts) do
+    "DateTime"
   end
 
-  defp column_type(:naive_datetime_usec = type, opts) do
-    [timezone, low_cardinality] = validate_type_opts!(type, opts, [:timezone, :low_cardinality])
-
-    type =
-      if timezone do
-        "DateTime64(6,'#{timezone}')"
-      else
-        "DateTime64(6)"
-      end
-
-    maybe_wrap_type(low_cardinality, "LowCardinality", type)
+  defp column_type(:naive_datetime_usec, _opts) do
+    "DateTime64(6)"
   end
 
   defp column_type(:time, _opts) do
-    "Time"
+    raise ArgumentError, "type :time is not supported"
   end
 
-  defp column_type(:decimal = type, opts) do
-    [precision, scale, size] = validate_type_opts!(type, opts, [:precision, :scale, :size])
-
-    cond do
-      precision && scale ->
-        validate_size!(precision, 1..76)
-        validate_size!(scale, 0..precision)
-        "Decimal(#{precision},#{scale})"
-
-      size && scale ->
-        validate_size!(size, [32, 64, 128, 256])
-
-        precision =
-          case size do
-            32 -> 9
-            64 -> 18
-            128 -> 38
-            256 -> 76
-          end
-
-        validate_size!(scale, 0..precision)
-        "Decimal#{size}(#{scale})"
-
-      true ->
-        "either :precision and :scale or :size and :scale are required for :decimal"
-    end
+  defp column_type(:decimal, _opts) do
+    raise ArgumentError,
+          ~s[type :decimal is ambiguous, use a literal (e.g. :"Decimal(p, s)") instead]
   end
 
-  defp column_type(type, opts) do
-    validate_type_opts!(type, opts, [])
+  defp column_type(type, _opts) do
     Atom.to_string(type)
-  end
-
-  defp validate_type_opts!(type, opts, keys) do
-    case Keyword.split(opts, [:default, :primary_key, :null] ++ keys) do
-      {opts, []} ->
-        Enum.map(keys, fn key -> opts[key] end)
-
-      {_opts, rest} ->
-        raise ArgumentError, "unsupported options for type #{inspect(type)}: #{inspect(rest)}"
-    end
-  end
-
-  defp maybe_wrap_type(wrap?, wrapper, type) do
-    if wrap? do
-      [wrapper, ?(, type, ?)]
-    else
-      type
-    end
-  end
-
-  defp column_type_map_kv({type, opts}), do: column_type(type, opts)
-  defp column_type_map_kv(type) when is_atom(type), do: column_type(type, [])
-  defp column_type_map_kv(type) when is_binary(type), do: type
-
-  defp validate_size!(nil, valid_sizes) do
-    unless nil in valid_sizes do
-      raise ArgumentError, "expected :size to be positive integer, got nil"
-    end
-  end
-
-  defp validate_size!(size, valid_sizes) do
-    unless is_integer(size) and size > 0 do
-      raise ArgumentError, "expected :size to be positive integer, got: #{inspect(size)}"
-    end
-
-    unless size in valid_sizes do
-      raise ArgumentError,
-            "expected :size to be in #{inspect(valid_sizes)}, got: #{size}"
-    end
   end
 end

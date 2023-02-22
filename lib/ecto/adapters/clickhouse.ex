@@ -29,32 +29,16 @@ defmodule Ecto.Adapters.ClickHouse do
       end
 
       @doc """
-      A convenience function for SQL-based repositories that executes the given multi-result query.
-
-      See `Ecto.Adapters.SQL.query_many/4` for more information.
-      """
-      def query_many(sql, params \\ [], opts \\ []) do
-        Ecto.Adapters.SQL.query_many(get_dynamic_repo(), sql, params, opts)
-      end
-
-      @doc """
-      A convenience function for SQL-based repositories that executes the given multi-result query.
-
-      See `Ecto.Adapters.SQL.query_many!/4` for more information.
-      """
-      def query_many!(sql, params \\ [], opts \\ []) do
-        Ecto.Adapters.SQL.query_many!(get_dynamic_repo(), sql, params, opts)
-      end
-
-      @doc """
       A convenience function for SQL-based repositories that translates the given query to SQL.
 
       See `Ecto.Adapters.SQL.to_sql/3` for more information.
       """
       def to_sql(operation, queryable) do
-        {query, params} = Ecto.Adapters.SQL.to_sql(operation, get_dynamic_repo(), queryable)
-        sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, params)
-        {IO.iodata_to_binary(sql), params}
+        {query, _cast_params, dump_params} =
+          Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
+
+        sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
+        {IO.iodata_to_binary(sql), dump_params}
       end
 
       @doc """
@@ -66,25 +50,28 @@ defmodule Ecto.Adapters.ClickHouse do
       def disconnect_all(interval, opts \\ []) do
         Ecto.Adapters.SQL.disconnect_all(get_dynamic_repo(), interval, opts)
       end
-
-      # TODO
-      # def insert_stream(schema_or_source, stream, opts \\ []) do
-      #   repo = get_dynamic_repo()
-      #   tuplet = Ecto.Repo.Supervisor.tuplet(repo, prepare_opts(:insert_stream, opts))
-      #   Ecto.Adapters.ClickHouse.Schema.insert_stream(schema_or_source, stream, tuplet)
-      # end
-
-      # TODO alter_delete_all, alter_update_all, explain
     end
   end
-
-  # TODO loaders for bool?
 
   @impl Ecto.Adapter
   def dumpers({:map, _subtype}, type), do: [&Ecto.Type.embedded_dump(type, &1, :json)]
   def dumpers({:in, subtype}, _type), do: [{:array, subtype}]
   def dumpers(:binary_id, type), do: [type, Ecto.UUID]
   def dumpers(_primitive, type), do: [type]
+
+  @impl Ecto.Adapter
+  def loaders({:map, _subtype}, type), do: [&Ecto.Type.embedded_load(type, &1, :json)]
+  def loaders(:binary_id, type), do: [Ecto.UUID, type]
+  def loaders(:boolean, type), do: [&bool_decode/1, type]
+  def loaders(:float, type), do: [&float_decode/1, type]
+  def loaders(_primitive, type), do: [type]
+
+  defp bool_decode(1), do: {:ok, true}
+  defp bool_decode(0), do: {:ok, false}
+  defp bool_decode(x), do: {:ok, x}
+
+  defp float_decode(%Decimal{} = decimal), do: {:ok, Decimal.to_float(decimal)}
+  defp float_decode(x), do: {:ok, x}
 
   @impl Ecto.Adapter.Migration
   def supports_ddl_transaction?, do: false
@@ -153,18 +140,29 @@ defmodule Ecto.Adapters.ClickHouse do
   @impl Ecto.Adapter.Queryable
   def execute(adapter_meta, _query_meta, {:nocache, {operation, query}}, params, opts) do
     sql = prepare_sql(operation, query, params)
+
+    opts =
+      case operation do
+        :all -> put_setting(opts, :readonly, 1)
+        _other -> opts
+      end
+
     result = Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
     case operation do
       :all ->
-        # TODO formats?
         %{num_rows: num_rows, rows: rows} = result
         {num_rows, rows}
 
       :delete_all ->
-        # TODO
-        {1, nil}
+        # clickhouse doesn't give us any info on how many have been deleted
+        {0, nil}
     end
+  end
+
+  defp put_setting(opts, key, value) do
+    setting = {key, value}
+    Keyword.update(opts, :settings, [setting], fn settings -> [setting | settings] end)
   end
 
   @doc false

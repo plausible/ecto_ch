@@ -1,8 +1,9 @@
 defmodule ChtoTest do
   use ExUnit.Case
+
   import Ecto.Query
   alias Ecto.Adapters.ClickHouse.Connection, as: SQL
-  alias EctoClickHouse.Integration.Event
+  alias EctoClickHouse.Integration.Product
 
   describe "all" do
     test "select one column" do
@@ -54,7 +55,7 @@ defmodule ChtoTest do
       date_range = %{first: ~D[2020-10-10], last: ~D[2021-01-01]}
 
       query =
-        from e in Event,
+        from e in "events",
           where: e.domain in ^domains,
           where: e.tags == ^tags,
           where: fragment("toDate(?)", e.inserted_at) >= ^date_range.first,
@@ -98,10 +99,10 @@ defmodule ChtoTest do
 
     test "where schema.array =" do
       tags = ["a", "b"]
-      query = Event |> where(tags: ^tags) |> select([e], e.domain)
+      query = Product |> where(tags: ^tags) |> select([p], p.name)
 
       assert all(query) ==
-               {~s[SELECT e0."domain" FROM "events" AS e0 WHERE (e0."tags" = {$0:Array(String)})],
+               {~s[SELECT p0."name" FROM "products" AS p0 WHERE (p0."tags" = {$0:Array(String)})],
                 [["a", "b"]]}
     end
   end

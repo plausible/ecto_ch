@@ -3,10 +3,14 @@ basic_types = [
   {:u16, UInt16, :integer},
   {:u32, UInt32, :integer},
   {:u64, UInt64, :integer},
+  {:u128, UInt128, :integer},
+  {:u256, UInt256, :integer},
   {:i8, Int8, :integer},
   {:i16, Int16, :integer},
   {:i32, Int32, :integer},
   {:i64, Int64, :integer},
+  {:i128, Int128, :integer},
+  {:i256, Int256, :integer},
   {:f32, Float32, :float},
   {:f64, Float64, :float}
 ]
@@ -27,24 +31,6 @@ for {type, name, base} <- basic_types do
     @impl true
     def load(value), do: Ecto.Type.load(unquote(base), value)
   end
-end
-
-defmodule Ch.Types.Boolean do
-  use Ecto.Type
-
-  @impl true
-  def type, do: :boolean
-
-  @impl true
-  def cast(value), do: Ecto.Type.cast(:boolean, value)
-
-  @impl true
-  def dump(value), do: Ecto.Type.dump(:boolean, value)
-
-  @impl true
-  def load(0), do: {:ok, false}
-  def load(1), do: {:ok, true}
-  def load(value), do: Ecto.Type.load(:boolean, value)
 end
 
 defmodule Ch.Types.FixedString do
@@ -69,4 +55,38 @@ defmodule Ch.Types.FixedString do
 
   @impl true
   def load(value, _loader, _size), do: Ecto.Type.load(:string, value)
+end
+
+defmodule Ch.Types.Decimal do
+  @moduledoc """
+  Ecto type for for [`Decimal(P, S)`](https://clickhouse.com/docs/en/sql-reference/data-types/decimal/)
+  """
+  use Ecto.ParameterizedType
+
+  # TODO fix warning
+  @impl true
+  def type({precision, scale}), do: {:decimal, precision, scale}
+
+  @impl true
+  def init(opts) do
+    precision = Keyword.fetch!(opts, :precision)
+    scale = Keyword.fetch!(opts, :scale)
+
+    (is_integer(precision) and precision > 0) ||
+      raise ArgumentError, ":precision needs to be a positive integer"
+
+    (is_integer(scale) and scale >= 0) ||
+      raise ArgumentError, ":scale needs to be a non-negative integer"
+
+    {precision, scale}
+  end
+
+  @impl true
+  def cast(value, _size), do: Ecto.Type.cast(:decimal, value)
+
+  @impl true
+  def dump(value, _dumper, _size), do: Ecto.Type.dump(:decimal, value)
+
+  @impl true
+  def load(value, _loader, _size), do: Ecto.Type.load(:decimal, value)
 end
