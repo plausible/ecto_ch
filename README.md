@@ -10,7 +10,7 @@ iex> defmodule Repo do
 iex> import Ecto.Query
 iex> Repo.start_link()
 
-iex> {:ok, _} = Repo.query("CREATE TABLE default.example(a UInt32, b String, c DateTime) engine=Memory")
+iex> Repo.query!("create table example(a UInt32, b String, c DateTime) engine=MergeTree order by tuple()")
 
 iex> defmodule Example do
        use Ecto.Schema
@@ -23,22 +23,25 @@ iex> defmodule Example do
        end
      end
 
+iex> Repo.insert_all("example", [%{a: 1, b: "2"}, %{a: 3, c: nil}], types: [a: :u32, b: :string, c: :datetime])
+{2, nil}
+
 iex> Repo.insert_all(Example, [%{a: 5, b: "5"}, %{a: 6}])
 {2, nil}
 
 iex> Repo.insert_all(Example, select(Example, [e], %{a: e.a, b: e.b}))
 {2, nil}
 
-iex> Example |> limit(2) |> Repo.all()
+iex> Example |> order_by(desc: :a) |> limit(2) |> Repo.all()
 [
-  %Example{
-    a: 5,
-    b: "5",
-    c: ~N[1970-01-01 00:00:00]
-  },
   %Example{
     a: 6,
     b: "",
+    c: ~N[1970-01-01 00:00:00]
+  }
+  %Example{
+    a: 5,
+    b: "5",
     c: ~N[1970-01-01 00:00:00]
   }
 ]
@@ -48,9 +51,12 @@ iex> Repo.update_all(Example, set: [a: 2])
 # from e0 in Dev.Example,
 #   update: [set: [a: ^...]]
 
-iex> {_, _} = Repo.delete_all(Example, settings: [allow_experimental_lightweight_delete: 1])
+# count is 0 since clickhouse doesn't (seem to) respond with how many rows been deleted
+iex> Repo.delete_all(Example, settings: [allow_experimental_lightweight_delete: 1, mutations_sync: 1])
+{0, nil}
+
 iex> Repo.aggregate(Example, :count)
 0
 
-iex> Repo.query!("DROP TABLE default.example")
+iex> Repo.query!("drop table example")
 ```
