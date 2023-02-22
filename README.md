@@ -1,6 +1,8 @@
 Ecto Adapter for ClickHouse using [`:ch`](https://github.com/ruslandoga/ch)
 
 ```elixir
+## speedrun
+
 iex> Mix.install([{:chto, github: "ruslandoga/chto"}])
 
 iex> defmodule Repo do
