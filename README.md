@@ -29,9 +29,6 @@ iex> Repo.insert_all("example", [%{a: 1, b: "2"}, %{a: 3, c: nil}], types: [a: :
 iex> Repo.insert_all(Example, [%{a: 5, b: "5"}, %{a: 6}])
 {2, nil}
 
-iex> Repo.insert_all(Example, select(Example, [e], %{a: e.a, b: e.b}))
-{2, nil}
-
 iex> Example |> order_by(desc: :a) |> limit(2) |> Repo.all()
 [
   %Example{
@@ -45,6 +42,9 @@ iex> Example |> order_by(desc: :a) |> limit(2) |> Repo.all()
     c: ~N[1970-01-01 00:00:00]
   }
 ]
+
+iex> Repo.insert_all(Example, select(Example, [e], %{a: e.a, b: e.b}))
+{4, nil}
 
 iex> Repo.update_all(Example, set: [a: 2])
 # ** (Ecto.QueryError) ClickHouse does not support UPDATE statements -- use ALTER TABLE instead in query:
