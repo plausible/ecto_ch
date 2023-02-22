@@ -36,9 +36,8 @@ end
 defmodule Ch.Types.FixedString do
   use Ecto.ParameterizedType
 
-  # TODO fix warning
   @impl true
-  def type(size), do: {:string, size}
+  def type(size), do: {:parameterized, :string, size}
 
   @impl true
   def init(opts) do
@@ -57,15 +56,42 @@ defmodule Ch.Types.FixedString do
   def load(value, _loader, _size), do: Ecto.Type.load(:string, value)
 end
 
+defmodule Ch.Types.Nullable do
+  use Ecto.ParameterizedType
+
+  @impl true
+  def type(type), do: {:parameterized, :nullable, type}
+
+  @impl true
+  def init(opts) do
+    type = Keyword.fetch!(opts, :type)
+    is_atom(type) || raise ArgumentError, ":type needs to be an atom"
+
+    try do
+      type.type()
+    rescue
+      _ -> type
+    end
+  end
+
+  @impl true
+  def cast(value, type), do: Ecto.Type.cast(type, value)
+
+  @impl true
+  def dump(value, _dumper, type), do: Ecto.Type.dump(type, value)
+
+  @impl true
+  def load(value, _loader, type), do: Ecto.Type.load(type, value)
+end
+
 defmodule Ch.Types.Decimal do
   @moduledoc """
   Ecto type for for [`Decimal(P, S)`](https://clickhouse.com/docs/en/sql-reference/data-types/decimal/)
   """
   use Ecto.ParameterizedType
 
-  # TODO fix warning
   @impl true
-  def type({precision, scale}), do: {:decimal, precision, scale}
+  def type({precision, scale}), do: {:parameterized, :decimal, {precision, scale}}
 
   @impl true
   def init(opts) do

@@ -36,7 +36,8 @@ defmodule Chto.MixProject do
       {:ecto_sql, "~> 3.9"},
       {:decimal, "~> 2.0"},
       {:rexbug, "~> 1.0", only: [:dev, :test]},
-      {:benchee, "~> 1.1", only: :bench}
+      {:benchee, "~> 1.1", only: :bench},
+      {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false}
     ]
   end
 end
