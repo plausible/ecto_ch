@@ -334,6 +334,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp join_on(:cross, true, _sources, _params, _query), do: []
 
+  defp join_on(array, true, _sources, _params, _query)
+       when array in [:inner_lateral, :left_lateral] do
+    []
+  end
+
   defp join_on(_qual, expr, sources, params, query) do
     [" ON " | expr(expr, sources, params, query)]
   end
