@@ -216,7 +216,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              UNION ALL \
              SELECT c0."id",t1."depth" + 1 FROM "categories" AS c0 \
              INNER JOIN "tree" AS t1 ON t1."id" = c0."parent_id") \
-             SELECT s0."x",t1."id",CAST(t1."depth" AS Int32) \
+             SELECT s0."x",t1."id",CAST(t1."depth" AS Int64) \
              FROM "schema" AS s0 \
              INNER JOIN "tree" AS t1 ON t1."id" = s0."category_id"\
              """
