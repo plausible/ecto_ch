@@ -34,11 +34,7 @@ defmodule Ecto.Adapters.ClickHouse do
       See `Ecto.Adapters.SQL.to_sql/3` for more information.
       """
       def to_sql(operation, queryable) do
-        {query, _cast_params, dump_params} =
-          Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
-
-        sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
-        {IO.iodata_to_binary(sql), dump_params}
+        Ecto.Adapters.ClickHouse.to_sql(operation, queryable)
       end
 
       @doc """
@@ -158,6 +154,15 @@ defmodule Ecto.Adapters.ClickHouse do
         # clickhouse doesn't give us any info on how many have been deleted
         {0, nil}
     end
+  end
+
+  @doc false
+  def to_sql(operation, queryable) do
+    {query, _cast_params, dump_params} =
+      Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
+
+    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
+    {IO.iodata_to_binary(sql), dump_params}
   end
 
   defp put_setting(opts, key, value) do

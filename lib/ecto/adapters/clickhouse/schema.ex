@@ -16,10 +16,10 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     %{num_rows: num_rows} =
       case rows do
-        {%Ecto.Query{} = _query, _params} ->
+        {%Ecto.Query{} = _query, params} ->
           sql = @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders)
           opts = [{:command, :insert} | opts]
-          Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
+          Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->
           types = prepare_types(schema, header, opts)
@@ -27,9 +27,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           rows =
             rows
             |> unzip_insert(header)
-            # TODO
-            |> Stream.chunk_every(50)
-            |> Stream.map(fn chunk -> Ch.RowBinary.encode_rows(chunk, types) end)
+            |> Ch.RowBinary.encode_rows(types)
 
           sql = @conn.insert(prefix, source, header, [])
           opts = [{:command, :insert}, {:format, "RowBinary"} | opts]
@@ -86,6 +84,22 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp remap_type(:utc_datetime_usec), do: {:datetime64, :microsecond}
   # TODO :integer is used in schema_versions schema
   defp remap_type(:integer), do: :i64
+
+  # TODO streamline
+  defp remap_type({:parameterized, type, params}) do
+    case type do
+      :string ->
+        {:string, params}
+
+      :decimal ->
+        {p, s} = params
+        {:decimal, p, s}
+
+      :nullable ->
+        params
+    end
+  end
+
   defp remap_type(other), do: other
 
   defp unzip_insert([row | rows], header) do
