@@ -846,8 +846,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db(:uuid), do: "UUID"
   defp ecto_to_db(:string), do: "String"
   defp ecto_to_db(:binary), do: "String"
-  defp ecto_to_db(:integer), do: "Int32"
-  defp ecto_to_db(:bigint), do: "Int64"
+  # when ecto migrator queries for versions in schema_versions it uses type(version, :integer)
+  # so we need :integer to be the same as :bigint which is used for schema_versions table definition
+  # this is why :integer is Int64 and not Int32
+  defp ecto_to_db(i) when i in [:integer, :bigint], do: "Int64"
   defp ecto_to_db(:float), do: "Float64"
 
   defp ecto_to_db(:decimal) do

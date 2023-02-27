@@ -188,11 +188,12 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     [
       @conn.quote_name(name),
       ?\s,
-      column_type(type, opts)
+      column_type(type)
       | column_options(type, opts)
     ]
   end
 
+  # TODO collate support?
   defp column_options(type, opts) do
     default = Keyword.fetch(opts, :default)
     null = Keyword.get(opts, :null)
@@ -212,7 +213,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       "ADD COLUMN ",
       @conn.quote_name(name),
       ?\s,
-      column_type(type, opts)
+      column_type(type)
       | column_options(type, opts)
     ]
   end
@@ -226,7 +227,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       "MODIFY COLUMN ",
       @conn.quote_name(name),
       ?\s,
-      column_type(type, opts),
+      column_type(type),
       modify_default(name, type, opts)
       | modify_null(name, opts)
     ]
@@ -312,81 +313,51 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   defp options_expr(options), do: [?\s | to_string(options)]
 
-  defp column_type(type, nil), do: column_type(type, [])
-
-  defp column_type(type, _opts) when type in [:serial, :bigserial] do
+  defp column_type(type) when type in [:serial, :bigserial] do
     raise ArgumentError,
           "type #{inspect(type)} is not supported as ClickHouse does not support AUTOINCREMENT"
   end
 
-  defp column_type(:uuid, _opts) do
-    "UUID"
-  end
-
-  defp column_type(:boolean, _opts) do
-    "Bool"
-  end
-
-  defp column_type(:id, _opts) do
+  defp column_type(:id) do
     raise ArgumentError, "type :id is ambiguous, use a literal (e.g. :Int64 or :UInt64) instead"
   end
 
-  defp column_type(:integer, _opts) do
-    "Int32"
+  defp column_type(:numeric) do
+    raise ArgumentError, "type :numeric is not supported"
   end
 
-  defp column_type(:bigint, _opts) do
-    "Int64"
+  defp column_type(:time) do
+    raise ArgumentError, "type :time is not supported"
   end
 
-  # TODO collate: bool
-  defp column_type(type, _opts) when type in [:string, :binary, :binary_id] do
-    "String"
-  end
-
-  defp column_type(:float, _opts) do
-    "Float64"
-  end
-
-  defp column_type(:numeric, _opts) do
-    raise "type :numeric is not supported"
-  end
-
-  defp column_type({:array, type}, opts) do
-    ["Array(", column_type(type, opts), ?)]
-  end
-
-  defp column_type(:map, _opts) do
+  defp column_type(:map) do
     raise ArgumentError,
           ~s[type :map is ambiguous, use a literal (e.g. :JSON or :"Map(String, UInt8)") instead]
   end
 
-  defp column_type(:utc_datetime, _opts) do
-    "DateTime('UTC')"
-  end
-
-  defp column_type(:utc_datetime_usec, _opts) do
-    "DateTime64(6,'UTC')"
-  end
-
-  defp column_type(:naive_datetime, _opts) do
-    "DateTime"
-  end
-
-  defp column_type(:naive_datetime_usec, _opts) do
-    "DateTime64(6)"
-  end
-
-  defp column_type(:time, _opts) do
-    raise ArgumentError, "type :time is not supported"
-  end
-
-  defp column_type(:decimal, _opts) do
+  defp column_type(:decimal) do
     raise ArgumentError,
           ~s[type :decimal is ambiguous, use a literal (e.g. :"Decimal(p, s)") instead]
   end
 
-  defp column_type(type, _opts) do
-    Atom.to_string(type)
+  defp column_type(:uuid), do: "UUID"
+  defp column_type(:boolean), do: "Bool"
+  defp column_type(:integer), do: "Int32"
+  defp column_type(:bigint), do: "Int64"
+
+  defp column_type(type) when type in [:string, :binary, :binary_id] do
+    "String"
   end
+
+  defp column_type(:float), do: "Float64"
+
+  defp column_type({:array, type}) do
+    ["Array(", column_type(type), ?)]
+  end
+
+  defp column_type(:utc_datetime), do: "DateTime('UTC')"
+  defp column_type(:utc_datetime_usec), do: "DateTime64(6,'UTC')"
+  defp column_type(:naive_datetime), do: "DateTime"
+  defp column_type(:naive_datetime_usec), do: "DateTime64(6)"
+  defp column_type(type), do: Atom.to_string(type)
 end
