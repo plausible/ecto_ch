@@ -31,7 +31,7 @@ defmodule Ecto.Adapters.ClickHouseTest do
     end
   end
 
-  describe "storage_down/2" do
+  describe "storage_down/1" do
     test "storage down (twice)" do
       opts = [database: "chto_temp_down_2"]
 
@@ -43,6 +43,22 @@ defmodule Ecto.Adapters.ClickHouseTest do
       refute ["chto_temp_down_2"] in rows
 
       assert {:error, :already_down} = ClickHouse.storage_down(opts)
+    end
+  end
+
+  describe "storage_status/1" do
+    test "when database is down" do
+      opts = [database: "chto_temp_status_down"]
+      assert ClickHouse.storage_status(opts) == :down
+    end
+
+    test "when database is up" do
+      opts = [database: "chto_temp_status_up"]
+
+      :ok = ClickHouse.storage_up(opts)
+      on_exit(fn -> ClickHouse.storage_down(opts) end)
+
+      assert ClickHouse.storage_status(opts) == :up
     end
   end
 end
