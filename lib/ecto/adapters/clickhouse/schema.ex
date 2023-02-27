@@ -96,7 +96,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         {:decimal, p, s}
 
       :nullable ->
-        params
+        {:nullable, params}
     end
   end
 

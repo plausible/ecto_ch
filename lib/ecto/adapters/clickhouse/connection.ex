@@ -871,7 +871,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp ecto_to_db({:parameterized, :nullable, type}) do
-    ecto_to_db(type)
+    ["Nullable(", ecto_to_db(type), ?)]
   end
 
   defp ecto_to_db(:boolean), do: "Bool"

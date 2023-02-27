@@ -60,28 +60,34 @@ defmodule Ch.Types.Nullable do
   use Ecto.ParameterizedType
 
   @impl true
-  def type(type), do: {:parameterized, :nullable, type}
+  def type({_ecto_type, ch_type}), do: {:parameterized, :nullable, ch_type}
 
   @impl true
   def init(opts) do
-    type = Keyword.fetch!(opts, :type)
-    is_atom(type) || raise ArgumentError, ":type needs to be an atom"
+    ecto_type = Keyword.fetch!(opts, :type)
 
-    try do
-      type.type()
-    rescue
-      _ -> type
-    end
+    is_atom(ecto_type) ||
+      raise ArgumentError,
+            ":type needs to be an Ecto.Type or an atom like :string, :utc_datetime, etc."
+
+    ch_type =
+      try do
+        ecto_type.type()
+      rescue
+        _ -> ecto_type
+      end
+
+    {ecto_type, ch_type}
   end
 
   @impl true
-  def cast(value, type), do: Ecto.Type.cast(type, value)
+  def cast(value, {ecto_type, _ch_type}), do: Ecto.Type.cast(ecto_type, value)
 
   @impl true
-  def dump(value, _dumper, type), do: Ecto.Type.dump(type, value)
+  def dump(value, _dumper, {ecto_type, _ch_type}), do: Ecto.Type.dump(ecto_type, value)
 
   @impl true
-  def load(value, _loader, type), do: Ecto.Type.load(type, value)
+  def load(value, _loader, {ecto_type, _ch_type}), do: Ecto.Type.load(ecto_type, value)
 end
 
 defmodule Ch.Types.Decimal do
