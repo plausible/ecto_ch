@@ -5,47 +5,52 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   @conn Ecto.Adapters.ClickHouse.Connection
 
+  # TODO include views
+
   def structure_dump(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
     migration_source = config[:migration_source] || "schema_migrations"
 
     with {:ok, conn} <- Conn.connect(config),
-         {:ok, contents, conn} <- structure_dump_schema(conn),
-         {:ok, versions, _conn} <- structure_dump_versions(conn, migration_source) do
+         {:ok, tables, conn} <- show("TABLES", conn),
+         {:ok, dicts, conn} <- show("DICTIONARIES", conn),
+         tables = tables -- [migration_source],
+         {:ok, tables, conn} <- show_create("TABLE", conn, [migration_source | tables]),
+         {:ok, dicts, conn} <- show_create("DICTIONARY", conn, dicts),
+         {:ok, versions, _conn} <- dump_versions(conn, migration_source) do
       File.mkdir_p!(Path.dirname(path))
-      File.write!(path, [contents, ?\n, versions])
+      File.write!(path, [tables, dicts, versions, ?\n])
       {:ok, path}
     end
   end
 
-  # TODO show dictionaries, views
-  defp structure_dump_schema(conn) do
-    with {:ok, %{rows: rows}, conn} <- exec(conn, "SHOW TABLES") do
-      tables = Enum.map(rows, fn [table] -> table end)
-      structure_dump_tables(conn, tables)
+  defp show(what, conn) do
+    with {:ok, %{rows: rows}, conn} <- exec(conn, "SHOW #{what}") do
+      objects = Enum.map(rows, fn [object] -> object end)
+      {:ok, objects, conn}
     end
   end
 
-  defp structure_dump_tables(conn, tables) do
-    stmt = fn table -> "SHOW CREATE TABLE #{@conn.quote_name(table)}" end
+  defp show_create(what, conn, objects) do
+    show = fn object -> "SHOW CREATE #{what} #{@conn.quote_name(object)}" end
 
     result =
-      Enum.reduce_while(tables, {[], conn}, fn table, {schemas, conn} ->
-        case exec(conn, stmt.(table)) do
-          {:ok, %{rows: [[schema]]}, conn} -> {:cont, {[schema, ?\n | schemas], conn}}
+      Enum.reduce_while(objects, {[], conn}, fn object, {schemas, conn} ->
+        case exec(conn, show.(object)) do
+          {:ok, %{rows: [[schema]]}, conn} -> {:cont, {[schema, "\n\n" | schemas], conn}}
           {:error, _reason} = error -> {:halt, error}
         end
       end)
 
     case result do
       {:error, _reason} = error -> error
-      schemas when is_list(schemas) -> {:ok, schemas, conn}
+      {schemas, conn} when is_list(schemas) -> {:ok, schemas, conn}
     end
   end
 
-  defp structure_dump_versions(conn, table) do
+  defp dump_versions(conn, table) do
     table = @conn.quote_name(table)
-    stmt = "SELECT * FROM #{table} FORMAT CSVWithNames"
+    stmt = "SELECT * FROM #{table}"
 
     with {:ok, %{rows: rows}, conn} <- exec(conn, stmt, [], format: "Values") do
       versions = ["INSERT INTO ", table, "(version, inserted_at) VALUES " | rows]
@@ -54,10 +59,9 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   end
 
   def exec(conn, sql, params \\ [], opts \\ []) do
-    {query_opts, exec_opts} = Keyword.split(opts, [:command])
-    query = Query.build(sql, query_opts)
+    query = Query.build(sql, opts)
 
-    case Conn.handle_execute(query, params, exec_opts, conn) do
+    case Conn.handle_execute(query, params, opts, conn) do
       {:ok, _query, result, conn} -> {:ok, result, conn}
       {:disconnect, reason, _conn} -> {:error, reason}
       {:error, reason, _conn} -> {:error, reason}
