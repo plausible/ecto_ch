@@ -6,12 +6,12 @@ defmodule Ecto.Integration.Case do
     on_exit(fn ->
       %{rows: rows} = TestRepo.query!("show tables")
 
-      # this includes schema_versions as well, but we don't
+      # this includes schema_migrations as well, but we don't
       # care since the database is recreated each time anew
       tables = Enum.map(rows, fn [table] -> table end)
 
       for table <- tables do
-        TestRepo.query!("truncate #{table}", [], alter_sync: 1)
+        TestRepo.query!("truncate #{table}")
       end
     end)
   end
