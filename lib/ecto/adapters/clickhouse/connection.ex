@@ -16,7 +16,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
-    query = Ch.Query.build(statement, opts)
+    query = Ch.Query.build(statement, opts[:command])
     DBConnection.prepare_execute(conn, query, params, opts)
   end
 
@@ -207,8 +207,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
     explain_query = [explain | query]
 
-    with {:ok, result} <- query(conn, explain_query, params, opts) do
-      {:ok, %{rows: rows}} = result
+    with {:ok, %{rows: rows}} <- query(conn, explain_query, params, opts) do
       {:ok, rows}
     end
   end

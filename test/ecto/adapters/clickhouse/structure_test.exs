@@ -196,7 +196,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       assert find_schema.("ingest_counters") == """
              CREATE TABLE chto_temp_structure_migrated.ingest_counters
              (
-                 `event_timebucket` DateTime('UTC'),
+                 `event_timebucket` DateTime,
                  `domain` LowCardinality(String),
                  `site_id` Nullable(UInt64),
                  `metric` LowCardinality(String),

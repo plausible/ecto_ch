@@ -1,6 +1,7 @@
 defmodule Ecto.Adapters.ClickHouse.Schema do
   @moduledoc false
   @conn Ecto.Adapters.ClickHouse.Connection
+  @dialyzer :no_improper_lists
 
   def insert_all(
         adapter_meta,
@@ -18,19 +19,14 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
       case rows do
         {%Ecto.Query{} = _query, params} ->
           sql = @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders)
-          opts = [{:command, :insert} | opts]
+          opts = [{:command, :insert_select} | opts]
           Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->
           types = prepare_types(schema, header, opts)
-
-          rows =
-            rows
-            |> unzip_insert(header)
-            |> Ch.RowBinary.encode_rows(types)
-
-          sql = @conn.insert(prefix, source, header, [])
-          opts = [{:command, :insert}, {:format, "RowBinary"} | opts]
+          rows = rows |> unzip_insert(header) |> Ch.RowBinary.encode_rows(types)
+          sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
+          opts = [{:command, :insert} | opts]
           Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
       end
 
@@ -42,8 +38,8 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     {header, row} = :lists.unzip(params)
 
     types = prepare_types(schema, header, opts)
-    sql = @conn.insert(prefix, source, header, [])
-    opts = [{:command, :insert}, {:format, "RowBinary"} | opts]
+    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
+    opts = [{:command, :insert} | opts]
     row = Ch.RowBinary.encode_row(row, types)
 
     Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts)

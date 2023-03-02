@@ -1756,7 +1756,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              "token" String NOT NULL,\
              "on_hand" Int32 DEFAULT 0 NULL,\
              "likes" Int32 DEFAULT 0 NOT NULL,\
-             "published_at" DateTime('UTC') NULL,\
+             "published_at" DateTime NULL,\
              "is_active" Bool DEFAULT 1,\
              "notes" text,\
              "meta" text,\
@@ -1936,8 +1936,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(create) == [
              """
              CREATE TABLE "posts"(\
-             "published_at" DateTime64(6,'UTC'),\
-             "submitted_at" DateTime('UTC')\
+             "published_at" DateTime64(6),\
+             "submitted_at" DateTime\
              ) ENGINE=TinyLog\
              """
            ]
@@ -2046,7 +2046,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """,
              """
              ALTER TABLE "posts" \
-             ADD COLUMN "when" DateTime('UTC') NOT NULL\
+             ADD COLUMN "when" DateTime NOT NULL\
              """
            ]
   end

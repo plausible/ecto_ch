@@ -143,10 +143,10 @@ defmodule Ecto.Integration.CrudTest do
     end
   end
 
-  # TODO raise on transaction, but allow checkout
   describe "transaction" do
+    @tag capture_log: true
     test "successful user and account creation" do
-      {:ok, _} =
+      multi =
         Ecto.Multi.new()
         |> Ecto.Multi.insert(:account, fn _ ->
           Account.changeset(%Account{id: 1}, %{name: "Foo"})
@@ -160,11 +160,15 @@ defmodule Ecto.Integration.CrudTest do
             user_id: user.id
           })
         end)
-        |> TestRepo.transaction()
+
+      assert_raise Ch.Error, "transaction are not supported", fn ->
+        TestRepo.transaction(multi)
+      end
     end
 
+    @tag capture_log: true
     test "unsuccessful account creation" do
-      {:error, _, _, _} =
+      multi =
         Ecto.Multi.new()
         |> Ecto.Multi.insert(:account, fn _ ->
           Account.changeset(%Account{id: 1}, %{name: nil})
@@ -178,11 +182,15 @@ defmodule Ecto.Integration.CrudTest do
             user_id: user.id
           })
         end)
-        |> TestRepo.transaction()
+
+      assert_raise Ch.Error, "transaction are not supported", fn ->
+        TestRepo.transaction(multi)
+      end
     end
 
+    @tag capture_log: true
     test "unsuccessful user creation" do
-      {:error, _, _, _} =
+      multi =
         Ecto.Multi.new()
         |> Ecto.Multi.insert(:account, fn _ ->
           Account.changeset(%Account{id: 1}, %{name: "Foo"})
@@ -196,7 +204,10 @@ defmodule Ecto.Integration.CrudTest do
             user_id: user.id
           })
         end)
-        |> TestRepo.transaction()
+
+      assert_raise Ch.Error, "transaction are not supported", fn ->
+        TestRepo.transaction(multi)
+      end
     end
   end
 
