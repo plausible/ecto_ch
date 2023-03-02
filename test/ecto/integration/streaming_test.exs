@@ -6,6 +6,7 @@ defmodule Ecto.Integration.StreamingTest do
 
   import Ecto.Query
 
+  @tag capture_log: true
   test "streams are not supported" do
     {:ok, _} = TestRepo.insert(User.changeset(%User{}, %{name: "Bill"}))
     {:ok, _} = TestRepo.insert(User.changeset(%User{}, %{name: "Shannon"}))
@@ -13,7 +14,7 @@ defmodule Ecto.Integration.StreamingTest do
     {:ok, _} = TestRepo.insert(User.changeset(%User{}, %{name: "Tiffany"}))
     {:ok, _} = TestRepo.insert(User.changeset(%User{}, %{name: "Dave"}))
 
-    assert_raise RuntimeError, "ClickHouse does not support cursors", fn ->
+    assert_raise Ch.Error, "transaction are not supported", fn ->
       TestRepo.transaction(fn ->
         User
         |> select([u], u)

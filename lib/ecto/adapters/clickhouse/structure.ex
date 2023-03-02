@@ -60,7 +60,7 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   end
 
   def exec(conn, sql, params \\ [], opts \\ []) do
-    query = Query.build(sql, opts)
+    query = Query.build(sql)
 
     case Conn.handle_execute(query, params, opts, conn) do
       {:ok, _query, result, conn} -> {:ok, result, conn}

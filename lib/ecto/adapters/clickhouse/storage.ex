@@ -37,8 +37,8 @@ defmodule Ecto.Adapters.ClickHouse.Storage do
     end
   end
 
-  defp exec(conn, sql, params \\ [], opts \\ []) do
-    query = Query.build(sql, command: opts[:command])
+  defp exec(conn, sql, params \\ []) do
+    query = Query.build(sql)
 
     case Conn.handle_execute(query, params, [], conn) do
       {:ok, _query, result, conn} -> {:ok, result, conn}

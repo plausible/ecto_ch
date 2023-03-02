@@ -355,8 +355,9 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     ["Array(", column_type(type), ?)]
   end
 
-  defp column_type(:utc_datetime), do: "DateTime('UTC')"
-  defp column_type(:utc_datetime_usec), do: "DateTime64(6,'UTC')"
+  # TODO DateTime('UTC')
+  defp column_type(:utc_datetime), do: "DateTime"
+  defp column_type(:utc_datetime_usec), do: "DateTime64(6)"
   defp column_type(:naive_datetime), do: "DateTime"
   defp column_type(:naive_datetime_usec), do: "DateTime64(6)"
   defp column_type(type), do: Atom.to_string(type)

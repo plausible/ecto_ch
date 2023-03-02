@@ -52,8 +52,14 @@ defmodule Ecto.Adapters.ClickHouse do
   @impl Ecto.Adapter
   def dumpers({:map, _subtype}, type), do: [&Ecto.Type.embedded_dump(type, &1, :json)]
   def dumpers({:in, subtype}, _type), do: [{:array, subtype}]
+  def dumpers(:boolean, type), do: [type, &bool_encode/1]
   def dumpers(:binary_id, type), do: [type, Ecto.UUID]
   def dumpers(_primitive, type), do: [type]
+
+  # TODO needed? can do in :ch?
+  defp bool_encode(1), do: {:ok, true}
+  defp bool_encode(0), do: {:ok, false}
+  defp bool_encode(x), do: {:ok, x}
 
   @impl Ecto.Adapter
   def loaders({:map, _subtype}, type), do: [&Ecto.Type.embedded_load(type, &1, :json)]
