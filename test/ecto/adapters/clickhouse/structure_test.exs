@@ -111,15 +111,13 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       on_exit(fn -> ClickHouse.storage_down(opts) end)
 
       Application.put_env(:structure_test, Repo,
-        database: "chto_temp_structure_migrated",
+        database: database,
         show_sensitive_data_on_connection_error: true
       )
 
       on_exit(fn -> Application.delete_env(:structure_test, Repo) end)
 
       start_supervised!(Repo)
-
-      now = NaiveDateTime.utc_now()
 
       assert [1, 2] ==
                Ecto.Migrator.run(Repo, [{1, Migration1}, {2, Migration2}], :up,
@@ -220,13 +218,16 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       assert Enum.at(parts, -2) == schema_migrations
 
-      now = now |> NaiveDateTime.truncate(:second) |> NaiveDateTime.to_string()
+      conn = start_supervised!({Ch, opts})
+
+      %{rows: [[1, inserted_at_1], [2, inserted_at_2]]} =
+        Ch.query!(conn, "select * from schema_migrations order by version")
 
       assert List.last(parts) ==
                """
-               INSERT INTO "schema_migrations"(version, inserted_at) VALUES
-               (1,'#{now}'),
-               (2,'#{now}');
+               INSERT INTO "chto_temp_structure_migrated"."schema_migrations" (version, inserted_at) VALUES
+               (1,'#{inserted_at_1}'),
+               (2,'#{inserted_at_2}');
                """
     end
   end

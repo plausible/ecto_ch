@@ -10,6 +10,7 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   def structure_dump(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
     migration_source = config[:migration_source] || "schema_migrations"
+    database = config[:database] || "default"
 
     with {:ok, conn} <- Conn.connect(config),
          {:ok, tables, conn} <- show("TABLES", conn),
@@ -17,7 +18,7 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
          tables = tables -- [migration_source],
          {:ok, tables, conn} <- show_create("TABLE", conn, [migration_source | tables]),
          {:ok, dicts, conn} <- show_create("DICTIONARY", conn, dicts),
-         {:ok, versions, _conn} <- dump_versions(conn, migration_source) do
+         {:ok, versions, _conn} <- dump_versions(conn, database, migration_source) do
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, [tables, dicts, versions])
       {:ok, path}
@@ -48,13 +49,13 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     end
   end
 
-  defp dump_versions(conn, table) do
-    table = @conn.quote_name(table)
+  defp dump_versions(conn, database, table) do
+    table = @conn.quote_table(database, table)
     stmt = "SELECT * FROM #{table}"
 
     with {:ok, %{rows: rows}, conn} <- exec(conn, stmt, [], format: "Values") do
       rows = rows |> IO.iodata_to_binary() |> String.replace("),(", "),\n(")
-      versions = ["INSERT INTO ", table, "(version, inserted_at) VALUES\n", rows, ";\n"]
+      versions = ["INSERT INTO ", table, " (version, inserted_at) VALUES\n", rows, ";\n"]
       {:ok, versions, conn}
     end
   end
