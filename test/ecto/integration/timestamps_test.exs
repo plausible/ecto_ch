@@ -2,8 +2,7 @@ defmodule Ecto.Integration.TimestampsTest do
   use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo
-  alias EctoClickHouse.Integration.Account
-  alias EctoClickHouse.Integration.Product
+  alias EctoClickHouse.Integration.{Account, Product}
 
   import Ecto.Query
 

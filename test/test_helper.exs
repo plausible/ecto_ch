@@ -1,10 +1,7 @@
 Logger.configure(level: :info)
 
-Application.put_env(:ecto, :primary_key_type, :id)
-Application.put_env(:ecto, :async_integration_tests, false)
-
-ecto = Mix.Project.deps_paths()[:ecto]
-Code.require_file("#{ecto}/integration_test/support/schemas.exs", __DIR__)
+Code.require_file("test/support/ecto_schemas.exs")
+Code.require_file("test/support/schemas.exs")
 
 alias Ecto.Integration.TestRepo
 
@@ -16,7 +13,6 @@ Application.put_env(:chto, TestRepo,
 
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
 
-# Load up the repository, start it, and run migrations
 _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 :ok = Ecto.Adapters.ClickHouse.storage_up(TestRepo.config())
 

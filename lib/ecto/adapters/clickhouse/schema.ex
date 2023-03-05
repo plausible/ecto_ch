@@ -55,9 +55,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp extract_types(schema, fields) do
     Enum.map(fields, fn field ->
-      schema.__schema__(:type, field)
-      |> Ecto.Type.type()
-      |> remap_type()
+      type = schema.__schema__(:type, field) || raise "missing type for " <> inspect(field)
+
+      type |> Ecto.Type.type() |> remap_type()
     end)
   end
 
@@ -74,27 +74,19 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     end
   end
 
-  defp remap_type(:naive_datetime), do: :datetime
-  defp remap_type(:utc_datetime), do: :datetime
-  defp remap_type(:naive_datetime_usec), do: {:datetime64, :microsecond}
-  defp remap_type(:utc_datetime_usec), do: {:datetime64, :microsecond}
+  defp remap_type(dt) when dt in [:naive_datetime, :utc_datetime], do: :datetime
+
+  defp remap_type(usec) when usec in [:naive_datetime_usec, :utc_datetime_usec] do
+    {:datetime64, :microsecond}
+  end
+
   # TODO :integer is used in schema_versions schema
   defp remap_type(:integer), do: :i64
+  defp remap_type(b) when b in [:binary_id, :binary], do: :string
 
-  # TODO streamline
-  defp remap_type({:parameterized, type, params}) do
-    case type do
-      :string ->
-        {:string, params}
-
-      :decimal ->
-        {p, s} = params
-        {:decimal, p, s}
-
-      :nullable ->
-        {:nullable, params}
-    end
-  end
+  # Ch.Types.FixedString, Ch.Types.Nullable, etc.
+  defp remap_type({:parameterized, :ch, type}), do: type
+  defp remap_type({:array, type}), do: {:array, remap_type(type)}
 
   defp remap_type(other), do: other
 

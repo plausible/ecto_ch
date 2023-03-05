@@ -129,7 +129,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @impl true
   # https://clickhouse.com/docs/en/sql-reference/statements/show#show-tables
   def table_exists_query(table) do
-    {"SELECT name FROM system.tables WHERE name={name:String} LIMIT 1", [table]}
+    {"SELECT name FROM system.tables WHERE name={$0:String} LIMIT 1", [table]}
   end
 
   @impl true
@@ -342,16 +342,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [" ON " | expr(expr, sources, params, query)]
   end
 
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/join/#supported-types-of-join
   defp join_qual(:inner), do: " INNER JOIN "
   defp join_qual(:inner_lateral), do: " ARRAY JOIN "
-  # TODO can it be this way? is yes, "deprecate" inner_lateral and left_lateral
-  defp join_qual(:array), do: " ARRAY JOIN "
-  defp join_qual(:cross), do: " CROSS JOIN "
-  defp join_qual(:full), do: " FULL JOIN "
   defp join_qual(:left_lateral), do: " LEFT ARRAY JOIN "
-  # TODO can it be this way?
-  defp join_qual(:left_array), do: " LEFT ARRAY JOIN "
   defp join_qual(:left), do: " LEFT OUTER JOIN "
+  defp join_qual(:right), do: " RIGHT OUTER JOIN "
+  defp join_qual(:full), do: " FULL OUTER JOIN "
+  defp join_qual(:cross), do: " CROSS JOIN "
 
   defp where(%{wheres: wheres} = query, sources, params) do
     boolean(" WHERE ", wheres, sources, params, query)
@@ -636,11 +634,27 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?(, intersperse_map(elems, ?,, &expr(&1, sources, params, query)), ?)]
   end
 
-  # TODO datetime etc. for intervals see postgres adapter
-
   defp expr({:count, _, []}, _sources, _params, _query), do: "count(*)"
 
-  # TODO wrong args order in prev versions
+  # TODO typecast to timestamp?
+  defp expr({:datetime_add, _, [datetime, count, interval]}, sources, params, query) do
+    [
+      expr(datetime, sources, params, query),
+      " + ",
+      interval(count, interval, sources, params, query)
+    ]
+  end
+
+  defp expr({:date_add, _, [date, count, interval]}, sources, params, query) do
+    [
+      "CAST(",
+      expr(date, sources, params, query),
+      " + ",
+      interval(count, interval, sources, params, query)
+      | " AS Date)"
+    ]
+  end
+
   # https://clickhouse.com/docs/en/sql-reference/functions/json-functions/#json_queryjson-path
   defp expr({:json_extract_path, _, [expr, path]}, sources, params, query) do
     path =
@@ -841,15 +855,30 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  # TODO quote?
+  defp interval(count, interval, _sources, _params, _query) when is_integer(count) do
+    ["INTERVAL ", Integer.to_string(count), ?\s, interval]
+  end
+
+  defp interval(count, interval, _sources, _params, _query) when is_float(count) do
+    count = :erlang.float_to_binary(count, [:compact, decimals: 16])
+    ["INTERVAL ", count, ?\s, interval]
+  end
+
+  # TODO typecast to ::numeric?
+  defp interval(count, interval, sources, params, query) do
+    [expr(count, sources, params, query), " * ", interval(1, interval, sources, params, query)]
+  end
+
+  import Ch.RowBinary, only: [decimal: 1, string: 1]
+
   defp ecto_to_db({:array, t}) do
     ["Array(", ecto_to_db(t), ?)]
   end
 
   defp ecto_to_db(:id), do: "UInt64"
-  defp ecto_to_db(:binary_id), do: "String"
   defp ecto_to_db(:uuid), do: "UUID"
-  defp ecto_to_db(:string), do: "String"
-  defp ecto_to_db(:binary), do: "String"
+  defp ecto_to_db(s) when s in [:string, :binary, :binary_id], do: "String"
   # when ecto migrator queries for versions in schema_versions it uses type(version, :integer)
   # so we need :integer to be the same as :bigint which is used for schema_versions table definition
   # this is why :integer is Int64 and not Int32
@@ -858,26 +887,17 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp ecto_to_db(:decimal) do
     raise ArgumentError,
-          "cast to :decimal is not supported, please use Ch.Types.Decimal instead"
+          "cast to :decimal is not supported, please use Ch.Types.{Decimal32, Decimal64, Decimal128, Decimal256} instead"
   end
 
-  defp ecto_to_db({:parameterized, :decimal, {precision, scale}}) do
-    ["Decimal(", Integer.to_string(precision), ?,, Integer.to_string(scale), ?)]
-  end
-
-  defp ecto_to_db({:parameterized, :string, size}) do
-    ["FixedString(", Integer.to_string(size), ?)]
-  end
-
-  defp ecto_to_db({:parameterized, :nullable, type}) do
-    ["Nullable(", ecto_to_db(type), ?)]
+  defp ecto_to_db({:parameterized, :ch, type}) do
+    ecto_to_db(type)
   end
 
   defp ecto_to_db(:boolean), do: "Bool"
   defp ecto_to_db(:date), do: "Date"
-  defp ecto_to_db(:utc_datetime), do: "DateTime('UTC')"
-  defp ecto_to_db(:naive_datetime), do: "DateTime"
-  # for belongs_to / has_many castings of Ch.Types.* primary keys
+  defp ecto_to_db(:date32), do: "Date32"
+  defp ecto_to_db(dt) when dt in [:datetime, :utc_datetime, :naive_datetime], do: "DateTime"
   defp ecto_to_db(:u8), do: "UInt8"
   defp ecto_to_db(:u16), do: "UInt16"
   defp ecto_to_db(:u32), do: "UInt32"
@@ -890,7 +910,24 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db(:i64), do: "Int64"
   defp ecto_to_db(:i128), do: "Int128"
   defp ecto_to_db(:i256), do: "Int256"
-  defp ecto_to_db(other), do: Atom.to_string(other)
+  defp ecto_to_db(:f32), do: "Float32"
+  defp ecto_to_db(:f64), do: "Float64"
+
+  defp ecto_to_db(decimal(size: size, scale: scale)) do
+    ["Decimal", Integer.to_string(size), ?(, Integer.to_string(scale), ?)]
+  end
+
+  defp ecto_to_db(string(size: size)) do
+    ["FixedString(", Integer.to_string(size), ?)]
+  end
+
+  defp ecto_to_db({:nullable, type}) do
+    ["Nullable(", ecto_to_db(type), ?)]
+  end
+
+  defp ecto_to_db(other) when is_atom(other) do
+    Atom.to_string(other)
+  end
 
   defp param_type_at(params, ix) do
     value = Enum.at(params, ix)
@@ -905,6 +942,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ch_typeof(%DateTime{}), do: "DateTime"
   defp ch_typeof(%Date{}), do: "Date"
   defp ch_typeof(%NaiveDateTime{}), do: "DateTime"
+
+  defp ch_typeof(%Decimal{exp: exp}) do
+    # TODO use sizes 128 and 256 as well if needed
+    scale = if exp < 0, do: abs(exp), else: 0
+    ["Decimal64(", Integer.to_string(scale), ?)]
+  end
+
+  defp ch_typeof([]), do: "Array(Nothing)"
   # TODO check whole list
   defp ch_typeof([v | _]), do: ["Array(", ch_typeof(v), ?)]
 end

@@ -1,11 +1,17 @@
 defmodule Ecto.Adapters.ClickHouse do
   @moduledoc "Ecto adapter for a minimal HTTP ClickHouse client"
-  use Ecto.Adapters.SQL, driver: :ch
 
-  @dialyzer {:no_return, update: 6, rollback: 2}
+  @dialyzer {:no_return, update: 6}
 
+  @behaviour Ecto.Adapter
+  @behaviour Ecto.Adapter.Migration
+  @behaviour Ecto.Adapter.Queryable
+  @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Storage
   @behaviour Ecto.Adapter.Structure
+
+  @conn __MODULE__.Connection
+  @driver :ch
 
   @impl Ecto.Adapter
   defmacro __before_compile__(_env) do
@@ -50,16 +56,41 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter
+  def ensure_all_started(config, type) do
+    Ecto.Adapters.SQL.ensure_all_started(@driver, config, type)
+  end
+
+  @impl Ecto.Adapter
+  def init(config) do
+    Ecto.Adapters.SQL.init(@conn, @driver, config)
+  end
+
+  @impl Ecto.Adapter
+  def checkout(meta, opts, fun) do
+    Ecto.Adapters.SQL.checkout(meta, opts, fun)
+  end
+
+  @impl Ecto.Adapter
+  def checked_out?(meta) do
+    Ecto.Adapters.SQL.checked_out?(meta)
+  end
+
+  @impl Ecto.Adapter
   def dumpers({:map, _subtype}, type), do: [&Ecto.Type.embedded_dump(type, &1, :json)]
   def dumpers({:in, subtype}, _type), do: [{:array, subtype}]
   def dumpers(:boolean, type), do: [type, &bool_encode/1]
-  def dumpers(:binary_id, type), do: [type, Ecto.UUID]
+  def dumpers(:uuid, Ecto.UUID), do: [&uuid_encode/1]
+  def dumpers(:uuid, type), do: [type, &uuid_encode/1]
   def dumpers(_primitive, type), do: [type]
 
   # TODO needed? can do in :ch?
   defp bool_encode(1), do: {:ok, true}
   defp bool_encode(0), do: {:ok, false}
   defp bool_encode(x), do: {:ok, x}
+
+  # TODO hex uuid is required for params (to be passed in urls)
+  #      but what happens to rows with uuid in RowBinary?
+  defp uuid_encode(uuid), do: Ecto.UUID.cast(uuid)
 
   @impl Ecto.Adapter
   def loaders({:map, _subtype}, type), do: [&Ecto.Type.embedded_load(type, &1, :json)]
@@ -80,6 +111,11 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @impl Ecto.Adapter.Migration
   def lock_for_migrations(_meta, _options, f), do: f.()
+
+  @impl Ecto.Adapter.Migration
+  def execute_ddl(meta, definition, opts) do
+    Ecto.Adapters.SQL.execute_ddl(meta, @conn, definition, opts)
+  end
 
   @impl Ecto.Adapter.Storage
   defdelegate storage_up(opts), to: Ecto.Adapters.ClickHouse.Storage
@@ -102,6 +138,11 @@ defmodule Ecto.Adapters.ClickHouse do
   def dump_cmd(_args, _opts, _config) do
     raise "not implemented"
   end
+
+  @impl Ecto.Adapter.Schema
+  def autogenerate(:id), do: nil
+  def autogenerate(:embed_id), do: Ecto.UUID.generate()
+  def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
 
   @impl Ecto.Adapter.Schema
   def insert_all(
@@ -132,8 +173,33 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter.Schema
+  def update(adapter_meta, %{source: source, prefix: prefix}, fields, params, returning, opts) do
+    {fields, field_values} = :lists.unzip(fields)
+    filter_values = Keyword.values(params)
+    sql = @conn.update(prefix, source, fields, params, returning)
+
+    Ecto.Adapters.SQL.struct(
+      adapter_meta,
+      @conn,
+      sql,
+      :update,
+      source,
+      params,
+      field_values ++ filter_values,
+      :raise,
+      returning,
+      opts
+    )
+  end
+
+  @impl Ecto.Adapter.Schema
   def delete(adapter_meta, schema_meta, params, opts) do
     Ecto.Adapters.ClickHouse.Schema.delete(adapter_meta, schema_meta, params, opts)
+  end
+
+  @impl Ecto.Adapter.Queryable
+  def stream(adapter_meta, query_meta, query, params, opts) do
+    Ecto.Adapters.SQL.stream(adapter_meta, query_meta, query, params, opts)
   end
 
   @impl Ecto.Adapter.Queryable
@@ -145,8 +211,11 @@ defmodule Ecto.Adapters.ClickHouse do
 
     opts =
       case operation do
-        :all -> put_setting(opts, :readonly, 1)
-        _other -> opts
+        :all ->
+          [{:command, :select} | put_setting(opts, :readonly, 1)]
+
+        :delete_all ->
+          [{:command, :delete} | opts]
       end
 
     result = Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
@@ -164,6 +233,11 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @doc false
   def to_sql(operation, queryable) do
+    queryable =
+      queryable
+      |> Ecto.Queryable.to_query()
+      |> Ecto.Query.Planner.ensure_select(operation == :all)
+
     {query, _cast_params, dump_params} =
       Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
 
