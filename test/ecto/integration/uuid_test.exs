@@ -4,7 +4,7 @@ defmodule Ecto.Integration.UUIDTest do
   alias Ecto.Integration.TestRepo
   alias EctoClickHouse.Integration.Product
 
-  test "handles uuid serialization and deserialization with string format " do
+  test "handles uuid serialization and deserialization with string format" do
     external_id = Ecto.UUID.generate()
     product = TestRepo.insert!(%Product{id: 1, name: "Pupper Beer", external_id: external_id})
 

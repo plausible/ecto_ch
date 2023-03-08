@@ -14,17 +14,13 @@ defmodule Ecto.Integration.MathTest do
     |> binary_part(0, len)
   end
 
-  defp random_id do
-    :rand.uniform(4_000_000)
-  end
-
   defp create_account(name) do
-    TestRepo.insert!(%Account{id: random_id(), name: name})
+    TestRepo.insert!(%Account{id: System.unique_integer([:positive]), name: name})
   end
 
   defp create_product(account, price) do
     TestRepo.insert!(%Product{
-      id: random_id(),
+      id: System.unique_integer([:positive]),
       name: random_string(8),
       price: price,
       account_id: account.id

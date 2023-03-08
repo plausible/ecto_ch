@@ -643,7 +643,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" = (s0."y" IS NULL) FROM "schema" AS s0]
   end
 
-  @decimal Ecto.ParameterizedType.init(Ch.Types.Decimal, precision: 18, scale: 2)
+  @decimal64_2 Ecto.ParameterizedType.init(Ch.Types.Decimal64, scale: 2)
   test "order_by and types" do
     query =
       "schema3"
@@ -656,11 +656,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query =
       "schema3"
-      |> order_by([e], type(fragment("?", e.binary), ^@decimal))
+      |> order_by([e], type(fragment("?", e.binary), ^@decimal64_2))
       |> select(true)
 
     assert all(query) ==
-             ~s[SELECT true FROM "schema3" AS s0 ORDER BY CAST(s0."binary" AS Decimal(18,2))]
+             ~s[SELECT true FROM "schema3" AS s0 ORDER BY CAST(s0."binary" AS Decimal64(2))]
   end
 
   test "fragments" do

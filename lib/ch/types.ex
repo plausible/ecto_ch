@@ -35,32 +35,34 @@ end
 
 defmodule Ch.Types.FixedString do
   use Ecto.ParameterizedType
+  import Ch.RowBinary, only: [string: 1]
 
   @impl true
-  def type(size), do: {:parameterized, :string, size}
+  def type(type), do: {:parameterized, :ch, type}
 
   @impl true
   def init(opts) do
     size = Keyword.fetch!(opts, :size)
     (is_integer(size) and size > 0) || raise ":size needs to be a positive integer"
-    size
+    string(size: size)
   end
 
   @impl true
-  def cast(value, _size), do: Ecto.Type.cast(:string, value)
+  def cast(value, _type), do: Ecto.Type.cast(:string, value)
 
   @impl true
-  def dump(value, _dumper, _size), do: Ecto.Type.dump(:string, value)
+  def dump(value, _dumper, _type), do: Ecto.Type.dump(:string, value)
 
   @impl true
-  def load(value, _loader, _size), do: Ecto.Type.load(:string, value)
+  def load(value, _loader, _type), do: Ecto.Type.load(:string, value)
 end
 
 defmodule Ch.Types.Nullable do
   use Ecto.ParameterizedType
+  @dialyzer :no_improper_lists
 
   @impl true
-  def type({_ecto_type, ch_type}), do: {:parameterized, :nullable, ch_type}
+  def type(state), do: {:parameterized, :ch, ch_type(state)}
 
   @impl true
   def init(opts) do
@@ -68,7 +70,12 @@ defmodule Ch.Types.Nullable do
 
     is_atom(ecto_type) ||
       raise ArgumentError,
-            ":type needs to be an Ecto.Type or an atom like :string, :utc_datetime, etc."
+            """
+            :type needs to be one of:
+            - an Ecto.Type like Ecto.UUID
+            - an atom like :string
+            - a tuple representing a composite type like {:array, type}
+            """
 
     ch_type =
       try do
@@ -77,48 +84,49 @@ defmodule Ch.Types.Nullable do
         _ -> ecto_type
       end
 
-    {ecto_type, ch_type}
+    state(ecto_type, {:nullable, ch_type})
   end
 
   @impl true
-  def cast(value, {ecto_type, _ch_type}), do: Ecto.Type.cast(ecto_type, value)
+  def cast(value, state), do: Ecto.Type.cast(ecto_type(state), value)
 
   @impl true
-  def dump(value, _dumper, {ecto_type, _ch_type}), do: Ecto.Type.dump(ecto_type, value)
+  def dump(value, _dumper, state), do: Ecto.Type.dump(ecto_type(state), value)
 
   @impl true
-  def load(value, _loader, {ecto_type, _ch_type}), do: Ecto.Type.load(ecto_type, value)
+  def load(value, _loader, state), do: Ecto.Type.load(ecto_type(state), value)
+
+  @compile inline: [state: 2, ecto_type: 1, ch_type: 1]
+  defp state(ecto_type, ch_type), do: [ecto_type | ch_type]
+  defp ecto_type([t | _]), do: t
+  defp ch_type([_ | t]), do: t
 end
 
-defmodule Ch.Types.Decimal do
-  @moduledoc """
-  Ecto type for for [`Decimal(P, S)`](https://clickhouse.com/docs/en/sql-reference/data-types/decimal/)
-  """
-  use Ecto.ParameterizedType
+for size <- [32, 64, 128, 256] do
+  defmodule Module.concat(Ch.Types, :"Decimal#{size}") do
+    use Ecto.ParameterizedType
+    import Ch.RowBinary, only: [decimal: 1]
 
-  @impl true
-  def type({precision, scale}), do: {:parameterized, :decimal, {precision, scale}}
+    @impl true
+    def type(type), do: {:parameterized, :ch, type}
 
-  @impl true
-  def init(opts) do
-    precision = Keyword.fetch!(opts, :precision)
-    scale = Keyword.fetch!(opts, :scale)
+    @impl true
+    def init(opts) do
+      scale = Keyword.fetch!(opts, :scale)
 
-    (is_integer(precision) and precision > 0) ||
-      raise ArgumentError, ":precision needs to be a positive integer"
+      (is_integer(scale) and scale >= 0) ||
+        raise ArgumentError, ":scale needs to be a non-negative integer"
 
-    (is_integer(scale) and scale >= 0) ||
-      raise ArgumentError, ":scale needs to be a non-negative integer"
+      decimal(size: unquote(size), scale: scale)
+    end
 
-    {precision, scale}
+    @impl true
+    def cast(value, _type), do: Ecto.Type.cast(:decimal, value)
+
+    @impl true
+    def dump(value, _dumper, _type), do: Ecto.Type.dump(:decimal, value)
+
+    @impl true
+    def load(value, _loader, _type), do: Ecto.Type.load(:decimal, value)
   end
-
-  @impl true
-  def cast(value, _size), do: Ecto.Type.cast(:decimal, value)
-
-  @impl true
-  def dump(value, _dumper, _size), do: Ecto.Type.dump(:decimal, value)
-
-  @impl true
-  def load(value, _loader, _size), do: Ecto.Type.load(:decimal, value)
 end
