@@ -83,13 +83,10 @@ defmodule Ecto.Adapters.ClickHouse do
   def dumpers(:uuid, type), do: [type, &uuid_encode/1]
   def dumpers(_primitive, type), do: [type]
 
-  # TODO needed? can do in :ch?
   defp bool_encode(1), do: {:ok, true}
   defp bool_encode(0), do: {:ok, false}
   defp bool_encode(x), do: {:ok, x}
 
-  # TODO hex uuid is required for params (to be passed in urls)
-  #      but what happens to rows with uuid in RowBinary?
   defp uuid_encode(uuid), do: Ecto.UUID.cast(uuid)
 
   @impl Ecto.Adapter

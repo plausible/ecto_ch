@@ -2394,7 +2394,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       Schema
       |> select([], fragment("?", [1, 2, 3]))
 
-    assert all(query) == ~s{SELECT array(1,2,3) FROM "schema" AS s0}
+    assert all(query) == ~s{SELECT [1,2,3] FROM "schema" AS s0}
   end
 
   test "preloading" do

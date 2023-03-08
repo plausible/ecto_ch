@@ -91,7 +91,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  # https://clickhouse.com/docs/en/sql-reference/statements/delete
   def delete_all(query, params \\ []) do
     unless query.joins == [] do
       raise Ecto.QueryError,
@@ -127,7 +126,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def ddl_logs(_), do: []
 
   @impl true
-  # https://clickhouse.com/docs/en/sql-reference/statements/show#show-tables
   def table_exists_query(table) do
     {"SELECT name FROM system.tables WHERE name={$0:String} LIMIT 1", [table]}
   end
@@ -138,7 +136,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  # https://clickhouse.com/docs/en/sql-reference/statements/insert-into
   def insert(prefix, table, header, rows, _on_conflict, returning, _placeholders) do
     unless returning == [] do
       raise ArgumentError, "ClickHouse does not support RETURNING on INSERT statements"
@@ -158,7 +155,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
           ["INSERT INTO ", quote_table(prefix, table) | fields]
       end
 
-    # TODO nulls as default?
     case rows do
       {%Ecto.Query{} = query, params} -> [insert, ?\s | all(query, params)]
       rows when is_list(rows) -> insert
@@ -193,7 +189,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  # https://clickhouse.com/docs/en/sql-reference/statements/explain
   def explain_query(conn, query, params, opts) do
     explain =
       case Keyword.get(opts, :type, :plan) do
@@ -310,7 +305,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join(%{joins: []}, _sources, _params), do: []
 
   defp join(%{joins: joins} = query, sources, params) do
-    # TODO fast_map?
     Enum.map(joins, fn
       %JoinExpr{qual: qual, ix: ix, source: source, on: %QueryExpr{expr: on_exrp}, hints: hints} ->
         unless hints == [] do
@@ -342,7 +336,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [" ON " | expr(expr, sources, params, query)]
   end
 
-  # https://clickhouse.com/docs/en/sql-reference/statements/select/join/#supported-types-of-join
   defp join_qual(:inner), do: " INNER JOIN "
   defp join_qual(:inner_lateral), do: " ARRAY JOIN "
   defp join_qual(:left_lateral), do: " LEFT ARRAY JOIN "
@@ -457,7 +450,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Enum.map(combinations, &combination(&1, params))
   end
 
-  # TODO union distinct, etc.
   defp combination({:union, query}, params), do: [" UNION ", all(query, params)]
   defp combination({:union_all, query}, params), do: [" UNION ALL ", all(query, params)]
   defp combination({:except, query}, params), do: [" EXCEPT ", all(query, params)]
@@ -505,7 +497,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp operator_to_boolean(:and), do: " AND "
   defp operator_to_boolean(:or), do: " OR "
 
-  # TODO
   defp parens_for_select([first_expr | _] = expression) do
     if is_binary(first_expr) and String.match?(first_expr, ~r/^\s*select/i) do
       [?(, expression, ?)]
@@ -546,7 +537,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     source
   end
 
-  # TODO?
   defp expr({:&, _, [idx, fields, _counter]}, sources, _params, query) do
     {_, name, schema} = elem(sources, idx)
 
@@ -636,7 +626,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:count, _, []}, _sources, _params, _query), do: "count(*)"
 
-  # TODO typecast to timestamp?
   defp expr({:datetime_add, _, [datetime, count, interval]}, sources, params, query) do
     [
       expr(datetime, sources, params, query),
@@ -655,7 +644,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ]
   end
 
-  # https://clickhouse.com/docs/en/sql-reference/functions/json-functions/#json_queryjson-path
   defp expr({:json_extract_path, _, [expr, path]}, sources, params, query) do
     path =
       Enum.map(path, fn
@@ -692,18 +680,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  # TODO test, verify works
-  # https://clickhouse.com/docs/en/sql-reference/data-types/array/#creating-an-array
   defp expr(list, sources, params, query) when is_list(list) do
-    ["array(", intersperse_map(list, ?,, &expr(&1, sources, params, query)), ?)]
+    [?[, intersperse_map(list, ?,, &expr(&1, sources, params, query)), ?]]
   end
 
-  # TODO https://clickhouse.com/docs/en/sql-reference/data-types/decimal/#parameters
   defp expr(%Decimal{} = decimal, _sources, _params, _query) do
     Decimal.to_string(decimal, :normal)
   end
 
-  # TODO test test test
   defp expr(%Tagged{value: value, type: type}, sources, params, query) do
     ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(type), ?)]
   end
@@ -730,11 +714,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       query: query,
       message: "unsupported expression #{inspect(expr)}"
   end
-
-  # TODO
-  # defp interal(count, _interval, sources, query) do
-  #   [expr(count, sources, query)]
-  # end
 
   defp op_to_binary({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
     paren_expr(expr, sources, params, query)
