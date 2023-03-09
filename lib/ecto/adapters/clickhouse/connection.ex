@@ -9,6 +9,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @parent_as __MODULE__
 
+  # TODO remove after https://github.com/elixir-ecto/ecto_sql/pull/487 is released
+  @dialyzer {:nowarn_function, child_spec: 1}
   @impl true
   def child_spec(opts) do
     Ch.child_spec(opts)

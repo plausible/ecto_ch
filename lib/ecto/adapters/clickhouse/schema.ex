@@ -3,6 +3,11 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @conn Ecto.Adapters.ClickHouse.Connection
   @dialyzer :no_improper_lists
 
+  # dialyzer complains that we pass {:raw, data} in query! params
+  # TODO PR into Ecto to accept term as params instead of [term]
+  @dialyzer {:no_fail_call, insert_all: 8, insert: 4}
+  @dialyzer {:no_return, insert: 4}
+
   def insert_all(
         adapter_meta,
         schema_meta,
@@ -14,20 +19,19 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         opts
       ) do
     %{source: source, prefix: prefix, schema: schema} = schema_meta
+    opts = [{:command, :insert} | opts]
 
     %{num_rows: num_rows} =
       case rows do
         {%Ecto.Query{} = _query, params} ->
           sql = @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders)
-          opts = [{:command, :insert_select} | opts]
           Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->
           types = prepare_types(schema, header, opts)
           rows = rows |> unzip_insert(header) |> Ch.RowBinary.encode_rows(types)
           sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
-          opts = [{:command, :insert} | opts]
-          Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+          Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, rows}, opts)
       end
 
     {num_rows, nil}
@@ -42,11 +46,12 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     opts = [{:command, :insert} | opts]
     row = Ch.RowBinary.encode_row(row, types)
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, row}, opts)
     {:ok, []}
   end
 
-  def delete(adapter_meta, %{source: source, prefix: prefix}, params, opts) do
+  def delete(adapter_meta, schema_meta, params, opts) do
+    %{source: source, prefix: prefix} = schema_meta
     filter_values = Keyword.values(params)
     sql = @conn.delete(prefix, source, params, [])
     Ecto.Adapters.SQL.query!(adapter_meta, sql, filter_values, opts)
@@ -56,7 +61,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp extract_types(schema, fields) do
     Enum.map(fields, fn field ->
       type = schema.__schema__(:type, field) || raise "missing type for " <> inspect(field)
-
       type |> Ecto.Type.type() |> remap_type()
     end)
   end
