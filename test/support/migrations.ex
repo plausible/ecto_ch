@@ -24,7 +24,7 @@ defmodule EctoClickHouse.Integration.Migration do
       add :public, :boolean
       add :cost, :"Decimal64(2)"
       add :visits, :UInt16
-      add :wrapped_visits, :UInt64
+      add :wrapped_visits, :Int64
       add :intensity, :Float32
       add :author_id, :UInt64
       add :posted, :date
@@ -134,7 +134,7 @@ defmodule EctoClickHouse.Integration.Migration do
 
     create table(:loggings, primary_key: false, engine: "MergeTree") do
       add :bid, :binary_id, primary_key: true
-      add :int, :UInt64
+      add :int, :Int64
       add :uuid, :uuid
       timestamps()
     end
