@@ -3,6 +3,8 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @conn Ecto.Adapters.ClickHouse.Connection
   @dialyzer :no_improper_lists
 
+  alias Ch.RowBinary
+
   # dialyzer complains that we pass {:raw, data} in query! params
   # TODO PR into Ecto to accept term as params instead of [term]
   @dialyzer {:no_fail_call, insert_all: 8, insert: 4}
@@ -29,9 +31,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
         rows when is_list(rows) ->
           types = prepare_types(schema, header, opts)
-          rows = rows |> unzip_insert(header) |> Ch.RowBinary.encode_rows(types)
-          sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
-          Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, rows}, opts)
+          sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
+          data = [encode_header(header, types) | unzip_encode_rows(rows, header, types)]
+          Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
       end
 
     {num_rows, nil}
@@ -42,11 +44,11 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     {header, row} = :lists.unzip(params)
 
     types = prepare_types(schema, header, opts)
-    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
+    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinaryWithNamesAndTypes"]
     opts = [{:command, :insert} | opts]
-    row = Ch.RowBinary.encode_row(row, types)
+    data = [encode_header(header, types) | RowBinary.encode_row(row, types)]
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, row}, opts)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
     {:ok, []}
   end
 
@@ -94,18 +96,28 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp remap_type(other), do: other
 
-  defp unzip_insert([row | rows], header) do
-    [unzip_row(header, row) | unzip_insert(rows, header)]
+  defp unzip_encode_rows([row | rows], header, types) do
+    [unzip_encode_row(header, types, row) | unzip_encode_rows(rows, header, types)]
   end
 
-  defp unzip_insert([], _header), do: []
+  defp unzip_encode_rows([], _header, _types), do: []
 
-  defp unzip_row([field | fields], row) do
+  defp unzip_encode_row([field | fields], [type | types], row) do
     case :lists.keyfind(field, 1, row) do
-      {_, value} -> [value | unzip_row(fields, row)]
-      false -> [nil | unzip_row(fields, row)]
+      {_, value} -> [RowBinary.encode(type, value) | unzip_encode_row(fields, types, row)]
+      false -> [RowBinary.encode(type, nil) | unzip_encode_row(fields, types, row)]
     end
   end
 
-  defp unzip_row([], _row), do: []
+  defp unzip_encode_row([], [], _row), do: []
+
+  defp encode_header(header, types) do
+    cols = length(header)
+
+    [
+      cols,
+      Enum.map(header, fn col -> RowBinary.encode(:string, to_string(col)) end),
+      Enum.map(types, fn type -> RowBinary.encode(:string, RowBinary.encode_type(type)) end)
+    ]
+  end
 end
