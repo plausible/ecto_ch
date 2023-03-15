@@ -74,7 +74,6 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter
-  def dumpers({:map, _subtype}, type), do: [&Ecto.Type.embedded_dump(type, &1, :json)]
   def dumpers({:in, subtype}, _type), do: [{:array, subtype}]
   def dumpers(:boolean, type), do: [type, &bool_encode/1]
   def dumpers(:uuid, Ecto.UUID), do: [&uuid_encode/1]
@@ -88,56 +87,15 @@ defmodule Ecto.Adapters.ClickHouse do
   defp uuid_encode(uuid), do: Ecto.UUID.cast(uuid)
 
   @impl Ecto.Adapter
-  def loaders({:map, _subtype}, type), do: [&Ecto.Type.embedded_load(type, &1, :json)]
-  def loaders(:string, type), do: [&string_decode/1, type]
   def loaders(:binary_id, type), do: [Ecto.UUID, type]
   def loaders(:boolean, type), do: [&bool_decode/1, type]
   def loaders(:float, type), do: [&float_decode/1, type]
   def loaders(_primitive, type), do: [type]
 
-  defp string_decode(str) when is_binary(str), do: {:ok, to_utf8(str)}
-  defp string_decode(x), do: {:ok, x}
-
   defp bool_decode(1), do: {:ok, true}
   defp bool_decode(0), do: {:ok, false}
-  defp bool_decode(x), do: {:ok, x}
 
   defp float_decode(%Decimal{} = decimal), do: {:ok, Decimal.to_float(decimal)}
-  defp float_decode(x), do: {:ok, x}
-
-  @doc false
-  def to_utf8(str) do
-    utf8 = to_utf8(str, 0, 0, str, [])
-    IO.iodata_to_binary(utf8)
-  end
-
-  defp to_utf8(<<_valid::utf8, rest::bytes>>, from, len, original, acc) do
-    to_utf8(rest, from, len + 1, original, acc)
-  end
-
-  @dialyzer {:no_improper_lists, to_utf8: 5, to_utf8_escape: 5}
-
-  defp to_utf8(<<_invalid, rest::bytes>>, from, len, original, acc) do
-    acc = [acc | binary_part(original, from, len)]
-    to_utf8_escape(rest, from + len, 1, original, acc)
-  end
-
-  defp to_utf8(<<>>, from, len, original, acc) do
-    [acc | binary_part(original, from, len)]
-  end
-
-  defp to_utf8_escape(<<_valid::utf8, rest::bytes>>, from, len, original, acc) do
-    acc = [acc | "�"]
-    to_utf8(rest, from + len, 1, original, acc)
-  end
-
-  defp to_utf8_escape(<<_invalid, rest::bytes>>, from, len, original, acc) do
-    to_utf8_escape(rest, from, len + 1, original, acc)
-  end
-
-  defp to_utf8_escape(<<>>, _from, _len, _original, acc) do
-    [acc | "�"]
-  end
 
   @impl Ecto.Adapter.Migration
   def supports_ddl_transaction?, do: false

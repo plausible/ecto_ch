@@ -120,6 +120,25 @@ defmodule Ecto.Integration.TypeTest do
     # assert [^datetime] = TestRepo.all(from u in Usec, where: u.utc_datetime_usec == ^datetime, select: u.utc_datetime_usec)
   end
 
+  test "utf8 strings" do
+    # :string loader ensures behaviour similar to
+    # https://clickhouse.com/docs/en/sql-reference/functions/string-functions/#tovalidutf8
+    TestRepo.insert!(%Post{title: "\x61\xF0\x80\x80\x80b"})
+    assert %Post{title: "a�b"} = TestRepo.one!(Post)
+    assert ["a�b"] = TestRepo.all(from p in Post, select: p.title)
+    assert ["a�b"] = TestRepo.all(from p in "posts", select: p.title)
+  end
+
+  # TODO find a way to not process :binary as utf8
+  @tag skip: true
+  test "non utf8 binary" do
+    value = "\x61\xF0\x80\x80\x80b"
+    TestRepo.insert!(%Post{blob: "\x61\xF0\x80\x80\x80b"})
+    assert %Post{blob: ^value} = TestRepo.one!(Post)
+    assert [^value] = TestRepo.all(from p in Post, select: p.blob)
+    assert [^value] = TestRepo.all(from p in "posts", select: p.blob)
+  end
+
   test "primitive types boolean negate" do
     TestRepo.insert!(%Post{public: true})
 
