@@ -31,8 +31,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
         rows when is_list(rows) ->
           types = prepare_types(schema, header, opts)
-          sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
-          data = [encode_header(header, types) | unzip_encode_rows(rows, header, types)]
+          # TODO use RowBinaryWithNamesAndTypes for type discrepancy warnings
+          sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
+          data = unzip_encode_rows(rows, header, types)
           Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
       end
 
@@ -44,9 +45,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     {header, row} = :lists.unzip(params)
 
     types = prepare_types(schema, header, opts)
-    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinaryWithNamesAndTypes"]
+    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
     opts = [{:command, :insert} | opts]
-    data = [encode_header(header, types) | RowBinary.encode_row(row, types)]
+    data = RowBinary.encode_row(row, types)
 
     Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
     {:ok, []}
@@ -110,14 +111,4 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   end
 
   defp unzip_encode_row([], [], _row), do: []
-
-  defp encode_header(header, types) do
-    cols = length(header)
-
-    [
-      cols,
-      Enum.map(header, fn col -> RowBinary.encode(:string, to_string(col)) end),
-      Enum.map(types, fn type -> RowBinary.encode(:string, RowBinary.encode_type(type)) end)
-    ]
-  end
 end
