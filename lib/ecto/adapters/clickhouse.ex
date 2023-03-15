@@ -127,7 +127,7 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   defp to_utf8_escape(<<_valid::utf8, rest::bytes>>, from, len, original, acc) do
-    acc = [acc | String.duplicate("�", len)]
+    acc = [acc | "�"]
     to_utf8(rest, from + len, 1, original, acc)
   end
 
@@ -135,8 +135,8 @@ defmodule Ecto.Adapters.ClickHouse do
     to_utf8_escape(rest, from, len + 1, original, acc)
   end
 
-  defp to_utf8_escape(<<>>, _from, len, _original, acc) do
-    [acc | String.duplicate("�", len)]
+  defp to_utf8_escape(<<>>, _from, _len, _original, acc) do
+    [acc | "�"]
   end
 
   @impl Ecto.Adapter.Migration
