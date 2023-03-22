@@ -32,7 +32,7 @@ defmodule Chto.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, github: "ruslandoga/ch"},
+      {:ch, github: "plausible/ch"},
       {:ecto_sql, "~> 3.9"},
       {:decimal, "~> 2.0"},
       {:rexbug, "~> 1.0", only: [:dev, :test]},
