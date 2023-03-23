@@ -195,13 +195,7 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @impl Ecto.Adapter.Queryable
   def stream(adapter_meta, query_meta, query, params, opts) do
-    Ecto.Adapters.SQL.stream(
-      adapter_meta,
-      query_meta,
-      query,
-      params,
-      put_source(opts, query_meta)
-    )
+    Ecto.Adapters.SQL.stream(adapter_meta, query_meta, query, params, opts)
   end
 
   @impl Ecto.Adapter.Queryable
