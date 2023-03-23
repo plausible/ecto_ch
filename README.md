@@ -1,9 +1,9 @@
-Ecto Adapter for ClickHouse using [`:ch`](https://github.com/ruslandoga/ch)
+Ecto Adapter for ClickHouse using [`:ch`](https://github.com/plausible/ch)
 
 ```elixir
 ## speedrun
 
-iex> Mix.install([{:chto, github: "ruslandoga/chto"}])
+iex> Mix.install([{:chto, github: "plausible/chto"}])
 
 iex> defmodule Repo do
        use Ecto.Repo, adapter: Ecto.Adapters.ClickHouse, otp_app: :example
