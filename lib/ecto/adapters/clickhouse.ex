@@ -202,7 +202,7 @@ defmodule Ecto.Adapters.ClickHouse do
   def prepare(operation, query), do: {:nocache, {operation, query}}
 
   @impl Ecto.Adapter.Queryable
-  def execute(adapter_meta, _query_meta, {:nocache, {operation, query}}, params, opts) do
+  def execute(adapter_meta, query_meta, {:nocache, {operation, query}}, params, opts) do
     sql = prepare_sql(operation, query, params)
 
     opts =
@@ -214,7 +214,7 @@ defmodule Ecto.Adapters.ClickHouse do
           [{:command, :delete} | opts]
       end
 
-    result = Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
+    result = Ecto.Adapters.SQL.query!(adapter_meta, sql, params, put_source(opts, query_meta))
 
     case operation do
       :all ->
@@ -250,4 +250,13 @@ defmodule Ecto.Adapters.ClickHouse do
   def prepare_sql(:all, query, params), do: @conn.all(query, params)
   def prepare_sql(:update_all, query, params), do: @conn.update_all(query, params)
   def prepare_sql(:delete_all, query, params), do: @conn.delete_all(query, params)
+
+  defp put_source(opts, %{sources: sources}) when is_binary(elem(elem(sources, 0), 0)) do
+    {source, _, _} = elem(sources, 0)
+    [source: source] ++ opts
+  end
+
+  defp put_source(opts, _) do
+    opts
+  end
 end
