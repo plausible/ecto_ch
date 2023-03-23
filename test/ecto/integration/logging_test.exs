@@ -35,6 +35,17 @@ defmodule Ecto.Integration.LoggingTest do
       assert_received :logged
     end
 
+    test "contains source" do
+      log = fn _event_name, _measurements, metadata ->
+        assert %{source: "accounts"} = metadata
+        send(self(), :logged)
+      end
+
+      Process.put(:telemetry, log)
+      TestRepo.all(Account)
+      assert_received :logged
+    end
+
     test "dispatches event with stacktrace" do
       log = fn _event_name, _measurements, metadata ->
         assert %{stacktrace: [_ | _]} = metadata
