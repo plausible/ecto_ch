@@ -1299,7 +1299,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "join hints" do
     query =
       Schema
-      |> join(:inner, [p], q in Schema2, hints: ["INDEXED BY FOO", "INDEXED BY BAR"])
+      |> join(:inner, [p], q in Schema2, hints: ["INDEXED BY FOO", "INDEXED BY BAR"], on: true)
       |> select([], true)
 
     assert_raise Ecto.QueryError, ~r/ClickHouse does not support hints on JOIN/, fn ->
@@ -1387,7 +1387,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query =
       "comments"
       |> from(as: :comment)
-      |> join(:inner, [c], p in subquery(posts))
+      |> join(:inner, [c], p in subquery(posts), on: true)
       |> select([_, p], p)
 
     assert all(query) ==
@@ -1441,7 +1441,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
           "SELECT * FROM schema2 AS s2 WHERE s2.id = ? AND s2.field = ?",
           p.x,
           ^10
-        )
+        ),
+        on: true
       )
       |> select([p], {p.id, ^0})
       |> where([p], p.id > 0 and p.id < ^100)
@@ -1482,7 +1483,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query =
       (p in Schema)
-      |> from(left_join: c in ^inner, select: {p.id, c.id})
+      |> from(left_join: c in ^inner, on: true, select: {p.id, c.id})
 
     assert all(query) ==
              """
@@ -1524,7 +1525,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
       query =
         subquery
-        |> join(:inner, [c], p in subquery(subquery))
+        |> join(:inner, [c], p in subquery(subquery), on: true)
 
       assert all(query) ==
                """
@@ -1540,7 +1541,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
       query =
         subquery
-        |> join(:inner, [c], p in subquery(subquery))
+        |> join(:inner, [c], p in subquery(subquery), on: true)
 
       assert all(query) ==
                """
@@ -1557,7 +1558,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       query =
         Schema
         |> select([r], %{y: ^666})
-        |> join(:inner, [c], p in subquery(subquery))
+        |> join(:inner, [c], p in subquery(subquery), on: true)
         |> where([a, b], a.x == ^111)
 
       assert all(query) ==

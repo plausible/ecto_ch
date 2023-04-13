@@ -123,6 +123,7 @@ defmodule Ecto.Integration.SubQueryTest do
     query =
       from c in Comment,
         join: p in subquery(query),
+        on: true,
         where: p.title == ^"hello",
         select: fragment("? + ?", p.visits, ^1)
 

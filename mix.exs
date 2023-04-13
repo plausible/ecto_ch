@@ -22,7 +22,6 @@ defmodule Chto.MixProject do
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(:bench), do: ["lib", "bench/support"]
   defp elixirc_paths(:dev), do: ["lib", "dev"]
   defp elixirc_paths(_env), do: ["lib"]
 
@@ -34,8 +33,6 @@ defmodule Chto.MixProject do
     [
       {:ch, github: "plausible/ch"},
       {:ecto_sql, "~> 3.9"},
-      {:decimal, "~> 2.0"},
-      {:rexbug, "~> 1.0", only: [:dev, :test]},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false}
     ]

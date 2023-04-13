@@ -5,11 +5,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   alias Ch.RowBinary
 
-  # dialyzer complains that we pass {:raw, data} in query! params
-  # TODO PR into Ecto to accept term as params instead of [term]
-  @dialyzer {:no_fail_call, insert_all: 8, insert: 4}
-  @dialyzer {:no_return, insert: 4}
-
   def insert_all(
         adapter_meta,
         schema_meta,
@@ -46,8 +41,8 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     types = prepare_types(schema, header, opts)
     sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
-    opts = [{:command, :insert} | opts]
     data = RowBinary.encode_row(row, types)
+    opts = [{:command, :insert} | opts]
 
     Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
     {:ok, []}
