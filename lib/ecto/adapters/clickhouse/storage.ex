@@ -39,9 +39,10 @@ defmodule Ecto.Adapters.ClickHouse.Storage do
 
   defp exec(conn, sql, params \\ []) do
     query = Query.build(sql)
+    params = DBConnection.Query.encode(query, params, [])
 
     case Conn.handle_execute(query, params, [], conn) do
-      {:ok, _query, result, conn} -> {:ok, result, conn}
+      {:ok, query, result, conn} -> {:ok, DBConnection.Query.decode(query, result, []), conn}
       {:disconnect, reason, _conn} -> {:error, reason}
       {:error, %Error{code: 82}, _conn} -> {:error, :already_up}
       {:error, %Error{code: 81}, _conn} -> {:error, :already_down}

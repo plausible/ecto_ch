@@ -135,8 +135,6 @@ defmodule Ecto.Adapters.ClickHouse do
   def autogenerate(:embed_id), do: Ecto.UUID.generate()
   def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
 
-  # dialyzer complains that we pass {:raw, data} as params to query! with wants [term]
-  @dialyzer {:nowarn_function, insert_all: 8}
   @impl Ecto.Adapter.Schema
   def insert_all(
         adapter_meta,
@@ -160,8 +158,6 @@ defmodule Ecto.Adapters.ClickHouse do
     )
   end
 
-  # dialyzer complains that we pass {:raw, data} as params to query! with wants [term]
-  @dialyzer {:no_return, insert: 6}
   @impl Ecto.Adapter.Schema
   def insert(adapter_meta, schema_meta, params, _, _, opts) do
     Ecto.Adapters.ClickHouse.Schema.insert(adapter_meta, schema_meta, params, opts)

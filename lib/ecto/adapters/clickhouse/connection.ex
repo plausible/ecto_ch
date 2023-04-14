@@ -9,8 +9,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @parent_as __MODULE__
 
-  # TODO remove after https://github.com/elixir-ecto/ecto_sql/pull/487 is released
-  @dialyzer {:nowarn_function, child_spec: 1}
   @impl true
   def child_spec(opts) do
     Ch.child_spec(opts)
@@ -286,7 +284,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     recursive_opt = if recursive, do: "RECURSIVE ", else: ""
 
     ctes =
-      intersperse_map(queries, ?,, fn {name, cte} ->
+      intersperse_map(queries, ?,, fn {name, _opts, cte} ->
         [quote_name(name), " AS ", cte_query(cte, sources, params, query)]
       end)
 
@@ -438,13 +436,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp limit(%{limit: nil}, _sources, _params), do: []
 
-  defp limit(%{limit: %QueryExpr{expr: expr}} = query, sources, params) do
+  defp limit(%{limit: %{expr: expr}} = query, sources, params) do
     [" LIMIT ", expr(expr, sources, params, query)]
   end
 
   defp offset(%{offset: nil}, _sources, _params), do: []
 
-  defp offset(%{offset: %QueryExpr{expr: expr}} = query, sources, params) do
+  defp offset(%{offset: %{expr: expr}} = query, sources, params) do
     [" OFFSET ", expr(expr, sources, params, query)]
   end
 
