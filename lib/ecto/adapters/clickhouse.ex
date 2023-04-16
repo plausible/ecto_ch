@@ -1,5 +1,5 @@
 defmodule Ecto.Adapters.ClickHouse do
-  @moduledoc "Ecto adapter for a minimal HTTP ClickHouse client"
+  @moduledoc "Ecto adapter for HTTP ClickHouse client"
 
   @behaviour Ecto.Adapter
   @behaviour Ecto.Adapter.Migration
