@@ -214,8 +214,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              WITH RECURSIVE "tree" AS \
              (SELECT sc0."id" AS "id",1 AS "depth" FROM "categories" AS sc0 WHERE (sc0."parent_id" IS NULL) \
              UNION ALL \
-             SELECT c0."id",t1."depth" + 1 FROM "categories" AS c0 \
-             INNER JOIN "tree" AS t1 ON t1."id" = c0."parent_id") \
+             (SELECT c0."id",t1."depth" + 1 FROM "categories" AS c0 \
+             INNER JOIN "tree" AS t1 ON t1."id" = c0."parent_id")) \
              SELECT s0."x",t1."id",CAST(t1."depth" AS Int64) \
              FROM "schema" AS s0 \
              INNER JOIN "tree" AS t1 ON t1."id" = s0."category_id"\
@@ -252,9 +252,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              FROM "posts" AS p0 \
              INNER JOIN "comments_scope" AS c1 ON c1."entity_id" = p0."guid" \
              UNION ALL \
-             SELECT v0."title",c1."text" \
+             (SELECT v0."title",c1."text" \
              FROM "videos" AS v0 \
-             INNER JOIN "comments_scope" AS c1 ON c1."entity_id" = v0."guid"\
+             INNER JOIN "comments_scope" AS c1 ON c1."entity_id" = v0."guid")\
              """
   end
 
@@ -455,10 +455,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 \
-             UNION SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20 \
-             UNION SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30 \
-             ORDER BY rand() LIMIT 5 OFFSET 10\
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             UNION (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
+             UNION (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
 
     query =
@@ -468,10 +467,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 \
-             UNION ALL SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20 \
-             UNION ALL SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30 \
-             ORDER BY rand() LIMIT 5 OFFSET 10\
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             UNION ALL (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
+             UNION ALL (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
   end
 
@@ -504,10 +502,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 \
-             EXCEPT SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20 \
-             EXCEPT SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30 \
-             ORDER BY rand() LIMIT 5 OFFSET 10\
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             EXCEPT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
+             EXCEPT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
 
     assert_raise Ecto.QueryError, ~r/ClickHouse does not support EXCEPT ALL/, fn ->
@@ -547,10 +544,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 \
-             INTERSECT SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20 \
-             INTERSECT SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30 \
-             ORDER BY rand() LIMIT 5 OFFSET 10\
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             INTERSECT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
+             INTERSECT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
 
     assert_raise Ecto.QueryError, ~r/ClickHouse does not support INTERSECT ALL/, fn ->
@@ -956,15 +952,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              WHERE ({$6:Bool}) AND ({$7:Bool}) \
              GROUP BY {$8:Int64},{$9:Int64} \
              HAVING ({$10:Bool}) AND ({$11:Bool}) \
-             UNION \
-             SELECT s0."id",{$12:Bool} FROM "schema1" AS s0 \
-             WHERE ({$13:Int64}) \
-             UNION ALL \
-             SELECT s0."id",{$14:Bool} FROM "schema2" AS s0 \
-             WHERE ({$15:Int64}) \
              ORDER BY {$16:Int64} \
              LIMIT {$17:Int64} \
-             OFFSET {$18:Int64}\
+             OFFSET {$18:Int64} \
+             UNION \
+             (SELECT s0."id",{$12:Bool} FROM "schema1" AS s0 \
+             WHERE ({$13:Int64})) \
+             UNION ALL \
+             (SELECT s0."id",{$14:Bool} FROM "schema2" AS s0 \
+             WHERE ({$15:Int64}))\
              """
   end
 

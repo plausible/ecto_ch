@@ -61,10 +61,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     group_by = group_by(query, sources, params)
     having = having(query, sources, params)
     window = window(query, sources, params)
-    combinations = combinations(query, params)
     order_by = order_by(query, sources, params)
     limit = limit(query, sources, params)
     offset = offset(query, sources, params)
+    combinations = combinations(query, params)
 
     [
       cte,
@@ -75,10 +75,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       group_by,
       having,
       window,
-      combinations,
       order_by,
       limit,
-      offset
+      offset,
+      combinations
     ]
   end
 
@@ -450,10 +450,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Enum.map(combinations, &combination(&1, params))
   end
 
-  defp combination({:union, query}, params), do: [" UNION ", all(query, params)]
-  defp combination({:union_all, query}, params), do: [" UNION ALL ", all(query, params)]
-  defp combination({:except, query}, params), do: [" EXCEPT ", all(query, params)]
-  defp combination({:intersect, query}, params), do: [" INTERSECT ", all(query, params)]
+  defp combination({:union, query}, params), do: [" UNION (", all(query, params), ?)]
+  defp combination({:union_all, query}, params), do: [" UNION ALL (", all(query, params), ?)]
+  defp combination({:except, query}, params), do: [" EXCEPT (", all(query, params), ?)]
+  defp combination({:intersect, query}, params), do: [" INTERSECT (", all(query, params), ?)]
 
   defp combination({:except_all, query}, _params) do
     raise Ecto.QueryError,
