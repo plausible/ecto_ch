@@ -61,10 +61,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     group_by = group_by(query, sources, params)
     having = having(query, sources, params)
     window = window(query, sources, params)
-    combinations = combinations(query, params)
     order_by = order_by(query, sources, params)
     limit = limit(query, sources, params)
     offset = offset(query, sources, params)
+    combinations = combinations(query, params)
 
     [
       cte,
@@ -75,10 +75,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       group_by,
       having,
       window,
-      combinations,
       order_by,
       limit,
-      offset
+      offset,
+      combinations
     ]
   end
 

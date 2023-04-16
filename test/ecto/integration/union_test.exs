@@ -20,16 +20,20 @@ defmodule Ecto.Integration.UnionTest do
         select: p.title
       )
 
-    data =
+    query =
       from(
         p in Post,
         union_all: ^other,
         where: not p.public,
         order_by: p.counter,
-        select: p.title
+        select: p.title,
+        limit: 1
       )
-      |> TestRepo.all()
 
+    {sql, _} = TestRepo.to_sql(:all, query)
+    IO.puts(sql)
+
+    data = TestRepo.all(query)
     assert data == ["hello", "bye"]
   end
 end
