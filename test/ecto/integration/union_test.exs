@@ -7,20 +7,17 @@ defmodule Ecto.Integration.UnionTest do
 
   test "union & ordering" do
     TestRepo.insert!(%Post{title: "hello", counter: 1, public: true})
-    TestRepo.insert!(%Post{title: "hello", counter: 1, public: true})
+    TestRepo.insert!(%Post{title: "morning", counter: 2, public: true})
 
-    TestRepo.insert!(%Post{title: "bye", counter: 2, public: false})
+    TestRepo.insert!(%Post{title: "bye", counter: 3, public: false})
 
     other =
       from(
         p in Post,
         where: p.public,
-        group_by: p.public,
-        order_by: fragment("total_counter"),
-        select: %{
-          public: p.public,
-          total_counter: sum(p.counter)
-        }
+        order_by: p.counter,
+        limit: 1,
+        select: p.title
       )
 
     data =
@@ -28,15 +25,12 @@ defmodule Ecto.Integration.UnionTest do
         p in Post,
         union_all: ^other,
         where: not p.public,
-        group_by: p.public,
-        order_by: fragment("total_counter"),
-        select: %{
-          public: p.public,
-          total_counter: sum(p.counter)
-        }
+        order_by: p.counter,
+        limit: 1,
+        select: p.title
       )
       |> TestRepo.all()
 
-    assert data == [%{public: false, total_counter: 2}, %{public: true, total_counter: 2}]
+    assert data == ["hello", "bye"]
   end
 end
