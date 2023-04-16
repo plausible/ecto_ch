@@ -26,7 +26,6 @@ defmodule Ecto.Integration.UnionTest do
         union_all: ^other,
         where: not p.public,
         order_by: p.counter,
-        limit: 1,
         select: p.title
       )
       |> TestRepo.all()
