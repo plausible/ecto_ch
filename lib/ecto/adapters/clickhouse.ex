@@ -1,5 +1,27 @@
 defmodule Ecto.Adapters.ClickHouse do
-  @moduledoc "Ecto adapter for HTTP ClickHouse client"
+  @moduledoc """
+  Adapter module for ClickHouse.
+
+  It uses `Ch` for communicating to the database.
+
+  ## Options
+
+  All options can be given via the repository
+  configuration:
+
+      config :your_app, YourApp.Repo,
+        ...
+
+    * `:hostname` - Server hostname (default: `"localhost"`)
+    * `:username` - Username
+    * `:password` - User password
+    * `:port` - HTTP Server port (default: `8123`)
+    * `:scheme` - HTTP scheme (default: `"http"`)
+    * `:database` - the database to connect to (default: `"default"`)
+    * `:settings` - Keyword list of connection settings
+    * `:transport_opts` - Options to be given to the transport being used. See `Mint.HTTP1.connect/4` for more info
+
+  """
 
   @behaviour Ecto.Adapter
   @behaviour Ecto.Adapter.Migration
