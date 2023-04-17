@@ -3,8 +3,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @conn Ecto.Adapters.ClickHouse.Connection
   @dialyzer :no_improper_lists
 
-  alias Ch.RowBinary
-
   def insert_all(
         adapter_meta,
         schema_meta,
@@ -26,10 +24,11 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
         rows when is_list(rows) ->
           types = prepare_types(schema, header, opts)
+          opts = [{:types, types} | opts]
           # TODO use RowBinaryWithNamesAndTypes for type discrepancy warnings
           sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
-          data = unzip_encode_rows(rows, header, types)
-          Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
+          rows = unzip_rows(rows, header)
+          Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
       end
 
     {num_rows, nil}
@@ -41,10 +40,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     types = prepare_types(schema, header, opts)
     sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinary"]
-    data = RowBinary.encode_row(row, types)
-    opts = [{:command, :insert} | opts]
+    opts = [{:command, :insert}, {:types, types} | opts]
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, {:raw, data}, opts)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts)
     {:ok, []}
   end
 
@@ -92,18 +90,18 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp remap_type(other), do: other
 
-  defp unzip_encode_rows([row | rows], header, types) do
-    [unzip_encode_row(header, types, row) | unzip_encode_rows(rows, header, types)]
+  defp unzip_rows([row | rows], header) do
+    [unzip_row(header, row) | unzip_rows(rows, header)]
   end
 
-  defp unzip_encode_rows([], _header, _types), do: []
+  defp unzip_rows([], _header), do: []
 
-  defp unzip_encode_row([field | fields], [type | types], row) do
-    case :lists.keyfind(field, 1, row) do
-      {_, value} -> [RowBinary.encode(type, value) | unzip_encode_row(fields, types, row)]
-      false -> [RowBinary.encode(type, nil) | unzip_encode_row(fields, types, row)]
+  defp unzip_row([field | fields], row) do
+    case List.keyfind(row, field, 0) do
+      {_, value} -> [value | unzip_row(fields, row)]
+      nil = not_found -> [not_found | unzip_row(fields, row)]
     end
   end
 
-  defp unzip_encode_row([], [], _row), do: []
+  defp unzip_row([], _row), do: []
 end
