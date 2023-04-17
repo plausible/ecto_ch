@@ -110,7 +110,7 @@ ARRAY JOIN "arr" AS a1
 
 #### UTF-8
 
-Both `:binary` and `:string` schema fields are decoded as UTF-8 since Ecto [doesn't call adapter's loaders for base types](https://github.com/elixir-ecto/ecto/blob/b5682bbd2123d32760af664cc3f91c5d8174ef74/lib/ecto/type.ex#L891-L897) like `:binary` and `:string`.
+Both `:binary` and `:string` Ecto types are decoded as UTF-8 since Ecto [doesn't call adapter's loaders for base types.](https://github.com/elixir-ecto/ecto/blob/b5682bbd2123d32760af664cc3f91c5d8174ef74/lib/ecto/type.ex#L891-L897)
 
 [See Ch for more details and an example.](https://github.com/plausible/ch#utf-8-in-rowbinary)
 
