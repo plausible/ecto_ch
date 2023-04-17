@@ -25,6 +25,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     DBConnection.execute(conn, query, params, opts)
   end
 
+  # TODO what should be done about transactions? probably will need to build custom Repo.stream
   @impl true
   def query(conn, statement, params, opts) do
     Ch.query(conn, statement, params, opts)
@@ -36,8 +37,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def stream(_conn, _statement, _params, _opts) do
-    raise "ClickHouse does not support cursors"
+  def stream(conn, statement, params, opts) do
+    Ch.stream(conn, statement, params, opts)
   end
 
   @impl true
