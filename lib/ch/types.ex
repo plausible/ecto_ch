@@ -17,6 +17,20 @@ basic_types = [
 
 for {type, name, base} <- basic_types do
   defmodule Module.concat(Ch.Types, name) do
+    @moduledoc """
+    Ecto type for #{inspect(name)} ClickHouse type.
+
+    Example:
+
+        defmodule Schema do
+          use Ecto.Schema
+
+          schema "demo_#{type}" do
+            field :value, #{inspect(__MODULE__)}
+          end
+        end
+
+    """
     use Ecto.Type
 
     @impl true
@@ -34,6 +48,21 @@ for {type, name, base} <- basic_types do
 end
 
 defmodule Ch.Types.FixedString do
+  @moduledoc """
+  Ecto type for FixedString ClickHouse type.
+
+  Example:
+
+      defmodule Schema do
+        use Ecto.Schema
+
+        schema "demo_fixed_string" do
+          field :country_code, #{inspect(__MODULE__)}, size: 2
+        end
+      end
+
+  """
+
   use Ecto.ParameterizedType
 
   @impl true
@@ -57,6 +86,22 @@ defmodule Ch.Types.FixedString do
 end
 
 defmodule Ch.Types.Nullable do
+  @moduledoc """
+  Ecto type for Nullable ClickHouse type.
+
+  Example:
+
+      defmodule Schema do
+        use Ecto.Schema
+
+        schema "demo_nullable" do
+          field :name, #{inspect(__MODULE__)}, type: :string
+          field :int, #{inspect(__MODULE__)}, type: Ch.Types.UInt8
+        end
+      end
+
+  """
+
   use Ecto.ParameterizedType
   @dialyzer :no_improper_lists
 
@@ -103,6 +148,21 @@ end
 
 for size <- [32, 64, 128, 256] do
   defmodule Module.concat(Ch.Types, :"Decimal#{size}") do
+    @moduledoc """
+    Ecto type for Decimal#{size} ClickHouse type.
+
+    Example:
+
+        defmodule Schema do
+          use Ecto.Schema
+
+          schema "demo_decimal#{size}" do
+            field :value, #{inspect(__MODULE__)}, scale: 2
+          end
+        end
+
+    """
+
     use Ecto.ParameterizedType
 
     @impl true
