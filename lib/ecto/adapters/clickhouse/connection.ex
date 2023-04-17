@@ -849,8 +849,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [expr(count, sources, params, query), " * ", interval(1, interval, sources, params, query)]
   end
 
-  import Ch.RowBinary, only: [decimal: 1, string: 1]
-
   defp ecto_to_db({:array, t}) do
     ["Array(", ecto_to_db(t), ?)]
   end
@@ -892,11 +890,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db(:f32), do: "Float32"
   defp ecto_to_db(:f64), do: "Float64"
 
-  defp ecto_to_db(decimal(size: size, scale: scale)) do
+  defp ecto_to_db({:decimal, size, scale}) do
     ["Decimal", Integer.to_string(size), ?(, Integer.to_string(scale), ?)]
   end
 
-  defp ecto_to_db(string(size: size)) do
+  defp ecto_to_db({:string, size}) do
     ["FixedString(", Integer.to_string(size), ?)]
   end
 

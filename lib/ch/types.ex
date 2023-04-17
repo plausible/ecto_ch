@@ -35,7 +35,6 @@ end
 
 defmodule Ch.Types.FixedString do
   use Ecto.ParameterizedType
-  import Ch.RowBinary, only: [string: 1]
 
   @impl true
   def type(type), do: {:parameterized, :ch, type}
@@ -44,7 +43,7 @@ defmodule Ch.Types.FixedString do
   def init(opts) do
     size = Keyword.fetch!(opts, :size)
     (is_integer(size) and size > 0) || raise ":size needs to be a positive integer"
-    string(size: size)
+    {:string, size}
   end
 
   @impl true
@@ -105,7 +104,6 @@ end
 for size <- [32, 64, 128, 256] do
   defmodule Module.concat(Ch.Types, :"Decimal#{size}") do
     use Ecto.ParameterizedType
-    import Ch.RowBinary, only: [decimal: 1]
 
     @impl true
     def type(type), do: {:parameterized, :ch, type}
@@ -117,7 +115,7 @@ for size <- [32, 64, 128, 256] do
       (is_integer(scale) and scale >= 0) ||
         raise ArgumentError, ":scale needs to be a non-negative integer"
 
-      decimal(size: unquote(size), scale: scale)
+      {:decimal, unquote(size), scale}
     end
 
     @impl true
