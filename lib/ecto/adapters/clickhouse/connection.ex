@@ -891,8 +891,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db(:f32), do: "Float32"
   defp ecto_to_db(:f64), do: "Float64"
 
-  defp ecto_to_db({:decimal, size, scale}) do
-    ["Decimal", Integer.to_string(size), ?(, Integer.to_string(scale), ?)]
+  for size <- [32, 64, 128, 256] do
+    defp ecto_to_db({unquote(:"decimal#{size}"), scale}) do
+      [unquote("Decimal#{size}("), Integer.to_string(scale), ?)]
+    end
+  end
+
+  defp ecto_to_db({:decimal, precision, scale}) do
+    ["Decimal(", Integer.to_string(precision), ", ", Integer.to_string(scale), ?)]
   end
 
   defp ecto_to_db({:string, size}) do

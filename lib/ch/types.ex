@@ -175,7 +175,7 @@ for size <- [32, 64, 128, 256] do
       (is_integer(scale) and scale >= 0) ||
         raise ArgumentError, ":scale needs to be a non-negative integer"
 
-      {:decimal, unquote(size), scale}
+      {unquote(:"decimal#{size}"), scale}
     end
 
     @impl true

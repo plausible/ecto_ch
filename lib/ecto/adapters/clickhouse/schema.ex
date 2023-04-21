@@ -86,6 +86,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   # Ch.Types.FixedString, Ch.Types.Nullable, etc.
   defp remap_type({:parameterized, :ch, type}), do: type
+  defp remap_type({:parameterized, Ch, type}), do: type
   defp remap_type({:array, type}), do: {:array, remap_type(type)}
 
   defp remap_type(other), do: other
