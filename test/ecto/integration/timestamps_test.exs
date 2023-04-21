@@ -10,7 +10,7 @@ defmodule Ecto.Integration.TimestampsTest do
     use Ecto.Schema
     import Ecto.Changeset
 
-    @primary_key {:id, Ch.Types.UInt64, autogenerate: false}
+    @primary_key {:id, UInt64, autogenerate: false}
     schema "users" do
       field :name, :string
       timestamps()
@@ -27,7 +27,7 @@ defmodule Ecto.Integration.TimestampsTest do
     use Ecto.Schema
     import Ecto.Changeset
 
-    @primary_key {:id, Ch.Types.UInt64, autogenerate: false}
+    @primary_key {:id, UInt64, autogenerate: false}
     schema "users" do
       field :name, :string
       timestamps(type: :utc_datetime)

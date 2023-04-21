@@ -74,22 +74,39 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     end
   end
 
-  defp remap_type(dt) when dt in [:naive_datetime, :utc_datetime], do: :datetime
+  defp remap_type(dt) when dt in [:naive_datetime, :utc_datetime],
+    do: :datetime
 
-  defp remap_type(usec) when usec in [:naive_datetime_usec, :utc_datetime_usec] do
-    {:datetime64, :microsecond}
+  defp remap_type(usec) when usec in [:naive_datetime_usec, :utc_datetime_usec],
+    do: {:datetime64, _precision = 6}
+
+  # :integer is used in schema_migrations schema
+  defp remap_type(:integer), do: :i64
+  defp remap_type(:binary_id), do: :binary
+  defp remap_type(t) when t in [:string, :binary, :date, :uuid, :boolean], do: t
+
+  for size <- [8, 16, 32, 64, 128, 256] do
+    defp remap_type(unquote(:"u#{size}") = u), do: u
+    defp remap_type(unquote(:"i#{size}") = i), do: i
   end
 
-  # TODO :integer is used in schema_versions schema
-  defp remap_type(:integer), do: :i64
-  defp remap_type(b) when b in [:binary_id, :binary], do: :string
-
-  # Ch.Types.FixedString, Ch.Types.Nullable, etc.
-  defp remap_type({:parameterized, :ch, type}), do: type
+  defp remap_type({:array = a, t}), do: {a, remap_type(t)}
   defp remap_type({:parameterized, Ch, type}), do: type
-  defp remap_type({:array, type}), do: {:array, remap_type(type)}
 
-  defp remap_type(other), do: other
+  defp remap_type(other) do
+    raise ArgumentError, """
+    #{inspect(other)} type is ambiguous, please use `Ch` Ecto type if you are inserting an Ecto schema struct:
+
+        schema "example" do
+          field :name, Ch, type: "Nullable(String)"
+        end
+
+    or a ClickHouse type as string if it's a schemaless insert:
+
+        Repo.insert_all("example", rows, types: ["UInt8", "String", "Nullable(Array(Int64))"])
+
+    """
+  end
 
   defp unzip_rows([row | rows], header) do
     [unzip_row(header, row) | unzip_rows(rows, header)]
