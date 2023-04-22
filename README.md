@@ -62,12 +62,6 @@ MyApp.Repo.insert_all(MyApp.Example, rows)
 
 Note that some base Ecto types like `:string` would also work.
 
-`ecto.ch.schema` mix task can be used to generate a schema from an existing ClickHouse table.
-
-Usage: `mix echo.ch.schema <table>` or `mix ecto.ch.schema <database>.<table>`
-
-Example: `mix ecto.ch.schema example`
-
 #### Schemaless inserts
 
 For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided
