@@ -87,15 +87,15 @@ defmodule Ecto.Integration.Post do
   import Ecto.Changeset
 
   schema "posts" do
-    field :counter, Ch.Types.UInt32, default: 0
+    field :counter, Ch, type: "UInt32", default: 0
     field :title, :string, default: ""
     field :blob, :binary, default: ""
     field :temp, :string, default: "temp", virtual: true
     field :public, :boolean, default: true
-    field :cost, Ch.Types.Decimal64, scale: 2, default: Decimal.new("0.00")
-    field :visits, Ch.Types.UInt16, default: 0
+    field :cost, Ch, type: "Decimal64(2)", default: Decimal.new("0.00")
+    field :visits, Ch, type: "UInt16", default: 0
     field :wrapped_visits, WrappedInteger, default: {:int, 0}
-    field :intensity, Ch.Types.Float32, default: 0.0
+    field :intensity, Ch, type: "Float32", default: 0.0
     # field :bid, :binary_id
     field :uuid, Ecto.Integration.TestRepo.uuid(), autogenerate: true
     # field :meta, :map
@@ -168,7 +168,7 @@ defmodule Ecto.Integration.Comment do
 
   schema "comments" do
     field :text, :string, default: ""
-    field :lock_version, Ch.Types.UInt8, default: 1
+    field :lock_version, Ch, type: "UInt8", default: 1
     belongs_to :post, Ecto.Integration.Post
     belongs_to :author, Ecto.Integration.User
     has_one :post_permalink, through: [:post, :permalink]

@@ -53,31 +53,7 @@ defmodule Chto.MixProject do
       source_ref: "v#{@version}",
       main: "readme",
       extras: ["README.md", "CHANGELOG.md"],
-      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
-      groups_for_modules: [
-        "Ecto Types": [
-          Ch.Types.UInt8,
-          Ch.Types.UInt16,
-          Ch.Types.UInt32,
-          Ch.Types.UInt64,
-          Ch.Types.UInt128,
-          Ch.Types.UInt256,
-          Ch.Types.Int8,
-          Ch.Types.Int16,
-          Ch.Types.Int32,
-          Ch.Types.Int64,
-          Ch.Types.Int128,
-          Ch.Types.Int256,
-          Ch.Types.Float32,
-          Ch.Types.Float64,
-          Ch.Types.FixedString,
-          Ch.Types.Nullable,
-          Ch.Types.Decimal32,
-          Ch.Types.Decimal64,
-          Ch.Types.Decimal128,
-          Ch.Types.Decimal256
-        ]
-      ]
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
     ]
   end
 

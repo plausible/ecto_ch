@@ -381,7 +381,7 @@ defmodule Ecto.Integration.TypeTest do
     assert Decimal.equal?(Decimal.new("0.0"), cost)
   end
 
-  @decimal64_2 Ecto.ParameterizedType.init(Ch.Types.Decimal64, scale: 2)
+  @decimal64_2 Ecto.ParameterizedType.init(Ch, type: "Decimal64(2)")
   test "decimal typed aggregations" do
     decimal = Decimal.new("1.0")
     TestRepo.insert!(%Post{cost: decimal})

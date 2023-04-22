@@ -30,9 +30,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     use Ecto.Schema
 
     schema "schema" do
-      field :x, Ch.Types.UInt8
-      field :y, Ch.Types.UInt16
-      field :z, Ch.Types.UInt64
+      field :x, Ch, type: "UInt8"
+      field :y, Ch, type: "UInt16"
+      field :z, Ch, type: "UInt64"
       field :meta, :map
 
       has_many :comments, Ecto.Adapters.ClickHouse.ConnectionTest.Schema2,
@@ -639,7 +639,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" = (s0."y" IS NULL) FROM "schema" AS s0]
   end
 
-  @decimal64_2 Ecto.ParameterizedType.init(Ch.Types.Decimal64, scale: 2)
+  @decimal64_2 Ecto.ParameterizedType.init(Ch, type: "Decimal64(2)")
   test "order_by and types" do
     query =
       "schema3"

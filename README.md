@@ -34,11 +34,9 @@ defmodule MyApp.Repo do
 end
 ```
 
-## Caveats
-
 #### Ecto schemas
 
-For automatic RowBinary encoding some schema fields need to use custom types:
+For automatic RowBinary encoding please use the custom `Ch` Ecto type:
 
 ```elixir
 defmodule MyApp.Example do
@@ -46,30 +44,40 @@ defmodule MyApp.Example do
 
   @primary_key false
   schema "example" do
-    field :numeric_types_need_size, Ch.Types.UInt32
-    field :no_custom_type_for_strings, :string
-    field :datetime, :naive_datetime
-    field :maybe_name, Ch.Types.Nullable, type: :string
-    field :country_code, Ch.Types.FixedString, size: 2
-    field :price, Ch.Types.Decimal32, scale: 2
+    field :number, Ch, type: "UInt32"
+    field :name, Ch, type: "String"
+    field :maybe_name, Ch, type: "Nullable(String)"
+    field :country_code, Ch, type: "FixedString(2)"
+    field :price, Ch, type: "Decimal32(2)"
+    field :map, Ch, type: "Map(String, UInt64)"
+    field :ipv4, Ch, type: "IPv4"
+    field :ipv4s, Ch, type: "Array(IPv4)"
+    field :enum, Ch, type: "Enum8('hello' = 1, 'world' = 2)"
+    # etc.
   end
 end
 
 MyApp.Repo.insert_all(MyApp.Example, rows)
 ```
 
+Note that some base Ecto types like `:string` would also work.
+
+`ecto.ch.schema` mix task can be used to generate a schema from an existing ClickHouse table.
+
+Usage: `mix echo.ch.schema <table>` or `mix ecto.ch.schema <database>.<table>`
+
+Example: `mix ecto.ch.schema example`
+
 #### Schemaless inserts
 
-For schemaless inserts `:types` is required
+For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided
 
 ```elixir
 types = [
-  numeric_types_need_size: :u32,
-  no_custom_type_for_strings: :string,
-  datetime: :datetime,
-  maybe_name: {:nullable, :string},
-  country_code: {:string, _size = 2},
-  price: {:decimal, _size = 32, _scale = 2}
+  number: "UInt64",
+  # or `number: :u64`
+  # or `number: Ch.Types.u64()`
+  # etc.
 ]
 
 MyApp.Repo.insert_all("example", rows, types: types)
@@ -84,17 +92,19 @@ MyApp.Repo.insert_all(MyApp.Example, rows, settings: [async_insert: 1])
 MyApp.Repo.delete_all("example", settings: [allow_experimental_lightweight_delete: 1])
 ```
 
+## Caveats
+
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)
 
-`:inner_lateral` and `:left_lateral` join types are used for `ARRAY JOIN` and `LEFT ARRAY JOIN` until Ecto adds `:array_join` types.
-
-`ARRAY JOIN` example:
+For now `:inner_lateral` and `:left_lateral` are used for `ARRAY` and `LEFT ARRAY` joins:
 
 ```elixir
 "arrays_test"
-|> join(:inner_lateral, [a], r in "arr", on: true)
+|> join(:inner_lateral, [a], r in "arr")
 |> select([a, r], {a.s, r.arr})
 ```
+
+is equivalent to
 
 ```sql
 SELECT a0."s", a1."arr"
@@ -107,12 +117,6 @@ ARRAY JOIN "arr" AS a1
 `DEFAULT` expressions on columns are ignored when inserting RowBinary.
 
 [See Ch for more details and an example.](https://github.com/plausible/ch#null-in-rowbinary)
-
-#### UTF-8
-
-Both `:binary` and `:string` Ecto types are decoded as UTF-8 since Ecto [doesn't call adapter's loaders for base types.](https://github.com/elixir-ecto/ecto/blob/b5682bbd2123d32760af664cc3f91c5d8174ef74/lib/ecto/type.ex#L891-L897)
-
-[See Ch for more details and an example.](https://github.com/plausible/ch#utf-8-in-rowbinary)
 
 ## Benchmarks
 

@@ -865,10 +865,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp ecto_to_db(:decimal) do
     raise ArgumentError,
-          "cast to :decimal is not supported, please use Ch.Types.{Decimal32, Decimal64, Decimal128, Decimal256} instead"
+          "cast to :decimal is not supported, please use `Ch, type: \"Decimal(P, S)\"` instead"
   end
 
-  defp ecto_to_db({:parameterized, :ch, type}) do
+  defp ecto_to_db({:parameterized, Ch, type}) do
     ecto_to_db(type)
   end
 
