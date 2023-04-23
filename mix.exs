@@ -1,18 +1,18 @@
-defmodule Chto.MixProject do
+defmodule EctoCh.MixProject do
   use Mix.Project
 
-  @source_url "https://github.com/plausible/chto"
+  @source_url "https://github.com/plausible/ecto_ch"
   @version "0.1.0"
 
   def project do
     [
-      app: :chto,
+      app: :ecto_ch,
       version: @version,
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       test_paths: test_paths(System.get_env("INTEGRATION")),
       deps: deps(),
-      name: "Chto",
+      name: "Ecto ClickHouse",
       description: "ClickHouse adapter for Ecto",
       docs: docs(),
       package: package(),

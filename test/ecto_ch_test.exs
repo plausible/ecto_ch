@@ -1,4 +1,4 @@
-defmodule ChtoTest do
+defmodule EctoCh.Test do
   use ExUnit.Case
 
   import Ecto.Query

@@ -5,18 +5,18 @@ defmodule Ecto.Adapters.ClickHouseTest do
 
   describe "storage_up/1" do
     test "create database" do
-      opts = [database: "chto_temp_db"]
+      opts = [database: "ecto_ch_temp_db"]
 
       assert :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
 
       conn = start_supervised!(Ch)
       assert {:ok, %{rows: rows}} = Ch.query(conn, "show databases")
-      assert ["chto_temp_db"] in rows
+      assert ["ecto_ch_temp_db"] in rows
     end
 
     test "does not fail on second call" do
-      opts = [database: "chto_temp_db_2"]
+      opts = [database: "ecto_ch_temp_db_2"]
 
       assert :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
@@ -33,14 +33,14 @@ defmodule Ecto.Adapters.ClickHouseTest do
 
   describe "storage_down/1" do
     test "storage down (twice)" do
-      opts = [database: "chto_temp_down_2"]
+      opts = [database: "ecto_ch_temp_down_2"]
 
       assert :ok = ClickHouse.storage_up(opts)
       assert :ok = ClickHouse.storage_down(opts)
 
       conn = start_supervised!(Ch)
       assert {:ok, %{rows: rows}} = Ch.query(conn, "show databases")
-      refute ["chto_temp_down_2"] in rows
+      refute ["ecto_ch_temp_down_2"] in rows
 
       assert {:error, :already_down} = ClickHouse.storage_down(opts)
     end
@@ -48,12 +48,12 @@ defmodule Ecto.Adapters.ClickHouseTest do
 
   describe "storage_status/1" do
     test "when database is down" do
-      opts = [database: "chto_temp_status_down"]
+      opts = [database: "ecto_ch_temp_status_down"]
       assert ClickHouse.storage_status(opts) == :down
     end
 
     test "when database is up" do
-      opts = [database: "chto_temp_status_up"]
+      opts = [database: "ecto_ch_temp_status_up"]
 
       :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
