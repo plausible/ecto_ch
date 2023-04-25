@@ -64,7 +64,7 @@ Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others
 
 #### Schemaless inserts
 
-For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided
+For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided:
 
 ```elixir
 types = [
@@ -79,7 +79,7 @@ MyApp.Repo.insert_all("example", rows, types: types)
 
 #### Settings
 
-`:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweght [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) and [more](https://clickhouse.com/docs/en/operations/settings/settings)
+`:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweght [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) and [more:](https://clickhouse.com/docs/en/operations/settings/settings)
 
 ```elixir
 MyApp.Repo.insert_all(MyApp.Example, rows, settings: [async_insert: 1])
