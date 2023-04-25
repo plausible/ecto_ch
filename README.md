@@ -62,17 +62,6 @@ MyApp.Repo.insert_all(MyApp.Example, rows)
 
 Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others like `:decimal`, `:integer` are ambiguous and should not be used.
 
-⚠️ No validation for `:type` is done, i.e. `type: "Map(Array(String), String)"` would be compiled but not accepted by ClickHouse during insert.
-
-<details>
-<summary>Error message from such INSERT</summary>
-
-```
-** (Ch.Error) Code: 36. DB::Exception: Type of Map key must be a type, that can be represented by integer or String or FixedString (possibly LowCardinality) or UUID, but Array(String) given. (BAD_ARGUMENTS)
-```
-
-</details>
-
 #### Schemaless inserts
 
 For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided
