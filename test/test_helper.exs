@@ -6,9 +6,9 @@ Code.require_file("test/support/schemas.exs")
 
 alias Ecto.Integration.TestRepo
 
-Application.put_env(:chto, TestRepo,
+Application.put_env(:ecto_ch, TestRepo,
   adapter: Ecto.Adapters.ClickHouse,
-  database: "chto_test",
+  database: "ecto_ch_test",
   show_sensitive_data_on_connection_error: true
 )
 

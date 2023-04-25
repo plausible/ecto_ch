@@ -1,5 +1,5 @@
 defmodule Ecto.Integration.TestRepo do
-  use Ecto.Repo, adapter: Ecto.Adapters.ClickHouse, otp_app: :chto
+  use Ecto.Repo, adapter: Ecto.Adapters.ClickHouse, otp_app: :ecto_ch
 
   def create_prefix(db) do
     query!("CREATE DATABASE #{db}")

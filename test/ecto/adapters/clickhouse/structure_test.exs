@@ -83,7 +83,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
   describe "structure_dump/1" do
     test "dump unknown db" do
-      opts = [database: "chto_does_not_exist"]
+      opts = [database: "ecto_ch_does_not_exist"]
 
       assert {:error, %Ch.Error{code: 81, message: message}} =
                ClickHouse.structure_dump("priv/repo", opts)
@@ -92,7 +92,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
     end
 
     test "dumps empty database" do
-      opts = [database: "chto_temp_structure_empty"]
+      opts = [database: "ecto_ch_temp_structure_empty"]
 
       assert :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
@@ -104,7 +104,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
     end
 
     test "dumps migrated database" do
-      database = "chto_temp_structure_migrated"
+      database = "ecto_ch_temp_structure_migrated"
       opts = [database: database]
 
       assert :ok = ClickHouse.storage_up(opts)
@@ -140,7 +140,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       end
 
       assert find_schema.("events") == """
-             CREATE TABLE chto_temp_structure_migrated.events
+             CREATE TABLE ecto_ch_temp_structure_migrated.events
              (
                  `name` String,
                  `domain` String,
@@ -163,7 +163,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
              """
 
       assert find_schema.("sessions") == """
-             CREATE TABLE chto_temp_structure_migrated.sessions
+             CREATE TABLE ecto_ch_temp_structure_migrated.sessions
              (
                  `session_id` UInt64,
                  `sign` Int8,
@@ -192,7 +192,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
              """
 
       assert find_schema.("ingest_counters") == """
-             CREATE TABLE chto_temp_structure_migrated.ingest_counters
+             CREATE TABLE ecto_ch_temp_structure_migrated.ingest_counters
              (
                  `event_timebucket` DateTime,
                  `domain` LowCardinality(String),
@@ -208,7 +208,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       schema_migrations = find_schema.("schema_migrations")
 
       assert schema_migrations == """
-             CREATE TABLE chto_temp_structure_migrated.schema_migrations
+             CREATE TABLE ecto_ch_temp_structure_migrated.schema_migrations
              (
                  `version` Int64,
                  `inserted_at` DateTime
@@ -225,7 +225,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       assert List.last(parts) ==
                """
-               INSERT INTO "chto_temp_structure_migrated"."schema_migrations" (version, inserted_at) VALUES
+               INSERT INTO "ecto_ch_temp_structure_migrated"."schema_migrations" (version, inserted_at) VALUES
                (1,'#{inserted_at_1}'),
                (2,'#{inserted_at_2}');
                """

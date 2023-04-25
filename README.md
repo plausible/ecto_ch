@@ -1,7 +1,7 @@
 # Ecto ClickHouse Adapter
 
-[![Hex Package](https://img.shields.io/hexpm/v/chto.svg)](https://hex.pm/packages/chto)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/chto)
+[![Hex Package](https://img.shields.io/hexpm/v/ecto_ch.svg)](https://hex.pm/packages/ecto_ch)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/ecto_ch)
 
 Uses [Ch](https://github.com/plausible/ch) as driver.
 
@@ -10,7 +10,7 @@ Uses [Ch](https://github.com/plausible/ch) as driver.
 ```elixir
 defp deps do
   [
-    {:chto, github: "plausible/chto"}
+    {:ecto_ch, github: "plausible/ecto_ch"}
   ]
 end
 ```
