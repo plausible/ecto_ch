@@ -1,4 +1,5 @@
 Logger.configure(level: :info)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
 
 Code.require_file("test/support/ecto_schemas.exs")
 Code.require_file("test/support/schemas.exs")
