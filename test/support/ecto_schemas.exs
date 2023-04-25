@@ -27,7 +27,7 @@ end
 
 defmodule WrappedInteger do
   use Ecto.Type
-  def type(), do: :integer
+  def type(), do: Ch.Types.i64()
   def cast(integer), do: {:ok, {:int, integer}}
   def load(integer), do: {:ok, {:int, integer}}
   def dump({:int, integer}), do: {:ok, integer}
@@ -54,7 +54,7 @@ end
 
 defmodule MonotonicID do
   use Ecto.Type
-  def type, do: :u64
+  def type, do: Ch.Types.u64()
   def cast(i), do: Ecto.Type.cast(:integer, i)
   def dump(i), do: Ecto.Type.dump(:integer, i)
   def load(i), do: Ecto.Type.load(:integer, i)
@@ -89,7 +89,8 @@ defmodule Ecto.Integration.Post do
   schema "posts" do
     field :counter, Ch, type: "UInt32", default: 0
     field :title, :string, default: ""
-    field :blob, :binary, default: ""
+    # TODO field :blob, :binary, default: ""
+    field :blob, Ch, type: "String", default: ""
     field :temp, :string, default: "temp", virtual: true
     field :public, :boolean, default: true
     field :cost, Ch, type: "Decimal64(2)", default: Decimal.new("0.00")
@@ -325,7 +326,7 @@ defmodule Ecto.Integration.Tag do
   use Ecto.Integration.Schema
 
   schema "tags" do
-    field :ints, {:array, :integer}
+    field :ints, Ch, type: "Array(Int64)"
     field :uuids, {:array, Ecto.Integration.TestRepo.uuid()}
     # embeds_many :items, Ecto.Integration.Item
   end
@@ -468,7 +469,7 @@ defmodule Ecto.Integration.Logging do
 
   @primary_key {:bid, :binary_id, autogenerate: true}
   schema "loggings" do
-    field :int, :integer
+    field :int, Ch, type: "Int64"
     field :uuid, Ecto.Integration.TestRepo.uuid()
     timestamps()
   end

@@ -518,9 +518,7 @@ defmodule Ch.TypeTest do
         ch_datetime DateTime,
         ch_datetime_utc DateTime('UTC'),
         naive_datetime DateTime,
-        naive_datetime_utc DateTime('UTC'),
-        utc_datetime DateTime,
-        utc_datetime_utc DateTime('UTC')
+        utc_datetime DateTime
       ) engine Memory
       """)
 
@@ -535,9 +533,7 @@ defmodule Ch.TypeTest do
         field(:ch_datetime, Ch, type: "DateTime")
         field(:ch_datetime_utc, Ch, type: "DateTime('UTC')")
         field(:naive_datetime, :naive_datetime)
-        field(:naive_datetime_utc, :naive_datetime)
         field(:utc_datetime, :utc_datetime)
-        field(:utc_datetime_utc, :utc_datetime)
       end
     end
 
@@ -552,9 +548,7 @@ defmodule Ch.TypeTest do
                    ch_datetime: naive_now,
                    ch_datetime_utc: utc_now,
                    naive_datetime: naive_now,
-                   naive_datetime_utc: naive_now,
-                   utc_datetime: utc_now,
-                   utc_datetime_utc: utc_now
+                   utc_datetime: utc_now
                  ]
                ])
 
@@ -563,17 +557,13 @@ defmodule Ch.TypeTest do
                  ch_datetime: ~N[1970-01-01 00:00:00],
                  ch_datetime_utc: ~U[1970-01-01 00:00:00Z],
                  naive_datetime: ~N[1970-01-01 00:00:00],
-                 naive_datetime_utc: ~N[1970-01-01 00:00:00],
-                 utc_datetime: ~U[1970-01-01 00:00:00Z],
-                 utc_datetime_utc: ~U[1970-01-01 00:00:00Z]
+                 utc_datetime: ~U[1970-01-01 00:00:00Z]
                },
                %{
                  ch_datetime: naive_now,
                  ch_datetime_utc: utc_now,
                  naive_datetime: naive_now,
-                 naive_datetime_utc: naive_now,
-                 utc_datetime: utc_now,
-                 utc_datetime_utc: utc_now
+                 utc_datetime: utc_now
                }
              ]
     end
@@ -587,9 +577,7 @@ defmodule Ch.TypeTest do
         ch_6 DateTime64(6),
         ch_5_utc DateTime(5, 'UTC'),
         naive_datetime_usec DateTime64(6),
-        naive_datetime_usec_utc DateTime64(6, 'UTC'),
-        utc_datetime_usec DateTime64(6),
-        utc_datetime_usec_utc DateTime64(6, 'UTC')
+        utc_datetime_usec DateTime64(6)
       ) engine Memory
       """)
 
@@ -605,9 +593,7 @@ defmodule Ch.TypeTest do
         field(:ch_6, Ch, type: "DateTime64(6)")
         field(:ch_5_utc, Ch, type: "DateTime64(5, 'UTC')")
         field(:naive_datetime_usec, :naive_datetime_usec)
-        field(:naive_datetime_usec_utc, :naive_datetime_usec)
         field(:utc_datetime_usec, :utc_datetime_usec)
-        field(:utc_datetime_usec_utc, :utc_datetime_usec)
       end
     end
 
@@ -623,9 +609,7 @@ defmodule Ch.TypeTest do
                    ch_6: naive_now,
                    ch_5_utc: utc_now,
                    naive_datetime_usec: naive_now,
-                   naive_datetime_usec_utc: naive_now,
-                   utc_datetime_usec: utc_now,
-                   utc_datetime_usec_utc: utc_now
+                   utc_datetime_usec: utc_now
                  ]
                ])
 
@@ -635,18 +619,14 @@ defmodule Ch.TypeTest do
                  ch_6: ~N[1970-01-01 00:00:00.000000],
                  ch_5_utc: ~U[1970-01-01 00:00:00.000000Z],
                  naive_datetime_usec: ~N[1970-01-01 00:00:00.000000],
-                 naive_datetime_usec_utc: ~N[1970-01-01 00:00:00.000000],
-                 utc_datetime_usec: ~U[1970-01-01 00:00:00.000000Z],
-                 utc_datetime_usec_utc: ~U[1970-01-01 00:00:00.000000Z]
+                 utc_datetime_usec: ~U[1970-01-01 00:00:00.000000Z]
                },
                %{
                  ch_3: ~N[2023-04-24 09:02:00.975000],
                  ch_6: naive_now,
                  ch_5_utc: ~U[2023-04-24 09:02:00.975310Z],
                  naive_datetime_usec: naive_now,
-                 naive_datetime_usec_utc: naive_now,
-                 utc_datetime_usec: utc_now,
-                 utc_datetime_usec_utc: utc_now
+                 utc_datetime_usec: utc_now
                }
              ]
     end

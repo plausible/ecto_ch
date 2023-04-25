@@ -96,7 +96,7 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter
-  def dumpers({:in, subtype}, _type), do: [{:array, subtype}]
+  # TODO cleanup
   def dumpers(:boolean, type), do: [type, &bool_encode/1]
   def dumpers(:uuid, Ecto.UUID), do: [&uuid_encode/1]
   def dumpers(:uuid, type), do: [type, &uuid_encode/1]
@@ -109,6 +109,7 @@ defmodule Ecto.Adapters.ClickHouse do
   defp uuid_encode(uuid), do: Ecto.UUID.cast(uuid)
 
   @impl Ecto.Adapter
+  # TODO cleanup
   def loaders(:binary_id, type), do: [Ecto.UUID, type]
   def loaders(:boolean, type), do: [&bool_decode/1, type]
   def loaders(:float, type), do: [&float_decode/1, type]
@@ -240,7 +241,7 @@ defmodule Ecto.Adapters.ClickHouse do
         {num_rows, rows}
 
       :delete_all ->
-        # clickhouse doesn't give us any info on how many have been deleted
+        # clickhouse doesn't give us any info on how many rows have been deleted
         {0, nil}
     end
   end
