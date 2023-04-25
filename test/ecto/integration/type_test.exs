@@ -285,11 +285,13 @@ defmodule Ecto.Integration.TypeTest do
     # Querying
     assert TestRepo.all(from t in Tag, where: t.ints == [1, 2, 3], select: t.ints) == [ints]
 
-    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+    # TODO
+    assert_raise Ecto.QueryError, ~r/incompatible/, fn ->
       TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
     end
 
-    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+    # TODO
+    assert_raise Ecto.QueryError, ~r/incompatible/, fn ->
       TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints)
     end
 

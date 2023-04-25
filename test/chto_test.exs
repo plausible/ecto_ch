@@ -73,14 +73,15 @@ defmodule ChtoTest do
                  countIf(e0."type" != 'pageview') \
                  FROM "events" AS e0 \
                  WHERE (\
-                 e0."domain" IN {$0:Array(String)}) AND \
-                 (e0."tags" = {$1:Array(String)}) AND \
-                 (toDate(e0."inserted_at") >= {$2:Date}) AND \
-                 (toDate(e0."inserted_at") <= {$3:Date}\
+                 e0."domain" IN ({$0:String},{$1:String})) AND \
+                 (e0."tags" = {$2:Array(String)}) AND \
+                 (toDate(e0."inserted_at") >= {$3:Date}) AND \
+                 (toDate(e0."inserted_at") <= {$4:Date}\
                  )\
                  """,
                  [
-                   ["dummy.site", "dummy2.site"],
+                   "dummy.site",
+                   "dummy2.site",
                    ["1", "2", "3"],
                    ~D[2020-10-10],
                    ~D[2021-01-01]

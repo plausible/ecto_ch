@@ -518,9 +518,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
   end
 
-  defp expr({:^, [], [ix, _]}, _sources, params, _query) do
-    ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
+  defp expr({:^, [], [ix, len]}, _sources, params, _query) when len > 0 do
+    params =
+      ix..len
+      |> Enum.take(len)
+      |> intersperse_map(?,, fn ix ->
+        ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
+      end)
+
+    [?(, params, ?)]
   end
+
+  # using an empty array literal since empty tuples are not allowed in ClickHouse
+  defp expr({:^, [], [_, 0]}, _sources, _params, _query), do: "[]"
 
   defp expr({{:., _, [{:&, _, [ix]}, field]}, _, []}, sources, _params, _query)
        when is_atom(field) do
@@ -561,7 +571,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [expr(left, sources, params, query), " IN (", args, ?)]
   end
 
-  defp expr({:in, _, [_, {:^, _, [_, 0]}]}, _sources, _params, _query), do: "0"
+  defp expr({:in, _, [_, {:^, _, [_ix, 0]}]}, _sources, _params, _query), do: "0"
 
   defp expr({:in, _, [left, right]}, sources, params, query) do
     [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
