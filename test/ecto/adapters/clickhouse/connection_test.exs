@@ -12,7 +12,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     use Ecto.Schema
 
     schema "comments" do
-      field :content, :string
+      field(:content, :string)
     end
   end
 
@@ -20,9 +20,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     use Ecto.Schema
 
     schema "posts" do
-      field :title, :string
-      field :content, :string
-      has_many :comments, Comment
+      field(:title, :string)
+      field(:content, :string)
+      has_many(:comments, Comment)
     end
   end
 
@@ -30,18 +30,20 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     use Ecto.Schema
 
     schema "schema" do
-      field :x, Ch, type: "UInt8"
-      field :y, Ch, type: "UInt16"
-      field :z, Ch, type: "UInt64"
-      field :meta, :map
+      field(:x, Ch, type: "UInt8")
+      field(:y, Ch, type: "UInt16")
+      field(:z, Ch, type: "UInt64")
+      field(:meta, :map)
 
-      has_many :comments, Ecto.Adapters.ClickHouse.ConnectionTest.Schema2,
+      has_many(:comments, Ecto.Adapters.ClickHouse.ConnectionTest.Schema2,
         references: :x,
         foreign_key: :z
+      )
 
-      has_one :permalink, Ecto.Adapters.ClickHouse.ConnectionTest.Schema3,
+      has_one(:permalink, Ecto.Adapters.ClickHouse.ConnectionTest.Schema3,
         references: :y,
         foreign_key: :id
+      )
     end
   end
 
@@ -49,9 +51,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     use Ecto.Schema
 
     schema "schema2" do
-      belongs_to :post, Ecto.Adapters.ClickHouse.ConnectionTest.Schema,
+      belongs_to(:post, Ecto.Adapters.ClickHouse.ConnectionTest.Schema,
         references: :x,
         foreign_key: :z
+      )
     end
   end
 
@@ -59,7 +62,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     use Ecto.Schema
 
     schema "schema3" do
-      field :binary, :binary
+      field(:binary, :binary)
     end
   end
 
@@ -1087,13 +1090,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "delete_all" do
     assert delete_all(Schema) == ~s{DELETE FROM "schema" WHERE 1}
 
-    query = from e in Schema, where: e.x == 123
+    query = from(e in Schema, where: e.x == 123)
     assert delete_all(query) == ~s{DELETE FROM "schema" WHERE ("x" = 123)}
 
-    query = from e in Schema, where: e.x == ^123
+    query = from(e in Schema, where: e.x == ^123)
     assert delete_all(query) == ~s[DELETE FROM "schema" WHERE ("x" = {$0:Int64})]
 
-    query = from e in Schema, where: e.x == 123, select: e.x
+    query = from(e in Schema, where: e.x == 123, select: e.x)
 
     assert_raise Ecto.QueryError,
                  ~r/ClickHouse does not support RETURNING on DELETE statements/,
@@ -1761,6 +1764,24 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ) ENGINE=MergeTree\
              """
            ]
+  end
+
+  test "create table uses :default_table_engine if set" do
+    prev = Application.get_env(:ecto_ch, :default_table_engine)
+    :ok = Application.put_env(:ecto_ch, :default_table_engine, "Memory")
+    on_exit(fn -> Application.put_env(:ecto_ch, :default_table_engine, prev) end)
+
+    create = {:create, table(:posts), []}
+    assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=Memory}]
+  end
+
+  test "TinyLog engine is used if :default_table_engine is nil" do
+    prev = Application.get_env(:ecto_ch, :default_table_engine)
+    :ok = Application.put_env(:ecto_ch, :default_table_engine, nil)
+    on_exit(fn -> Application.put_env(:ecto_ch, :default_table_engine, prev) end)
+
+    create = {:create, table(:posts), []}
+    assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=TinyLog}]
   end
 
   test "create empty table" do

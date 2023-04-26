@@ -16,7 +16,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
         :create_if_not_exists -> "CREATE TABLE IF NOT EXISTS "
       end
 
-    engine = engine || "TinyLog"
+    engine = engine || Application.get_env(:ecto_ch, :default_table_engine) || "TinyLog"
     pk = if engine in ["TinyLog", "Memory"], do: [], else: pk_definition(columns)
     columns = @conn.intersperse_map(columns, ?,, &column_definition/1)
     options = options_expr(options)
