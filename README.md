@@ -68,6 +68,12 @@ MyApp.Repo.insert_all(MyApp.Example, rows)
 
 Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others like `:decimal`, `:integer` are ambiguous and should not be used.
 
+`ecto.ch.schema` mix task can be used to generate a schema from an existing ClickHouse table.
+
+Usage: `mix ecto.ch.schema <database>.<table>`
+
+Example: `mix ecto.ch.schema system.numbers`
+
 #### Schemaless inserts
 
 For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided:
