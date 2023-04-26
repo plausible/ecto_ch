@@ -34,6 +34,12 @@ defmodule MyApp.Repo do
 end
 ```
 
+Optionally you can also set the default table engine to use in migrations
+
+```elixir
+config :ecto_ch, default_table_engine: "TinyLog"
+```
+
 #### Ecto schemas
 
 For automatic RowBinary encoding please use the custom `Ch` Ecto type:
