@@ -39,7 +39,10 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
     case query(conn, statement, params) do
       {%Ch.Result{rows: [_ | _] = rows}, _conn} ->
         schema = [
-          ~s[schema "#{table}" do\n],
+          """
+          @primary_key false
+          schema "#{table}" do
+          """,
           Enum.map(rows, fn [name, type] ->
             ~s[  field :"#{name}", Ch, type: "#{type}"\n]
           end),

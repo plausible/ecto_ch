@@ -27,6 +27,7 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
         end)
 
       assert schema == """
+             @primary_key false
              schema "numbers" do
                field :"number", Ch, type: "UInt64"
              end
