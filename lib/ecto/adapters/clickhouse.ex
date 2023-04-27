@@ -33,6 +33,8 @@ defmodule Ecto.Adapters.ClickHouse do
   @conn __MODULE__.Connection
   @driver :ch
 
+  require Logger
+
   @impl Ecto.Adapter
   defmacro __before_compile__(_env) do
     quote do
@@ -144,8 +146,30 @@ defmodule Ecto.Adapters.ClickHouse do
   defdelegate structure_dump(default, config), to: Ecto.Adapters.ClickHouse.Structure
 
   @impl Ecto.Adapter.Structure
-  def structure_load(_default, _config) do
-    raise "not implemented"
+  def structure_load(default, config) do
+    path = config[:dump_path] || Path.join(default, "structure.sql")
+
+    Logger.info("Loading database structure from file: #{path}")
+    {:ok, conn} = Ch.Connection.connect(config)
+
+    case File.read(path) do
+      {:ok, data} ->
+        String.split(data, ";", trim: true)
+        |> Enum.filter(&String.match?(&1, ~r/[A-Za-z]+/))
+        |> Enum.each(fn sql_string ->
+          query = Ch.Query.build(sql_string)
+          params = DBConnection.Query.encode(query, [], [])
+
+          case Ch.Connection.handle_execute(query, params, [], conn) do
+            {:ok, _query, _result, _conn} -> :ok
+            {:disconnect, reason, _conn} -> raise reason
+            {:error, reason, _conn} -> raise reason
+          end
+        end)
+
+      {:error, reason} ->
+        raise reason
+    end
   end
 
   @impl Ecto.Adapter.Structure
