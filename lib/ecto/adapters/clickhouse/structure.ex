@@ -22,7 +22,6 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
         |> Enum.each(fn sql_string ->
           case exec(conn, sql_string) do
             {:ok, _result, _conn} -> :ok
-            {:disconnect, reason, _conn} -> raise reason
             {:error, reason, _conn} -> raise reason
           end
         end)
