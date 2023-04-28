@@ -14,9 +14,9 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
     args = ["--queries-file", path]
 
-    case run_with_cmd("clickhouse client", config, args) do
-      {:ok, _output} -> {:ok, path}
-      {:error, output} -> {:error, output}
+    case run_with_cmd("clickhouse-client", config, args) do
+      {_output, 0} -> {:ok, path}
+      {output, _} -> {:error, output}
     end
   end
 
@@ -108,9 +108,6 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
       cmd_opts
       |> Keyword.put_new(:stderr_to_stdout, true)
 
-    case System.cmd(cmd, args, cmd_opts) do
-      {output, 0} -> {:ok, output}
-      {output, _} -> {:error, output}
-    end
+    System.cmd(cmd, args, cmd_opts)
   end
 end

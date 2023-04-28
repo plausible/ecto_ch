@@ -42,20 +42,6 @@ jobs:
             ${{ runner.os }}-mix-${{ github.head_ref || github.ref }}-
             ${{ runner.os }}-mix-refs/heads/master-
 
-      - name: Install Clickouse cli tools
-        run: curl https://clickhouse.com/ | sh
-
-      - name: Add Clickhouse cli tools to path
-        run: echo "${HOME}/clickhouse" >> $GITHUB_PATH && echo "$GITHUB_PATH" && echo "${HOME}" && echo "${GITHUB_WORKSPACE}"
-
-      - name: Other try
-        run: echo "::add-path::$GITHUB_WORKSPACE/clickhouse"
-      
-
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@v1 
-
-
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
