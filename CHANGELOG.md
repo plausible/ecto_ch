@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 (2023-04-29)
 
 - add `mix ecto.load` support
 
