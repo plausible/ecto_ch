@@ -249,12 +249,6 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       start_supervised!(Repo)
 
-      assert [1, 2] ==
-               Ecto.Migrator.run(Repo, [{1, Migration1}, {2, Migration2}], :up,
-                 all: true,
-                 log: false
-               )
-
       tmp = System.tmp_dir!()
 
       path = Path.join(tmp, "structure.sql")
@@ -273,37 +267,15 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       ClickHouse.structure_load(tmp, opts)
 
-      assert {:ok, path} = ClickHouse.structure_dump(tmp, opts)
-      on_exit(fn -> File.rm!(path) end)
+      {:ok, %{num_rows: 0}} =
+        Repo.query(
+          "select id, time from ecto_ch_temp_structure_migrated.first_struture_load_table"
+        )
 
-      structure = File.read!(path)
-      parts = String.split(structure, "\n\n")
-
-      find_schema = fn name ->
-        Enum.find(parts, fn part ->
-          String.starts_with?(part, "CREATE TABLE " <> database <> "." <> name)
-        end)
-      end
-
-      assert find_schema.("first_struture_load_table") == """
-             CREATE TABLE ecto_ch_temp_structure_migrated.first_struture_load_table
-             (
-                 `id` String,
-                 `time` DateTime
-             )
-             ENGINE = Memory;\
-             """
-
-      assert find_schema.("second_struture_load_table") == """
-             CREATE TABLE ecto_ch_temp_structure_migrated.second_struture_load_table
-             (
-                 `id` String,
-                 `time` DateTime
-             )
-             ENGINE = MergeTree
-             ORDER BY time
-             SETTINGS index_granularity = 8192;\
-             """
+      {:ok, %{num_rows: 0}} =
+        Repo.query(
+          "select id, time from ecto_ch_temp_structure_migrated.second_struture_load_table"
+        )
     end
   end
 end

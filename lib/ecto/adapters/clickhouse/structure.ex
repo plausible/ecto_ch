@@ -3,9 +3,34 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   alias Ch.Query
   alias Ch.Connection, as: Conn
 
+  require Logger
+
   @conn Ecto.Adapters.ClickHouse.Connection
 
   # TODO include views
+
+  def structure_load(default, config) do
+    path = config[:dump_path] || Path.join(default, "structure.sql")
+
+    Logger.info("Loading database structure from file: #{path}")
+    {:ok, conn} = Conn.connect(config)
+
+    case File.read(path) do
+      {:ok, data} ->
+        String.split(data, ";", trim: true)
+        |> Enum.filter(&String.match?(&1, ~r/[A-Za-z]+/))
+        |> Enum.each(fn sql_string ->
+          case exec(conn, sql_string) do
+            {:ok, _result, _conn} -> :ok
+            {:disconnect, reason, _conn} -> raise reason
+            {:error, reason, _conn} -> raise reason
+          end
+        end)
+
+      {:error, reason} ->
+        raise reason
+    end
+  end
 
   def structure_dump(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
