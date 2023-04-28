@@ -110,7 +110,7 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
     case System.cmd(cmd, args, cmd_opts) do
       {output, 0} -> {:ok, output}
-      {output, 1} -> {:error, output}
+      {output, _} -> {:error, output}
     end
   end
 end
