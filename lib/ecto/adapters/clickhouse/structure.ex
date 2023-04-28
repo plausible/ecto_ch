@@ -12,22 +12,11 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   def structure_load(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
 
-    Logger.info("Loading database structure from file: #{path}")
-    {:ok, conn} = Conn.connect(config)
+    args = ["--queries-file", path]
 
-    case File.read(path) do
-      {:ok, data} ->
-        String.split(data, ";", trim: true)
-        |> Enum.filter(&String.match?(&1, ~r/[A-Za-z]+/))
-        |> Enum.each(fn sql_string ->
-          case exec(conn, sql_string) do
-            {:ok, _result, _conn} -> :ok
-            {:error, reason, _conn} -> raise reason
-          end
-        end)
-
-      {:error, reason} ->
-        raise reason
+    case run_with_cmd("clickhouse-client", config, args) do
+      {:ok, _output} -> {:ok, path}
+      {:error, output} -> {:error, output}
     end
   end
 
@@ -92,6 +81,36 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
       {:ok, query, result, conn} -> {:ok, DBConnection.Query.decode(query, result, []), conn}
       {:disconnect, reason, _conn} -> {:error, reason}
       {:error, reason, _conn} -> {:error, reason}
+    end
+  end
+
+  defp run_with_cmd(cmd, opts, opt_args, cmd_opts \\ []) do
+    unless System.find_executable(cmd) do
+      raise "could not find executable `#{cmd}` in path, " <>
+              "please guarantee it is available before running ecto commands"
+    end
+
+    args = []
+
+    args = if username = opts[:username], do: ["--username", username | args], else: args
+
+    args = if password = opts[:password], do: ["--password", password | args], else: args
+
+    args = if port = opts[:port], do: ["--port", to_string(port) | args], else: args
+    args = if database = opts[:database], do: ["--database", database | args], else: args
+
+    host = opts[:hostname] || "localhost"
+
+    args = ["--host", host | args]
+    args = args ++ opt_args
+
+    cmd_opts =
+      cmd_opts
+      |> Keyword.put_new(:stderr_to_stdout, true)
+
+    case System.cmd(cmd, args, cmd_opts) do
+      {output, 0} -> {:ok, output}
+      {output, 1} -> {:error, output}
     end
   end
 end
