@@ -3,8 +3,6 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   alias Ch.Query
   alias Ch.Connection, as: Conn
 
-  require Logger
-
   @conn Ecto.Adapters.ClickHouse.Connection
 
   # TODO include views
