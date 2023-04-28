@@ -28,10 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: curl https://clickhouse.com/ | sh
-      - run: sudo ./clickhouse install
-      - run: clickhouse-client --version
-
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.14.3"
@@ -47,9 +43,14 @@ jobs:
             ${{ runner.os }}-mix-${{ github.head_ref || github.ref }}-
             ${{ runner.os }}-mix-refs/heads/master-
 
-
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix test
+
+      - run: curl https://clickhouse.com/ | sh
+      - run: sudo ./clickhouse install
+      - run: clickhouse-client --version
+      - run: mix test --include clickhouse_client
+
       # - run: INTEGRATION=1 mix test

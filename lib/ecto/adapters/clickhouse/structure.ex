@@ -5,18 +5,17 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   @conn Ecto.Adapters.ClickHouse.Connection
 
-  # TODO include views
-
   def structure_load(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
+    {cmd, cmd_args} = clickhouse_client_cmd()
 
-    args = ["--queries-file", path]
-
-    case run_with_cmd("clickhouse-client", config, args) do
+    case run_with_cmd(cmd, cmd_args ++ ["--queries-file", path], config) do
       {_output, 0} -> {:ok, path}
       {output, _} -> {:error, output}
     end
   end
+
+  # TODO include views
 
   def structure_dump(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
@@ -82,30 +81,26 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     end
   end
 
-  defp run_with_cmd(cmd, opts, opt_args, cmd_opts \\ []) do
-    unless System.find_executable(cmd) do
-      raise "could not find executable `#{cmd}` in path, " <>
-              "please guarantee it is available before running ecto commands"
-    end
+  defp clickhouse_client_cmd do
+    candidates = [
+      {"clickhouse-client", _args = []},
+      {"clickhouse", _args = ["client"]}
+    ]
 
-    args = []
+    cmd_with_args = Enum.find(candidates, fn {cmd, _args} -> System.find_executable(cmd) end)
 
+    cmd_with_args ||
+      raise "could not find `clickhouse-client` nor `clickhouse` executables in path, " <>
+              "please guarantee that one of them is available before running ecto commands"
+  end
+
+  defp run_with_cmd(cmd, cmd_args, opts) do
+    args = ["--host", opts[:hostname] || "localhost"]
     args = if username = opts[:username], do: ["--username", username | args], else: args
-
     args = if password = opts[:password], do: ["--password", password | args], else: args
-
     args = if port = opts[:port], do: ["--port", to_string(port) | args], else: args
     args = if database = opts[:database], do: ["--database", database | args], else: args
 
-    host = opts[:hostname] || "localhost"
-
-    args = ["--host", host | args]
-    args = args ++ opt_args
-
-    cmd_opts =
-      cmd_opts
-      |> Keyword.put_new(:stderr_to_stdout, true)
-
-    System.cmd(cmd, args, cmd_opts)
+    System.cmd(cmd, cmd_args ++ args, stderr_to_stdout: true)
   end
 end

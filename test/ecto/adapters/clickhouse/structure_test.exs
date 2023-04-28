@@ -233,8 +233,10 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
   end
 
   describe "structure_load/2" do
-    test "can load structure" do
-      database = "ecto_ch_temp_structure_migrated"
+    @describetag :clickhouse_client
+
+    setup do
+      database = "ecto_ch_temp_structure_load"
       opts = [database: database]
 
       assert :ok = ClickHouse.storage_up(opts)
@@ -250,32 +252,139 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       start_supervised!(Repo)
 
       tmp = System.tmp_dir!()
-
       path = Path.join(tmp, "structure.sql")
 
-      File.write!(path, """
-      create table first_struture_load_table (
-        id String,
-        time DateTime
-      ) Engine = Memory();
+      {:ok, path: path, tmp: tmp, opts: opts}
+    end
 
-      create table second_struture_load_table (
-          id String,
-          time DateTime
-        ) Engine = MergeTree() order by time;
+    test "doesn't load structure for database that doesn't exist", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      File.write!(path, """
+      CREATE TABLE ecto_ch_temp_structure_migrated.schema_migrations
+      (
+          `version` Int64,
+          `inserted_at` DateTime
+      )
+      ENGINE = TinyLog;
+
+      CREATE TABLE ecto_ch_temp_structure_migrated.ingest_counters
+      (
+          `event_timebucket` DateTime,
+          `domain` LowCardinality(String),
+          `site_id` Nullable(UInt64),
+          `metric` LowCardinality(String),
+          `value` UInt64
+      )
+      ENGINE = SummingMergeTree(value)
+      ORDER BY (domain, toDate(event_timebucket), metric, toStartOfMinute(event_timebucket))
+      SETTINGS index_granularity = 8192;
       """)
 
-      ClickHouse.structure_load(tmp, opts)
+      assert {:error, reason} = ClickHouse.structure_load(tmp, opts)
+      assert reason =~ "Database ecto_ch_temp_structure_migrated doesn't exist."
+    end
 
-      {:ok, %{num_rows: 0}} =
-        Repo.query(
-          "select id, time from ecto_ch_temp_structure_migrated.first_struture_load_table"
-        )
+    test "loads structure for current database", %{path: path, tmp: tmp, opts: opts} do
+      File.write!(path, """
+      CREATE TABLE ecto_ch_temp_structure_load.schema_migrations
+      (
+          `version` Int64,
+          `inserted_at` DateTime
+      )
+      ENGINE = TinyLog;
 
-      {:ok, %{num_rows: 0}} =
-        Repo.query(
-          "select id, time from ecto_ch_temp_structure_migrated.second_struture_load_table"
-        )
+      CREATE TABLE ecto_ch_temp_structure_load.ingest_counters
+      (
+          `event_timebucket` DateTime,
+          `domain` LowCardinality(String),
+          `site_id` Nullable(UInt64),
+          `metric` LowCardinality(String),
+          `value` UInt64
+      )
+      ENGINE = SummingMergeTree(value)
+      ORDER BY (domain, toDate(event_timebucket), metric, toStartOfMinute(event_timebucket))
+      SETTINGS index_granularity = 8192;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+
+      assert show_create_table("schema_migrations") == """
+             CREATE TABLE ecto_ch_temp_structure_load.schema_migrations
+             (
+                 `version` Int64,
+                 `inserted_at` DateTime
+             )
+             ENGINE = TinyLog\
+             """
+
+      assert show_create_table("ingest_counters") == """
+             CREATE TABLE ecto_ch_temp_structure_load.ingest_counters
+             (
+                 `event_timebucket` DateTime,
+                 `domain` LowCardinality(String),
+                 `site_id` Nullable(UInt64),
+                 `metric` LowCardinality(String),
+                 `value` UInt64
+             )
+             ENGINE = SummingMergeTree(value)
+             ORDER BY (domain, toDate(event_timebucket), metric, toStartOfMinute(event_timebucket))
+             SETTINGS index_granularity = 8192\
+             """
+    end
+
+    test "loads unprefixed tables into current database", %{path: path, tmp: tmp, opts: opts} do
+      File.write!(path, """
+      CREATE TABLE schema_migrations
+      (
+          `version` Int64,
+          `inserted_at` DateTime
+      )
+      ENGINE = TinyLog;
+
+      CREATE TABLE ingest_counters
+      (
+          `event_timebucket` DateTime,
+          `domain` LowCardinality(String),
+          `site_id` Nullable(UInt64),
+          `metric` LowCardinality(String),
+          `value` UInt64
+      )
+      ENGINE = SummingMergeTree(value)
+      ORDER BY (domain, toDate(event_timebucket), metric, toStartOfMinute(event_timebucket))
+      SETTINGS index_granularity = 8192;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+
+      assert show_create_table("schema_migrations") == """
+             CREATE TABLE ecto_ch_temp_structure_load.schema_migrations
+             (
+                 `version` Int64,
+                 `inserted_at` DateTime
+             )
+             ENGINE = TinyLog\
+             """
+
+      assert show_create_table("ingest_counters") == """
+             CREATE TABLE ecto_ch_temp_structure_load.ingest_counters
+             (
+                 `event_timebucket` DateTime,
+                 `domain` LowCardinality(String),
+                 `site_id` Nullable(UInt64),
+                 `metric` LowCardinality(String),
+                 `value` UInt64
+             )
+             ENGINE = SummingMergeTree(value)
+             ORDER BY (domain, toDate(event_timebucket), metric, toStartOfMinute(event_timebucket))
+             SETTINGS index_granularity = 8192\
+             """
+    end
+
+    defp show_create_table(table) do
+      IO.iodata_to_binary(Repo.query!("SHOW CREATE TABLE #{table}").rows)
     end
   end
 end
