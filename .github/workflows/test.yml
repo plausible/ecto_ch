@@ -45,6 +45,11 @@ jobs:
       - name: Install Clickouse cli tools
         run: curl https://clickhouse.com/ | sh
       
+
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1 
+
+
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
