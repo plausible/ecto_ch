@@ -46,7 +46,7 @@ jobs:
         run: curl https://clickhouse.com/ | sh
 
       - name: Add Clickhouse cli tools to path
-        run: echo "${HOME}/clickhouse" >> $GITHUB_PATH
+        run: echo "${HOME}/clickhouse" >> $GITHUB_PATH && echo "$GITHUB_PATH" && echo "${HOME}"
       
 
       # - name: Setup upterm session
