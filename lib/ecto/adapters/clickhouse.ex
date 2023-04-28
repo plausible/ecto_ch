@@ -144,9 +144,7 @@ defmodule Ecto.Adapters.ClickHouse do
   defdelegate structure_dump(default, config), to: Ecto.Adapters.ClickHouse.Structure
 
   @impl Ecto.Adapter.Structure
-  def structure_load(_default, _config) do
-    raise "not implemented"
-  end
+  defdelegate structure_load(default, config), to: Ecto.Adapters.ClickHouse.Structure
 
   @impl Ecto.Adapter.Structure
   def dump_cmd(_args, _opts, _config) do

@@ -17,6 +17,7 @@ jobs:
         image: clickhouse/clickhouse-server:22.8.13.20-alpine
         ports:
           - 8123:8123
+          - 9000:9000
         env:
           options: >-
             --health-cmd nc -zw3 localhost 8124
@@ -46,4 +47,10 @@ jobs:
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix test
+
+      - run: curl https://clickhouse.com/ | sh
+      - run: sudo ./clickhouse install
+      - run: clickhouse-client --version
+      - run: mix test --include clickhouse_client
+
       # - run: INTEGRATION=1 mix test
