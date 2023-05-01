@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2023-05-01)
+
+- fix `in` params https://github.com/plausible/ecto_ch/pull/64
+
 ## 0.1.2 (2023-04-28)
 
 - add `mix ecto.load` support https://github.com/plausible/ecto_ch/pull/60

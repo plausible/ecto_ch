@@ -520,7 +520,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:^, [], [ix, len]}, _sources, params, _query) when len > 0 do
     params =
-      ix..len
+      ix..(ix + len)
       |> Enum.take(len)
       |> intersperse_map(?,, fn ix ->
         ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
