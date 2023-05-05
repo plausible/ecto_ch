@@ -43,9 +43,7 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
           @primary_key false
           schema "#{table}" do
           """,
-          Enum.map(rows, fn [name, type] ->
-            ~s[  field :"#{name}", Ch, type: "#{type}"\n]
-          end),
+          Enum.map(rows, fn [name, type] -> ["  ", build_field(name, type), ?\n] end),
           "end"
         ]
 
@@ -73,4 +71,29 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
       {:error, reason, _conn} -> raise reason
     end
   end
+
+  @doc false
+  def build_field(name, type) do
+    type = Ch.Types.decode(type)
+
+    ecto_type = ecto_type(type)
+    clickhouse_type = clickhouse_type(type)
+
+    case {ecto_type, clickhouse_type} do
+      {ecto_type, nil} ->
+        ~s[field :"#{name}", #{inspect(ecto_type)}]
+
+      {ecto_type, clickhouse_type} ->
+        ~s[field :"#{name}", #{inspect(ecto_type)}, type: "#{clickhouse_type}"]
+    end
+  end
+
+  defp ecto_type({:array, type}), do: {:array, ecto_type(type)}
+  defp ecto_type(type) when type in [:string, :date, :boolean], do: type
+  defp ecto_type(:uuid), do: Ecto.UUID
+  defp ecto_type(_type), do: Ch
+
+  defp clickhouse_type({:array, type}), do: clickhouse_type(type)
+  defp clickhouse_type(type) when type in [:uuid, :string, :date, :boolean], do: nil
+  defp clickhouse_type(type), do: Ch.Types.encode(type)
 end

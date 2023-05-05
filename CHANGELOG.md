@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- improve `:array` type handling https://github.com/plausible/ecto_ch/pull/67
+
 ## 0.1.3 (2023-05-01)
 
 - fix `in` params https://github.com/plausible/ecto_ch/pull/64
