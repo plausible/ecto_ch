@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.4 (2023-05-05)
 
 - improve `:array` type handling https://github.com/plausible/ecto_ch/pull/67
 
