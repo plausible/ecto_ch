@@ -1,25 +1,15 @@
-defmodule UInt64 do
-  use Ecto.Type
-
-  def type, do: :u64
-  def cast(value), do: Ecto.Type.cast(:integer, value)
-  def dump(value), do: Ecto.Type.dump(:integer, value)
-  def load(value), do: Ecto.Type.load(:integer, value)
-end
-
 defmodule EctoClickHouse.Integration.AccountUser do
   @moduledoc false
 
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, UInt64, autogenerate: false}
-  @foreign_key_type UInt64
+  @primary_key {:id, Ch, type: "UInt64"}
   schema "account_users" do
     timestamps()
 
-    belongs_to :account, EctoClickHouse.Integration.Account
-    belongs_to :user, EctoClickHouse.Integration.User
+    belongs_to :account, EctoClickHouse.Integration.Account, type: Ch, raw: "UInt64"
+    belongs_to :user, EctoClickHouse.Integration.User, type: Ch, raw: "UInt64"
   end
 
   def changeset(struct, attrs) do
@@ -35,8 +25,7 @@ defmodule EctoClickHouse.Integration.Account do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, UInt64, autogenerate: false}
-  @foreign_key_type UInt64
+  @primary_key {:id, Ch, type: "UInt64"}
   schema "accounts" do
     field :name, :string
     field :email, :string
@@ -60,8 +49,7 @@ defmodule EctoClickHouse.Integration.Product do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, UInt64, autogenerate: false}
-  @foreign_key_type UInt64
+  @primary_key {:id, Ch, type: "UInt64"}
   schema "products" do
     field :name, :string
     field :description, :string
@@ -70,7 +58,7 @@ defmodule EctoClickHouse.Integration.Product do
     field :approved_at, :naive_datetime
     field :price, Ch, type: "Decimal64(2)"
 
-    belongs_to :account, EctoClickHouse.Integration.Account
+    belongs_to :account, EctoClickHouse.Integration.Account, type: Ch, raw: "UInt64"
 
     timestamps()
   end
@@ -113,8 +101,7 @@ defmodule EctoClickHouse.Integration.User do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, UInt64, autogenerate: false}
-  @foreign_key_type UInt64
+  @primary_key {:id, Ch, type: "UInt64"}
   schema "users" do
     field :name, :string
 
