@@ -284,16 +284,11 @@ defmodule Ecto.Integration.TypeTest do
 
     # Querying
     assert TestRepo.all(from t in Tag, where: t.ints == [1, 2, 3], select: t.ints) == [ints]
-
-    # TODO
-    assert_raise Ecto.QueryError, ~r/incompatible/, fn ->
-      TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
-    end
-
-    # TODO
-    assert_raise Ecto.QueryError, ~r/incompatible/, fn ->
-      TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints)
-    end
+    assert TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints) == []
+    assert TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints) == [ints]
+    assert TestRepo.all(from t in "tags", where: t.ints == [1, 2, 3], select: t.ints) == [ints]
+    assert TestRepo.all(from t in "tags", where: 0 in t.ints, select: t.ints) == []
+    assert TestRepo.all(from t in "tags", where: 1 in t.ints, select: t.ints) == [ints]
 
     # # Update
     # tag = TestRepo.update!(Ecto.Changeset.change tag, ints: nil)

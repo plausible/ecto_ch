@@ -573,6 +573,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_ix, 0]}]}, _sources, _params, _query), do: "0"
 
+  defp expr({:in, _, [left, {{:., _, _}, _, _} = right]}, sources, params, query) do
+    ["has(", expr(right, sources, params, query), ?,, expr(left, sources, params, query), ?)]
+  end
+
   defp expr({:in, _, [left, right]}, sources, params, query) do
     [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
   end

@@ -326,7 +326,7 @@ defmodule Ecto.Integration.Tag do
   use Ecto.Integration.Schema
 
   schema "tags" do
-    field :ints, Ch, type: "Array(Int64)"
+    field :ints, {:array, Ch}, type: "Int64"
     field :uuids, {:array, Ecto.Integration.TestRepo.uuid()}
     # embeds_many :items, Ecto.Integration.Item
   end

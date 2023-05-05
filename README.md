@@ -57,7 +57,7 @@ defmodule MyApp.Example do
     field :price, Ch, type: "Decimal32(2)"
     field :map, Ch, type: "Map(String, UInt64)"
     field :ipv4, Ch, type: "IPv4"
-    field :ipv4s, Ch, type: "Array(IPv4)"
+    field :ipv4s, {:array, Ch}, type: "IPv4"
     field :enum, Ch, type: "Enum8('hello' = 1, 'world' = 2)"
     # etc.
   end
