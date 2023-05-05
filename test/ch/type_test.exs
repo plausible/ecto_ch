@@ -876,6 +876,14 @@ defmodule Ch.TypeTest do
                %{t1: {""}, t2: {"", 0}, t3: {"", [], 0}},
                %{t1: {"hello"}, t2: {"hello", 42}, t3: {"hello", ["world"], 42}}
              ]
+
+      # TODO
+      # assert Tuples |> where([t], "hell" in t.t1) |> all() |> unstruct() == []
+      # assert Tuples |> where([t], ^"hell" in t.t1) |> all() |> unstruct() == []
+      # assert Tuples |> where([t], 42 in t.t2) |> all() |> unstruct() == []
+      # assert Tuples |> where([t], ^42 in t.t2) |> all() |> unstruct() == []
+      # assert Tuples |> where([t], ["world"] in t.t3) |> all() |> unstruct() == []
+      # assert Tuples |> where([t], ^["world"] in t.t3) |> all() |> unstruct() == []
     end
   end
 

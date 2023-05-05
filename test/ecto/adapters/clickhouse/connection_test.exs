@@ -646,20 +646,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "order_by and types" do
     query =
       "schema3"
-      |> order_by([e], type(fragment("?", e.binary), :decimal))
-      |> select(true)
-
-    assert_raise ArgumentError, ~r/cast to :decimal is not supported/, fn ->
-      all(query)
-    end
-
-    query =
-      "schema3"
       |> order_by([e], type(fragment("?", e.binary), ^@decimal64_2))
       |> select(true)
 
     assert all(query) ==
-             ~s[SELECT true FROM "schema3" AS s0 ORDER BY CAST(s0."binary" AS Decimal64(2))]
+             ~s[SELECT true FROM "schema3" AS s0 ORDER BY CAST(s0."binary" AS Decimal(18, 2))]
   end
 
   test "fragments" do
@@ -1720,13 +1711,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "delete" do
     query = delete(nil, "schema", [x: 1, y: 2], [])
-    assert query == ~s[DELETE FROM "schema" WHERE "x" = {$0:Int64} AND "y" = {$1:Int64}]
+    assert query == ~s[DELETE FROM "schema" WHERE "x"={$0:Int64} AND "y"={$1:Int64}]
 
     query = delete("prefix", "schema", [x: 1, y: 2], [])
-    assert query == ~s[DELETE FROM "prefix"."schema" WHERE "x" = {$0:Int64} AND "y" = {$1:Int64}]
+    assert query == ~s[DELETE FROM "prefix"."schema" WHERE "x"={$0:Int64} AND "y"={$1:Int64}]
 
     query = delete(nil, "schema", [x: nil, y: 1], [])
-    assert query == ~s[DELETE FROM "schema" WHERE "x" IS NULL AND "y" = {$1:Int64}]
+    assert query == ~s[DELETE FROM "schema" WHERE "x" IS NULL AND "y"={$1:Int64}]
   end
 
   test "executing a string during migration" do
@@ -2439,5 +2430,40 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(integer) == [
              ~s/CREATE TABLE "posts"("id" Int32,PRIMARY KEY ("id")) ENGINE=MergeTree/
            ]
+  end
+
+  test "build_params/3" do
+    params = [1, "a", true, Date.utc_today(), DateTime.utc_now()]
+
+    assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
+    assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
+    assert to_string(Connection.build_params(_ix = 2, _len = 0, params)) == ""
+
+    assert to_string(Connection.build_params(_ix = 0, _len = 1, params)) ==
+             "{$0:Int64}"
+
+    assert to_string(Connection.build_params(_ix = 0, _len = 2, params)) ==
+             "{$0:Int64},{$1:String}"
+
+    assert to_string(Connection.build_params(_ix = 1, _len = 1, params)) ==
+             "{$1:String}"
+
+    assert to_string(Connection.build_params(_ix = 1, _len = 2, params)) ==
+             "{$1:String},{$2:Bool}"
+
+    assert to_string(Connection.build_params(_ix = 2, _len = 1, params)) ==
+             "{$2:Bool}"
+
+    assert to_string(Connection.build_params(_ix = 2, _len = 2, params)) ==
+             "{$2:Bool},{$3:Date}"
+
+    assert to_string(Connection.build_params(_ix = 2, _len = 3, params)) ==
+             "{$2:Bool},{$3:Date},{$4:DateTime}"
+
+    assert to_string(Connection.build_params(_ix = 1, _len = 4, params)) ==
+             "{$1:String},{$2:Bool},{$3:Date},{$4:DateTime}"
+
+    assert to_string(Connection.build_params(_ix = 0, _len = 5, params)) ==
+             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime}"
   end
 end

@@ -183,7 +183,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
           [quote_name(field), " IS NULL"]
 
         {{field, value}, idx} ->
-          [quote_name(field), " = {$", Integer.to_string(idx), ?:, ch_typeof(value), ?}]
+          [quote_name(field), ?=, build_param(idx, param_type(value))]
       end)
 
     ["DELETE FROM ", quote_table(prefix, table), " WHERE ", filters]
@@ -515,18 +515,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:^, [], [ix]}, _sources, params, _query) do
-    ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
+    build_param(ix, param_type_at(params, ix))
   end
 
   defp expr({:^, [], [ix, len]}, _sources, params, _query) when len > 0 do
-    params =
-      ix..(ix + len)
-      |> Enum.take(len)
-      |> intersperse_map(?,, fn ix ->
-        ["{$", Integer.to_string(ix), ?:, param_type_at(params, ix), ?}]
-      end)
-
-    [?(, params, ?)]
+    [?(, build_params(ix, len, params), ?)]
   end
 
   # using an empty array literal since empty tuples are not allowed in ClickHouse
@@ -572,10 +565,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:in, _, [_, {:^, _, [_ix, 0]}]}, _sources, _params, _query), do: "0"
-
-  defp expr({:in, _, [left, {{:., _, _}, _, _} = right]}, sources, params, query) do
-    ["has(", expr(right, sources, params, query), ?,, expr(left, sources, params, query), ?)]
-  end
 
   defp expr({:in, _, [left, right]}, sources, params, query) do
     [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
@@ -787,6 +776,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   def intersperse_map([], _separator, _mapper), do: []
 
+  @compile inline: [build_param: 2]
+  defp build_param(ix, type) do
+    ["{$", Integer.to_string(ix), ?:, type, ?}]
+  end
+
+  @doc false
+  def build_params(ix, len, params) when len > 1 do
+    [build_param(ix, param_type_at(params, ix)), ?, | build_params(ix + 1, len - 1, params)]
+  end
+
+  def build_params(ix, _len = 1, params), do: build_param(ix, param_type_at(params, ix))
+  def build_params(_ix, _len = 0, _params), do: []
+
   @doc false
   def quote_name(name, quoter \\ ?")
   def quote_name(nil, _), do: []
@@ -864,90 +866,43 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [expr(count, sources, params, query), " * ", interval(1, interval, sources, params, query)]
   end
 
-  defp ecto_to_db({:array, t}) do
-    ["Array(", ecto_to_db(t), ?)]
-  end
-
-  defp ecto_to_db(:id), do: "UInt64"
-  defp ecto_to_db(:uuid), do: "UUID"
-  defp ecto_to_db(s) when s in [:string, :binary, :binary_id], do: "String"
   # when ecto migrator queries for versions in schema_versions it uses type(version, :integer)
   # so we need :integer to be the same as :bigint which is used for schema_versions table definition
   # this is why :integer is Int64 and not Int32
-  defp ecto_to_db(i) when i in [:integer, :bigint], do: "Int64"
-  defp ecto_to_db(:float), do: "Float64"
+  defp ecto_to_db(:integer), do: "Int64"
+  defp ecto_to_db(:binary), do: "String"
+  defp ecto_to_db({:parameterized, Ch, type}), do: Ch.Types.encode(type)
+  defp ecto_to_db({:array, type}), do: ["Array(", ecto_to_db(type), ?)]
+  defp ecto_to_db(type) when type in [:uuid, :string, :date, :boolean], do: Ch.Types.encode(type)
 
-  defp ecto_to_db(:decimal) do
-    raise ArgumentError,
-          "cast to :decimal is not supported, please use `Ch, type: \"Decimal(P, S)\"` instead"
-  end
-
-  defp ecto_to_db({:parameterized, Ch, type}) do
-    ecto_to_db(type)
-  end
-
-  defp ecto_to_db(:boolean), do: "Bool"
-  defp ecto_to_db(:date), do: "Date"
-  defp ecto_to_db(:date32), do: "Date32"
-  defp ecto_to_db(dt) when dt in [:datetime, :utc_datetime, :naive_datetime], do: "DateTime"
-  defp ecto_to_db(:u8), do: "UInt8"
-  defp ecto_to_db(:u16), do: "UInt16"
-  defp ecto_to_db(:u32), do: "UInt32"
-  defp ecto_to_db(:u64), do: "UInt64"
-  defp ecto_to_db(:u128), do: "UInt128"
-  defp ecto_to_db(:u256), do: "UInt256"
-  defp ecto_to_db(:i8), do: "Int8"
-  defp ecto_to_db(:i16), do: "Int16"
-  defp ecto_to_db(:i32), do: "Int32"
-  defp ecto_to_db(:i64), do: "Int64"
-  defp ecto_to_db(:i128), do: "Int128"
-  defp ecto_to_db(:i256), do: "Int256"
-  defp ecto_to_db(:f32), do: "Float32"
-  defp ecto_to_db(:f64), do: "Float64"
-
-  for size <- [32, 64, 128, 256] do
-    defp ecto_to_db({unquote(:"decimal#{size}"), scale}) do
-      [unquote("Decimal#{size}("), Integer.to_string(scale), ?)]
-    end
-  end
-
-  defp ecto_to_db({:decimal, precision, scale}) do
-    ["Decimal(", Integer.to_string(precision), ", ", Integer.to_string(scale), ?)]
-  end
-
-  defp ecto_to_db({:string, size}) do
-    ["FixedString(", Integer.to_string(size), ?)]
-  end
-
-  defp ecto_to_db({:nullable, type}) do
-    ["Nullable(", ecto_to_db(type), ?)]
-  end
-
-  defp ecto_to_db(other) when is_atom(other) do
-    Atom.to_string(other)
+  defp ecto_to_db(type) do
+    raise ArgumentError, "unknown or ambiguous ClickHouse type: #{inspect(type)}"
   end
 
   defp param_type_at(params, ix) do
     value = Enum.at(params, ix)
-    ch_typeof(value)
+    param_type(value)
   end
 
-  defp ch_typeof(s) when is_binary(s), do: "String"
-  defp ch_typeof(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFF, do: "UInt64"
-  defp ch_typeof(i) when is_integer(i), do: "Int64"
-  defp ch_typeof(f) when is_float(f), do: "Float64"
-  defp ch_typeof(b) when is_boolean(b), do: "Bool"
-  defp ch_typeof(%DateTime{}), do: "DateTime"
-  defp ch_typeof(%Date{}), do: "Date"
-  defp ch_typeof(%NaiveDateTime{}), do: "DateTime"
+  defp param_type(s) when is_binary(s), do: "String"
+  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFF, do: "UInt64"
+  defp param_type(i) when is_integer(i), do: "Int64"
+  defp param_type(f) when is_float(f), do: "Float64"
+  defp param_type(b) when is_boolean(b), do: "Bool"
 
-  defp ch_typeof(%Decimal{exp: exp}) do
+  # TODO DateTime64 and Date32
+  defp param_type(%NaiveDateTime{}), do: "DateTime"
+  defp param_type(%DateTime{}), do: "DateTime"
+  defp param_type(%Date{}), do: "Date"
+
+  defp param_type(%Decimal{exp: exp}) do
     # TODO use sizes 128 and 256 as well if needed
     scale = if exp < 0, do: abs(exp), else: 0
     ["Decimal64(", Integer.to_string(scale), ?)]
   end
 
-  defp ch_typeof([]), do: "Array(Nothing)"
+  defp param_type([]), do: "Array(Nothing)"
+
   # TODO check whole list
-  defp ch_typeof([v | _]), do: ["Array(", ch_typeof(v), ?)]
+  defp param_type([v | _]), do: ["Array(", param_type(v), ?)]
 end
