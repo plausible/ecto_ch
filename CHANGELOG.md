@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6 (2023-05-23)
+
+- make types more strict https://github.com/plausible/ecto_ch/pull/69
+
 ## 0.1.5 (2023-05-23)
 
 - require `:ch` to be `~> 0.1.10` https://github.com/plausible/ecto_ch/pull/71
