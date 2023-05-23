@@ -126,6 +126,10 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           field :#{field}, Ch, type: "#{ch_type}"
         end
 
+    You can also try using `ecto.ch.schema` to generate a schema:
+
+        mix ecto.ch.schema <database>.#{schema.__schema__(:source)}
+
     """
   end
 
@@ -133,7 +137,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp ch_type_hint(:id), do: "Int64"
   defp ch_type_hint(:integer), do: "Int64"
   defp ch_type_hint(:float), do: "Float32"
-  defp ch_type_hint({:array, type}), do: "Array(#{ch_type_hint(type)})"
+  defp ch_type_hint({:array, type}), do: "{:array, #{ch_type_hint(type)}}"
   defp ch_type_hint(:map), do: "Map(String, Int64)"
   defp ch_type_hint({:map, type}), do: "Map(String, #{ch_type_hint(type)})"
   defp ch_type_hint(:decimal), do: "Decimal32(2)"

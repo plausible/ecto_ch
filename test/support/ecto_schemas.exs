@@ -27,7 +27,8 @@ end
 
 defmodule WrappedInteger do
   use Ecto.Type
-  def type(), do: Ch.Types.i64()
+  i64 = Ecto.ParameterizedType.init(Ch, type: "Int64")
+  def type(), do: unquote(Macro.escape(i64))
   def cast(integer), do: {:ok, {:int, integer}}
   def load(integer), do: {:ok, {:int, integer}}
   def dump({:int, integer}), do: {:ok, integer}
@@ -54,7 +55,8 @@ end
 
 defmodule MonotonicID do
   use Ecto.Type
-  def type, do: Ch.Types.u64()
+  u64 = Ecto.ParameterizedType.init(Ch, type: "UInt64")
+  def type, do: unquote(Macro.escape(u64))
   def cast(i), do: Ecto.Type.cast(:integer, i)
   def dump(i), do: Ecto.Type.dump(:integer, i)
   def load(i), do: Ecto.Type.load(:integer, i)

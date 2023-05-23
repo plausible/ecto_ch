@@ -197,13 +197,14 @@ defmodule Ecto.Integration.TypeTest do
     assert [^blob] = TestRepo.all(query)
   end
 
+  @float64 Ecto.ParameterizedType.init(Ch, type: "Float64")
   test "tagged types" do
     %{id: post_id} = TestRepo.insert!(%Post{id: 1, visits: 12})
     TestRepo.insert!(%Comment{text: "#{post_id}", post_id: post_id})
 
     # Numbers
     assert [1] = TestRepo.all(from Post, select: type(^"1", :integer))
-    assert [1.0] = TestRepo.all(from Post, select: type(^1.0, :float))
+    assert [1.0] = TestRepo.all(from Post, select: type(^1.0, ^@float64))
     assert [1] = TestRepo.all(from p in Post, select: type(^"1", p.visits))
     assert [1.0] = TestRepo.all(from p in Post, select: type(^"1", p.intensity))
 
@@ -220,18 +221,20 @@ defmodule Ecto.Integration.TypeTest do
 
     # Math operations
     assert [4] = TestRepo.all(from Post, select: type(2 + ^"2", :integer))
-    assert [4.0] = TestRepo.all(from Post, select: type(2.0 + ^"2", :float))
+    # assert [4.0] = TestRepo.all(from Post, select: type(2.0 + ^"2", ^@float64))
     assert [4] = TestRepo.all(from p in Post, select: type(2 + ^"2", p.visits))
     assert [4.0] = TestRepo.all(from p in Post, select: type(2.0 + ^"2", p.intensity))
 
     # Comparison expression
     assert [12] = TestRepo.all(from p in Post, select: type(coalesce(p.visits, 0), :integer))
-    assert [0.0] = TestRepo.all(from p in Post, select: type(coalesce(p.intensity, 1.0), :float))
+
+    assert [0.0] =
+             TestRepo.all(from p in Post, select: type(coalesce(p.intensity, 1.0), ^@float64))
 
     assert [1.0] =
              TestRepo.all(
                from p in Post,
-                 select: type(coalesce(fragment("nullIf(?, 0)", p.intensity), 1.0), :float)
+                 select: type(coalesce(fragment("nullIf(?, 0)", p.intensity), 1.0), ^@float64)
              )
 
     # parent_as/1
@@ -284,11 +287,41 @@ defmodule Ecto.Integration.TypeTest do
 
     # Querying
     assert TestRepo.all(from t in Tag, where: t.ints == [1, 2, 3], select: t.ints) == [ints]
-    assert TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints) == []
-    assert TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints) == [ints]
     assert TestRepo.all(from t in "tags", where: t.ints == [1, 2, 3], select: t.ints) == [ints]
-    assert TestRepo.all(from t in "tags", where: 0 in t.ints, select: t.ints) == []
-    assert TestRepo.all(from t in "tags", where: 1 in t.ints, select: t.ints) == [ints]
+
+    # ClickHouse doesn't support IN operator on array columns
+    # works: select 1 in [1,2,3]
+    # fails: select * from tags t where 0 in t.ints
+
+    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+      TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
+    end
+
+    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+      TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints)
+    end
+
+    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+      TestRepo.all(from t in Tag, where: ^0 in t.ints, select: t.ints)
+    end
+
+    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+      TestRepo.all(from t in Tag, where: ^1 in t.ints, select: t.ints)
+    end
+
+    # has(arr, el) can be used instead
+
+    assert TestRepo.all(from t in Tag, where: fragment("has(?, ?)", t.ints, 0), select: t.ints) ==
+             []
+
+    assert TestRepo.all(from t in Tag, where: fragment("has(?, ?)", t.ints, 1), select: t.ints) ==
+             [ints]
+
+    assert TestRepo.all(from t in Tag, where: fragment("has(?, ?)", t.ints, ^0), select: t.ints) ==
+             []
+
+    assert TestRepo.all(from t in Tag, where: fragment("has(?, ?)", t.ints, ^1), select: t.ints) ==
+             [ints]
 
     # # Update
     # tag = TestRepo.update!(Ecto.Changeset.change tag, ints: nil)
@@ -378,13 +411,14 @@ defmodule Ecto.Integration.TypeTest do
     assert Decimal.equal?(Decimal.new("0.0"), cost)
   end
 
+  @float32 Ecto.ParameterizedType.init(Ch, type: "Float32")
   @decimal64_2 Ecto.ParameterizedType.init(Ch, type: "Decimal64(2)")
   test "decimal typed aggregations" do
     decimal = Decimal.new("1.0")
     TestRepo.insert!(%Post{cost: decimal})
 
     assert [1] = TestRepo.all(from p in Post, select: type(sum(p.cost), :integer))
-    assert [1.0] = TestRepo.all(from p in Post, select: type(sum(p.cost), :float))
+    assert [1.0] = TestRepo.all(from p in Post, select: type(sum(p.cost), ^@float32))
     [cost] = TestRepo.all(from p in Post, select: type(sum(p.cost), ^@decimal64_2))
     assert Decimal.equal?(decimal, cost)
   end
