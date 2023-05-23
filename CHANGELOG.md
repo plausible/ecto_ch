@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- add `insert_stream` https://github.com/plausible/ecto_ch/pull/74
+
 ## 0.1.6 (2023-05-23)
 
 - make types more strict https://github.com/plausible/ecto_ch/pull/69

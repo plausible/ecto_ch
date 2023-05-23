@@ -72,6 +72,41 @@ defmodule Ecto.Adapters.ClickHouse do
       def disconnect_all(interval, opts \\ []) do
         Ecto.Adapters.SQL.disconnect_all(get_dynamic_repo(), interval, opts)
       end
+
+      @doc """
+      Similar to `insert_all/2` but with the following differences:
+
+        - accepts rows as streams or lists
+        - sends rows as a chunked request
+        - doesn't autogenerate ids or does any other preprocessing
+
+      Example:
+
+          Repo.query!("create table ecto_ch_demo(a UInt64, b String) engine Null")
+
+          defmodule Demo do
+            use Ecto.Schema
+
+            @primary_key false
+            schema "ecto_ch_demo" do
+              field :a, Ch, type: "UInt64"
+              field :b, :string
+            end
+          end
+
+          rows = Stream.map(1..100_000, fn i -> %{a: i, b: to_string(i)} end)
+          {100_000, nil} = Repo.insert_stream(Demo, rows)
+
+          # schemaless
+          {100_000, nil} = Repo.insert_stream("ecto_ch_demo", rows, types: [a: Ch.Types.u64(), b: :string])
+
+      """
+      def insert_stream(source_or_schema, rows, opts \\ []) do
+        repo = get_dynamic_repo()
+        # TODO need it?
+        # opts = Ecto.Repo.Supervisor.tuplet(repo, prepare_opts(:insert_all, opts))
+        Ecto.Adapters.ClickHouse.Schema.insert_stream(repo, source_or_schema, rows, opts)
+      end
     end
   end
 

@@ -3,6 +3,10 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @conn Ecto.Adapters.ClickHouse.Connection
   @dialyzer :no_improper_lists
 
+  # ignores passing stream into Ecto.Adapters.SQL.query!
+  @dialyzer {:no_fail_call, do_insert_stream: 7}
+  @dialyzer {:no_return, insert_stream: 4, do_insert_stream: 7}
+
   def insert_all(
         adapter_meta,
         schema_meta,
@@ -45,6 +49,62 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts)
     {:ok, []}
+  end
+
+  def insert_stream(repo, schema, rows, opts) when is_atom(schema) do
+    header = schema.__schema__(:fields)
+
+    do_insert_stream(
+      repo,
+      schema.__schema__(:prefix),
+      schema.__schema__(:source),
+      header,
+      extract_types(schema, header),
+      rows,
+      opts
+    )
+  end
+
+  def insert_stream(repo, table, rows, opts) when is_binary(table) do
+    types = Keyword.fetch!(opts, :types)
+    {header, types} = Enum.unzip(types)
+    do_insert_stream(repo, nil, table, header, types, rows, opts)
+  end
+
+  def insert_stream(repo, {source, schema}, rows, opts) when is_atom(schema) do
+    header = schema.__schema__(:fields)
+
+    do_insert_stream(
+      repo,
+      schema.__schema__(:prefix),
+      source,
+      header,
+      extract_types(schema, header),
+      rows,
+      opts
+    )
+  end
+
+  defp do_insert_stream(repo, prefix, source, header, types, rows, opts) do
+    chunk_every = opts[:chunk_every] || 1000
+
+    names = prepare_names(header)
+    opts = [{:command, :insert}, {:encode, false} | opts]
+    sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
+
+    row_binary =
+      rows
+      |> Stream.chunk_every(chunk_every)
+      |> Stream.map(fn chunk ->
+        chunk
+        |> unzip_rows(header)
+        |> Ch.RowBinary.encode_rows(types)
+      end)
+
+    stream = Stream.concat([Ch.RowBinary.encode_names_and_types(names, types)], row_binary)
+    %{num_rows: num_rows} = Ecto.Adapters.SQL.query!(repo, sql, stream, opts)
+
+    {num_rows, nil}
   end
 
   def delete(adapter_meta, schema_meta, params, opts) do
@@ -149,18 +209,31 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     end
   end
 
-  defp unzip_rows([row | rows], header) do
-    [unzip_row(header, row) | unzip_rows(rows, header)]
+  defp unzip_rows([row | rows], header) when is_list(row) do
+    [unzip_row_list(header, row) | unzip_rows(rows, header)]
+  end
+
+  defp unzip_rows([row | rows], header) when is_map(row) do
+    [unzip_row_map(header, row) | unzip_rows(rows, header)]
   end
 
   defp unzip_rows([], _header), do: []
 
-  defp unzip_row([field | fields], row) do
+  defp unzip_row_list([field | fields], row) do
     case List.keyfind(row, field, 0) do
-      {_, value} -> [value | unzip_row(fields, row)]
-      nil = not_found -> [not_found | unzip_row(fields, row)]
+      {_, value} -> [value | unzip_row_list(fields, row)]
+      nil = not_found -> [not_found | unzip_row_list(fields, row)]
     end
   end
 
-  defp unzip_row([], _row), do: []
+  defp unzip_row_list([], _row), do: []
+
+  defp unzip_row_map([field | fields], row) do
+    case Map.get(row, field) do
+      nil = not_found -> [not_found | unzip_row_map(fields, row)]
+      value -> [value | unzip_row_map(fields, row)]
+    end
+  end
+
+  defp unzip_row_map([], _row), do: []
 end
