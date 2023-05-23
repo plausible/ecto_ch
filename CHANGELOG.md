@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 (2023-05-23)
+
+- require `:ch` to be `~> 0.1.10` https://github.com/plausible/ecto_ch/pull/71
+
 ## 0.1.4 (2023-05-05)
 
 - improve `:array` type handling https://github.com/plausible/ecto_ch/pull/67
