@@ -88,6 +88,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp do_insert_stream(repo, prefix, source, header, types, rows, opts) do
     chunk_every = opts[:chunk_every] || 1000
 
+    types = Ch.RowBinary.encoding_types(types)
     names = prepare_names(header)
     opts = [{:command, :insert}, {:encode, false} | opts]
     sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
