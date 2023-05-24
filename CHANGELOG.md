@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- fix string types in schemaless inserts https://github.com/plausible/ecto_ch/pull/75
+
 ## 0.1.7 (2023-05-24)
 
 - add `insert_stream` https://github.com/plausible/ecto_ch/pull/74
