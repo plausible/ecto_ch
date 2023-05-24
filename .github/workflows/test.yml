@@ -25,23 +25,28 @@ jobs:
             --health-timeout 5s
             --health-retries 5
 
+    strategy:
+      matrix:
+        elixir: ["1.14"]
+        otp: ["25", "26"]
+
     steps:
       - uses: actions/checkout@v3
 
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.14.3"
-          otp-version: "25.2.3"
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
 
       - uses: actions/cache@v3
         with:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-${{ github.head_ref || github.ref }}-
-            ${{ runner.os }}-mix-refs/heads/master-
+            ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-
+            ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-refs/heads/master-
 
       - run: mix deps.get
       - run: mix format --check-formatted
