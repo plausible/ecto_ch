@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9 (2023-05-24)
+
+- update `:ch`
+
 ## 0.1.8 (2023-05-24)
 
 - fix string types in schemaless inserts https://github.com/plausible/ecto_ch/pull/75
