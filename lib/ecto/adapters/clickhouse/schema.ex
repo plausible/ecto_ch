@@ -99,7 +99,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
       |> Stream.map(fn chunk ->
         chunk
         |> unzip_rows(header)
-        |> Ch.RowBinary.encode_rows(types)
+        |> Ch.RowBinary._encode_rows(types)
       end)
 
     stream = Stream.concat([Ch.RowBinary.encode_names_and_types(names, types)], row_binary)
