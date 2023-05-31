@@ -692,6 +692,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Decimal.to_string(decimal, :normal)
   end
 
+  defp expr(%Tagged{value: value, type: :any}, sources, params, query) do
+    expr(value, sources, params, query)
+  end
+
   defp expr(%Tagged{value: value, type: type}, sources, params, query) do
     ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(type), ?)]
   end
