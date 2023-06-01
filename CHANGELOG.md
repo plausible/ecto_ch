@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.10 (2023-06-01)
 
 - add support for `type(..., :any)` https://github.com/plausible/ecto_ch/pull/78
 
