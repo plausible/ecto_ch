@@ -697,7 +697,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr(%Tagged{value: value, type: type}, sources, params, query) do
-    ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(type), ?)]
+    ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(type, query), ?)]
   end
 
   defp expr(nil, _sources, _params, _query), do: "NULL"
@@ -873,14 +873,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # when ecto migrator queries for versions in schema_versions it uses type(version, :integer)
   # so we need :integer to be the same as :bigint which is used for schema_versions table definition
   # this is why :integer is Int64 and not Int32
-  defp ecto_to_db(:integer), do: "Int64"
-  defp ecto_to_db(:binary), do: "String"
-  defp ecto_to_db({:parameterized, Ch, type}), do: Ch.Types.encode(type)
-  defp ecto_to_db({:array, type}), do: ["Array(", ecto_to_db(type), ?)]
-  defp ecto_to_db(type) when type in [:uuid, :string, :date, :boolean], do: Ch.Types.encode(type)
+  defp ecto_to_db(:integer, _query), do: "Int64"
+  defp ecto_to_db(:binary, _query), do: "String"
+  defp ecto_to_db({:parameterized, Ch, type}, _query), do: Ch.Types.encode(type)
+  defp ecto_to_db({:array, type}, query), do: ["Array(", ecto_to_db(type, query), ?)]
 
-  defp ecto_to_db(type) do
-    raise ArgumentError, "unknown or ambiguous ClickHouse type: #{inspect(type)}"
+  defp ecto_to_db(type, _query) when type in [:uuid, :string, :date, :boolean] do
+    Ch.Types.encode(type)
+  end
+
+  defp ecto_to_db(type, query) do
+    raise Ecto.QueryError,
+      query: query,
+      message: "unknown or ambiguous (for ClickHouse) Ecto type #{inspect(type)}"
   end
 
   defp param_type_at(params, ix) do

@@ -717,10 +717,36 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."y" AS "y2" FROM "schema" AS s0]
   end
 
-  # TODO ensure correct
   test "tagged type" do
     query = Schema |> select([], type(^"601d74e4-a8d3-4b6e-8365-eddb4c893327", Ecto.UUID))
     assert all(query) == ~s[SELECT CAST({$0:String} AS UUID) FROM "schema" AS s0]
+  end
+
+  test "tagged :any type doesn't add CAST(...) call" do
+    query = from e in "events", select: type(e.count + 1, e.some_column)
+    assert all(query) == ~s[SELECT e0."count" + 1 FROM "events" AS e0]
+
+    query = from e in "events", select: type(e.count + 1, :any)
+    assert all(query) == ~s[SELECT e0."count" + 1 FROM "events" AS e0]
+  end
+
+  test "tagged column type" do
+    query = from s in Schema, select: type(s.x + 1, s.y)
+    assert all(query) == ~s[SELECT CAST(s0."x" + 1 AS UInt16) FROM "schema" AS s0]
+  end
+
+  test "tagged unknown type" do
+    query = from e in "events", select: type(e.count + 1, :time)
+
+    assert_raise Ecto.QueryError,
+                 ~r/unknown or ambiguous \(for ClickHouse\) Ecto type :time in query/,
+                 fn -> all(query) end
+
+    query = from e in "events", select: type(e.count + 1, :decimal)
+
+    assert_raise Ecto.QueryError,
+                 ~r/unknown or ambiguous \(for ClickHouse\) Ecto type :decimal in query/,
+                 fn -> all(query) end
   end
 
   # TODO tautology?
