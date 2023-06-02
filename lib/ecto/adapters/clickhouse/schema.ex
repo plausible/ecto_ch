@@ -17,7 +17,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         placeholders,
         opts
       ) do
-    %{source: source, prefix: prefix, schema: schema} = schema_meta
+    %{source: source, prefix: prefix} = schema_meta
     opts = [{:command, :insert} | opts]
 
     %{num_rows: num_rows} =
@@ -27,15 +27,116 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->
-          names = prepare_names(header)
-          types = prepare_types(schema, header, opts)
-          opts = [{:names, names}, {:types, types} | opts]
-          sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
-          rows = unzip_rows(rows, header)
-          Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+          if input = opts[:input] do
+            insert_input(adapter_meta, schema_meta, input, rows, opts)
+          else
+            insert_rows(adapter_meta, schema_meta, header, rows, opts)
+          end
       end
 
     {num_rows, nil}
+  end
+
+  defp insert_rows(adapter_meta, schema_meta, header, rows, opts) do
+    %{source: source, prefix: prefix, schema: schema} = schema_meta
+
+    names = prepare_names(header)
+    types = prepare_types(schema, header, opts)
+    opts = [{:names, names}, {:types, types} | opts]
+    rows = unzip_rows(rows, header)
+    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinaryWithNamesAndTypes"]
+
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+  end
+
+  defp insert_input(adapter_meta, schema_meta, query, rows, opts) do
+    %{repo: repo, adapter: adapter} = adapter_meta
+    %{source: source, prefix: prefix} = schema_meta
+
+    types =
+      case query.from.source do
+        {:fragment, [{:input, types}], _fragment} ->
+          types
+
+        _other ->
+          raise ArgumentError, """
+          unexpected source found in input query:
+
+            #{inspect(query)}
+
+          Please use Ch.input/1 helper in :input queries:
+
+            input = from i in Ch.input(schema_or_types), select: %{a: i.a}
+            insert_all("table", rows, input: input)
+
+          """
+      end
+
+    {query, opts} = repo.prepare_query(:insert_all, query, opts)
+
+    {query, _cast_params, dump_params} =
+      Ecto.Adapter.Queryable.plan_query(:insert_all, adapter, query)
+
+    unless dump_params == [] do
+      raise ArgumentError, """
+      cannot insert from parameterized input query:
+
+        #{inspect(query)}
+
+      Please remove all parameters from the query.
+      """
+    end
+
+    ix =
+      case query.select do
+        %Ecto.Query.SelectExpr{expr: {:&, _, [ix]}} -> ix
+        _ -> nil
+      end
+
+    header =
+      case query.select do
+        %Ecto.Query.SelectExpr{expr: {:%{}, _ctx, args}} ->
+          Enum.map(args, &elem(&1, 0))
+
+        %Ecto.Query.SelectExpr{take: %{^ix => {_fun, fields}}} ->
+          fields
+
+        # TODO might need more work
+        %Ecto.Query.SelectExpr{expr: {:merge, _, [{:&, _, [_]}, {:%{}, _, args}]}} ->
+          fields = Keyword.keys(types)
+          merged = Enum.map(args, &elem(&1, 0))
+          Enum.uniq(fields ++ merged) |> IO.inspect()
+
+        _ ->
+          raise ArgumentError, """
+          cannot generate a fields list for insert_all from the given input query
+          because it does not have a select clause that uses a map:
+
+            #{inspect(query)}
+
+          Please add a select clause that selects into a map, like this:
+
+            from i in Ch.input(Source),
+              select: %{
+                field_a: i.bar,
+                field_b: i.foo
+              }
+
+          All keys must exist in the schema that is being inserted into
+          """
+      end
+
+    sql = [
+      @conn.insert(prefix, source, header, {query, dump_params})
+      | " FORMAT RowBinaryWithNamesAndTypes"
+    ]
+
+    names = prepare_names(header)
+    types = prepare_types(_schema = nil, header, types: types)
+    opts = [{:names, names}, {:types, types} | opts]
+    rows = unzip_rows(rows, header)
+
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
   end
 
   def insert(adapter_meta, schema_meta, params, opts) do
@@ -138,6 +239,11 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
       true ->
         raise ArgumentError, "missing :types"
     end
+  end
+
+  @doc false
+  def remap_type(type, schema, field) do
+    remap_type(Ecto.Type.type(type), type, schema, field)
   end
 
   defp remap_type({:parameterized, Ch, t}, _original, _schema, _field), do: t
