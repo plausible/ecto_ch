@@ -248,10 +248,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp select_fields(fields, sources, params, query) do
     intersperse_map(fields, ?,, fn
-      # TODO
+      # this is useful in array joins lie
+      #
+      #     "arrays_test"
+      #     |> join(:inner_lateral, [a], r in "arr")
+      #     |> select([a, r], {a.s, r})
+      #
       {:&, _, [idx]} ->
         {_, source, _} = elem(sources, idx)
-        [source | ".*"]
+        source
 
       {k, v} ->
         [expr(v, sources, params, query), " AS " | quote_name(k)]
