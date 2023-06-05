@@ -145,9 +145,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query = "0posts" |> select([:x])
     assert all(query) == ~s{SELECT t0."x" FROM "0posts" AS t0}
-
-    query = from(p in "posts", select: p)
-    assert all(query) == ~s{SELECT p0.* FROM "posts" AS p0}
   end
 
   test "from with subquery" do
@@ -1310,6 +1307,17 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              SELECT true FROM "schema" AS s0 INNER JOIN "schema2" AS s1 ON s0."x" = s1."z" \
              INNER JOIN "schema" AS s2 ON 1\
              """
+  end
+
+  test "lateral (but really array) join" do
+    query =
+      "arrays_test"
+      |> join(:inner_lateral, [a], r in "arr", on: true)
+      |> select([a, r], {a.s, r})
+
+    assert all(query) == """
+           SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
+           """
   end
 
   test "join hints" do

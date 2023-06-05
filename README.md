@@ -107,13 +107,13 @@ For now `:inner_lateral` and `:left_lateral` are used for `ARRAY` and `LEFT ARRA
 ```elixir
 "arrays_test"
 |> join(:inner_lateral, [a], r in "arr")
-|> select([a, r], {a.s, r.arr})
+|> select([a, r], {a.s, r})
 ```
 
 is equivalent to
 
 ```sql
-SELECT a0."s", a1."arr"
+SELECT a0."s", a1
 FROM "arrays_test" AS a0
 ARRAY JOIN "arr" AS a1
 ```
