@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- add support for `:array_join` and `:left_array_join` types https://github.com/plausible/ecto_ch/pull/76
+
 ## 0.1.10 (2023-06-01)
 
 - add support for `type(..., :any)` https://github.com/plausible/ecto_ch/pull/78

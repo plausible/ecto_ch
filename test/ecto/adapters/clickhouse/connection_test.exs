@@ -1320,6 +1320,39 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
   end
 
+  test "left lateral (but really left array) join" do
+    query =
+      "arrays_test"
+      |> join(:left_lateral, [a], r in "arr", on: true)
+      |> select([a, r], {a.s, r})
+
+    assert all(query) == """
+           SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
+           """
+  end
+
+  test "array join" do
+    query =
+      from at in "arrays_test",
+        array_join: a in "arr",
+        select: [at.s, a]
+
+    assert all(query) == """
+           SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
+           """
+  end
+
+  test "left array join" do
+    query =
+      from at in "arrays_test",
+        left_array_join: a in "arr",
+        select: [at.s, a]
+
+    assert all(query) == """
+           SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
+           """
+  end
+
   test "join hints" do
     query =
       Schema

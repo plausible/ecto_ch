@@ -251,7 +251,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       # this is useful in array joins lie
       #
       #     "arrays_test"
-      #     |> join(:inner_lateral, [a], r in "arr")
+      #     |> join(:array, [a], r in "arr")
       #     |> select([a, r], {a.s, r})
       #
       {:&, _, [idx]} ->
@@ -334,7 +334,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join_on(:cross, true, _sources, _params, _query), do: []
 
   defp join_on(array, true, _sources, _params, _query)
-       when array in [:inner_lateral, :left_lateral] do
+       when array in [:array, :left_array, :inner_lateral, :left_lateral] do
     []
   end
 
@@ -343,8 +343,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp join_qual(:inner), do: " INNER JOIN "
-  defp join_qual(:inner_lateral), do: " ARRAY JOIN "
-  defp join_qual(:left_lateral), do: " LEFT ARRAY JOIN "
+  defp join_qual(t) when t in [:inner_lateral, :array], do: " ARRAY JOIN "
+  defp join_qual(t) when t in [:left_lateral, :left_array], do: " LEFT ARRAY JOIN "
   defp join_qual(:left), do: " LEFT OUTER JOIN "
   defp join_qual(:right), do: " RIGHT OUTER JOIN "
   defp join_qual(:full), do: " FULL OUTER JOIN "
