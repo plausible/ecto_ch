@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.11 (2023-06-12)
 
 - add support for `:array_join` and `:left_array_join` types https://github.com/plausible/ecto_ch/pull/76
 - add preliminary support for inserts via `:input` https://github.com/plausible/ecto_ch/pull/79
