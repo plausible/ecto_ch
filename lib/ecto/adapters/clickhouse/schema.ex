@@ -64,9 +64,10 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
             #{inspect(query)}
 
-          Please use Ch.input/1 helper in :input queries:
+          Please use Ecto.Adapters.ClickHouse.API.input/1 helper in :input queries:
 
-            input = from i in Ch.input(schema_or_types), select: %{a: i.a}
+            import Ecto.Adapters.ClickHouse.API, only: [input: 1]
+            input = from i in input(schema_or_types), select: %{a: i.a}
             insert_all("table", rows, input: input)
 
           """
@@ -116,7 +117,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
           Please add a select clause that selects into a map, like this:
 
-            from i in Ch.input(Source),
+            import Ecto.Adapters.ClickHouse.API, only: [input: 1]
+
+            from i in input(Source),
               select: %{
                 field_a: i.bar,
                 field_b: i.foo
