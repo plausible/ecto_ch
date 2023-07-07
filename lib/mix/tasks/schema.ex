@@ -1,11 +1,12 @@
 defmodule Mix.Tasks.Ecto.Ch.Schema do
   @moduledoc """
-  Shows an Ecto schema hint for a table.
+  Shows an Ecto schema hint for a ClickHouse table.
 
   Examples:
 
       $ mix ecto.ch.schema
       $ mix ecto.ch.schema system.numbers
+      $ mix ecto.ch.schema system.numbers --repo MyApp.Repo
   """
   use Mix.Task
   alias Ch.Connection, as: Conn
@@ -14,7 +15,15 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
     IO.puts(@moduledoc)
   end
 
-  def run([source]) do
+  def run(["-" <> _k | _] = kvs) do
+    run(_source = nil, kvs)
+  end
+
+  def run([source | kvs]) do
+    run(source, kvs)
+  end
+
+  defp run(source, kvs) do
     [_, table] =
       source =
       case String.split(source, ".") do
@@ -34,7 +43,16 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
 
     statement = "select name, type from system.columns " <> where
 
-    conn = connect(_config = [])
+    repos = Mix.Ecto.parse_repo(kvs)
+
+    config =
+      Enum.find_value(repos, fn repo ->
+        Mix.Ecto.ensure_repo(repo, kvs)
+        repo.__adapter__() == Ecto.Adapters.ClickHouse
+        repo.config()
+      end)
+
+    conn = connect(config || [])
 
     case query(conn, statement, params) do
       {%Ch.Result{rows: [_ | _] = rows}, _conn} ->
@@ -78,13 +96,14 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
 
     ecto_type = ecto_type(type)
     clickhouse_type = clickhouse_type(type)
+    name = Code.format_string!(":#{name}")
 
     case {ecto_type, clickhouse_type} do
       {ecto_type, nil} ->
-        ~s[field :"#{name}", #{inspect(ecto_type)}]
+        ~s[field #{name}, #{inspect(ecto_type)}]
 
       {ecto_type, clickhouse_type} ->
-        ~s[field :"#{name}", #{inspect(ecto_type)}, type: "#{clickhouse_type}"]
+        ~s[field #{name}, #{inspect(ecto_type)}, type: "#{clickhouse_type}"]
     end
   end
 
