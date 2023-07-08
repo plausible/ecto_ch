@@ -48,10 +48,10 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
     config =
       Enum.find_value(repos, fn repo ->
         Mix.Ecto.ensure_repo(repo, kvs)
-if repo.__adapter__() == Ecto.Adapters.ClickHouse do
-  repo.config()
-end
-        repo.config()
+
+        if repo.__adapter__() == Ecto.Adapters.ClickHouse do
+          repo.config()
+        end
       end)
 
     conn = connect(config || [])
