@@ -2,27 +2,27 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
   use ExUnit.Case
   import ExUnit.CaptureIO
 
+  test "run/1 help" do
+    help =
+      capture_io(fn ->
+        Mix.Tasks.Ecto.Ch.Schema.run([])
+      end)
+
+    assert help == """
+           Shows an Ecto schema hint for a ClickHouse table.
+
+           Examples:
+
+               $ mix ecto.ch.schema
+               $ mix ecto.ch.schema system.numbers
+               $ mix ecto.ch.schema system.numbers --repo MyApp.Repo
+
+           """
+  end
+
   describe "run/1" do
     setup do
       put_env_reset(:ecto_ch, :ecto_repos, [Ecto.Integration.TestRepo])
-    end
-
-    test "help" do
-      help =
-        capture_io(fn ->
-          Mix.Tasks.Ecto.Ch.Schema.run([])
-        end)
-
-      assert help == """
-             Shows an Ecto schema hint for a ClickHouse table.
-
-             Examples:
-
-                 $ mix ecto.ch.schema
-                 $ mix ecto.ch.schema system.numbers
-                 $ mix ecto.ch.schema system.numbers --repo MyApp.Repo
-
-             """
     end
 
     test "system.numbers" do
@@ -68,6 +68,31 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
              """
     end
 
+    test "products" do
+      schema =
+        capture_io(fn ->
+          Mix.Tasks.Ecto.Ch.Schema.run(["products"])
+        end)
+
+      assert schema == """
+             @primary_key false
+             schema "products" do
+               field :id, Ch, type: "UInt64"
+               field :account_id, Ch, type: "UInt64"
+               field :name, :string
+               field :description, :string
+               field :external_id, Ecto.UUID
+               field :tags, {:array, :string}
+               field :approved_at, Ch, type: "DateTime"
+               field :price, Ch, type: "Decimal(18, 2)"
+               field :inserted_at, Ch, type: "DateTime"
+               field :updated_at, Ch, type: "DateTime"
+             end
+             """
+    end
+  end
+
+  describe "run/1 custom repo flags" do
     test "-r" do
       schema =
         capture_io(fn ->
@@ -102,29 +127,6 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
                field :id, Ch, type: "UInt64"
                field :name, :string
                field :email, :string
-               field :inserted_at, Ch, type: "DateTime"
-               field :updated_at, Ch, type: "DateTime"
-             end
-             """
-    end
-
-    test "products" do
-      schema =
-        capture_io(fn ->
-          Mix.Tasks.Ecto.Ch.Schema.run(["products"])
-        end)
-
-      assert schema == """
-             @primary_key false
-             schema "products" do
-               field :id, Ch, type: "UInt64"
-               field :account_id, Ch, type: "UInt64"
-               field :name, :string
-               field :description, :string
-               field :external_id, Ecto.UUID
-               field :tags, {:array, :string}
-               field :approved_at, Ch, type: "DateTime"
-               field :price, Ch, type: "Decimal(18, 2)"
                field :inserted_at, Ch, type: "DateTime"
                field :updated_at, Ch, type: "DateTime"
              end
