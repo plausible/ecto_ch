@@ -38,7 +38,7 @@ defmodule EctoCh.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, "~> 0.1.14"},
+      {:ch, github: "plausible/ch", branch: "fix-uuid-encoding"},
       {:ecto_sql, "~> 3.9"},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
