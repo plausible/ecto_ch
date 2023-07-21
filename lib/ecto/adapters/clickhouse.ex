@@ -131,29 +131,61 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter
-  # TODO cleanup
-  def dumpers(:boolean, type), do: [type, &bool_encode/1]
-  def dumpers(:uuid, Ecto.UUID), do: [&uuid_encode/1]
-  def dumpers(:uuid, type), do: [type, &uuid_encode/1]
+  def dumpers(:uuid, Ecto.UUID), do: [&__MODULE__.hex_uuid/1]
+  def dumpers(:uuid, type), do: [type, &__MODULE__.hex_uuid/1]
+  def dumpers(:binary_id, type), do: [type, &__MODULE__.hex_uuid/1]
+  def dumpers(_primitive, {:parameterized, Ch, params}), do: [dumper(params)]
+  def dumpers({:parameterized, Ch, params}, type), do: [type, dumper(params)]
   def dumpers(_primitive, type), do: [type]
 
-  defp bool_encode(1), do: {:ok, true}
-  defp bool_encode(0), do: {:ok, false}
-  defp bool_encode(x), do: {:ok, x}
+  defp dumper(:uuid), do: &__MODULE__.hex_uuid/1
+  defp dumper(:date32), do: :date
+  defp dumper(:datetime), do: :naive_datetime
+  defp dumper({:datetime, "UTC"}), do: :utc_datetime
+  defp dumper({:datetime64, _precision}), do: :naive_datetime_usec
+  defp dumper({:datetime64, _precision, "UTC"}), do: :utc_datetime_usec
+  defp dumper({:nullable, type}), do: dumper(type)
+  defp dumper({:low_cardinality, type}), do: dumper(type)
+  defp dumper({:decimal = d, _precision, _scale}), do: d
 
-  defp uuid_encode(uuid), do: Ecto.UUID.cast(uuid)
+  for size <- [32, 64, 128, 256] do
+    defp dumper({unquote(:"decimal#{size}"), _scale}), do: :decimal
+  end
+
+  for size <- [8, 16, 32, 64, 128, 256] do
+    defp dumper(unquote(:"i#{size}")), do: :integer
+    defp dumper(unquote(:"u#{size}")), do: :integer
+  end
+
+  for size <- [32, 64] do
+    defp dumper(unquote(:"f#{size}")), do: :float
+  end
+
+  defp dumper({:simple_aggregate_function, _name, type}), do: dumper(type)
+  defp dumper({:array = array, type}), do: {array, dumper(type)}
+  defp dumper(_type), do: &__MODULE__.ok_identity/1
 
   @impl Ecto.Adapter
-  # TODO cleanup
+  def loaders(:uuid, Ecto.UUID = uuid), do: [uuid]
+  def loaders(:uuid, type), do: [Ecto.UUID, type]
   def loaders(:binary_id, type), do: [Ecto.UUID, type]
-  def loaders(:boolean, type), do: [&bool_decode/1, type]
-  def loaders(:float, type), do: [&float_decode/1, type]
+  def loaders(_primitive, {:parameterized, Ch, params}), do: [loader(params)]
+  def loaders({:parameterized, Ch, params}, type), do: [loader(params), type]
   def loaders(_primitive, type), do: [type]
 
-  defp bool_decode(1), do: {:ok, true}
-  defp bool_decode(0), do: {:ok, false}
+  defp loader(:uuid), do: Ecto.UUID
+  defp loader({:nullable, type}), do: loader(type)
+  defp loader({:low_cardinality, type}), do: loader(type)
+  defp loader({:simple_aggregate_function, _name, type}), do: loader(type)
+  defp loader({:array = array, type}), do: {array, loader(type)}
+  defp loader(_type), do: &__MODULE__.ok_identity/1
 
-  defp float_decode(%Decimal{} = decimal), do: {:ok, Decimal.to_float(decimal)}
+  @doc false
+  def ok_identity(value), do: {:ok, value}
+
+  @doc false
+  def hex_uuid(nil), do: {:ok, nil}
+  def hex_uuid(value), do: Ecto.UUID.cast(value)
 
   @impl Ecto.Adapter.Migration
   def supports_ddl_transaction?, do: false

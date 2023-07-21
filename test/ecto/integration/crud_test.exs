@@ -245,4 +245,288 @@ defmodule Ecto.Integration.CrudTest do
       assert [%{sum: 3.0}] = TestRepo.all(query)
     end
   end
+
+  defmodule Issue90 do
+    use Ecto.Schema
+
+    # https://github.com/plausible/ecto_ch/issues/90
+    @primary_key false
+    schema "ecto_ch_issue_90" do
+      field :ecto_uuid, Ecto.UUID
+      field :ch_uuid, Ch, type: "UUID"
+      field :ch_nullable_uuid, Ch, type: "Nullable(UUID)"
+    end
+  end
+
+  describe "uuids" do
+    setup do
+      TestRepo.query!("""
+      create table if not exists ecto_ch_issue_90(
+        ecto_uuid UUID,
+        ch_uuid UUID,
+        ch_nullable_uuid Nullable(UUID)
+      ) engine MergeTree order by tuple()
+      """)
+
+      :ok
+    end
+
+    test "can insert" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      assert {:ok, inserted} =
+               TestRepo.insert(%Issue90{
+                 ecto_uuid: ecto_uuid,
+                 ch_uuid: ch_uuid,
+                 ch_nullable_uuid: ch_nullable_uuid
+               })
+
+      assert inserted.ecto_uuid == ecto_uuid
+      assert inserted.ch_uuid == ch_uuid
+      assert inserted.ch_nullable_uuid == ch_nullable_uuid
+    end
+
+    test "can insert_all" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      rows = [[ecto_uuid: ecto_uuid, ch_uuid: ch_uuid, ch_nullable_uuid: ch_nullable_uuid]]
+      assert {1, _} = TestRepo.insert_all(Issue90, rows)
+
+      assert [selected] = TestRepo.all(Issue90)
+      assert selected.ecto_uuid == ecto_uuid
+      assert selected.ch_uuid == ch_uuid
+      assert selected.ch_nullable_uuid == ch_nullable_uuid
+    end
+
+    test "can insert_all schemaless" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      rows = [[ecto_uuid: ecto_uuid, ch_uuid: ch_uuid, ch_nullable_uuid: ch_nullable_uuid]]
+      types = [ecto_uuid: "UUID", ch_uuid: "UUID", ch_nullable_uuid: "Nullable(UUID)"]
+
+      assert {1, _} = TestRepo.insert_all("ecto_ch_issue_90", rows, types: types)
+
+      assert [selected] =
+               "ecto_ch_issue_90"
+               |> select([u], map(u, [:ecto_uuid, :ch_uuid, :ch_nullable_uuid]))
+               |> TestRepo.all()
+
+      # note that without a schema we are getting the raw bytes back
+      # since Ecto doesn't know that these bytes need to be casted to Ecto.UUID
+      assert selected.ecto_uuid == Ecto.UUID.dump!(ecto_uuid)
+      assert selected.ch_uuid == Ecto.UUID.dump!(ch_uuid)
+      assert selected.ch_nullable_uuid == Ecto.UUID.dump!(ch_nullable_uuid)
+    end
+
+    test "to_sql all" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      query =
+        Issue90
+        |> where(ecto_uuid: ^ecto_uuid)
+        |> where(ch_uuid: ^ch_uuid)
+        |> where(ch_nullable_uuid: ^ch_nullable_uuid)
+
+      {_sql, params} = TestRepo.to_sql(:all, query)
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
+    end
+
+    test "to_sql all schemaless" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      query =
+        "ecto_ch_issue_90"
+        |> where(ecto_uuid: ^ecto_uuid)
+        |> where(ch_uuid: ^ch_uuid)
+        |> where(ch_nullable_uuid: ^ch_nullable_uuid)
+        |> select([u], map(u, [:ecto_uuid, :ch_uuid, :ch_nullable_uuid]))
+
+      {_sql, params} = TestRepo.to_sql(:all, query)
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
+    end
+
+    test "to_sql delete_all" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      query =
+        Issue90
+        |> where(ecto_uuid: ^ecto_uuid)
+        |> where(ch_uuid: ^ch_uuid)
+        |> where(ch_nullable_uuid: ^ch_nullable_uuid)
+
+      {_sql, params} = TestRepo.to_sql(:delete_all, query)
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
+    end
+
+    test "to_sql delete_all schemaless" do
+      ecto_uuid = Ecto.UUID.generate()
+      ch_uuid = Ecto.UUID.generate()
+      ch_nullable_uuid = Ecto.UUID.generate()
+
+      query =
+        "ecto_ch_issue_90"
+        |> where(ecto_uuid: ^ecto_uuid)
+        |> where(ch_uuid: ^ch_uuid)
+        |> where(ch_nullable_uuid: ^ch_nullable_uuid)
+
+      {_sql, params} = TestRepo.to_sql(:delete_all, query)
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
+    end
+
+    defp insert_uuids do
+      TestRepo.insert!(%Issue90{
+        ecto_uuid: Ecto.UUID.generate(),
+        ch_uuid: Ecto.UUID.generate(),
+        ch_nullable_uuid: Ecto.UUID.generate()
+      })
+    end
+
+    @tag :skip
+    # ** (Ecto.NoPrimaryKeyFieldError) schema `Ecto.Integration.CrudTest.Issue90` has no primary key
+    test "can delete" do
+      inserted = insert_uuids()
+      assert {:ok, deleted} = TestRepo.delete(inserted)
+      assert deleted.ecto_uuid == inserted.ecto_uuid
+      assert deleted.ch_uuid == inserted.ch_uuid
+      assert deleted.ch_nullable_uuid == inserted.ch_nullable_uuid
+      refute TestRepo.one(Issue90)
+    end
+
+    test "can delete_all by ecto_uuid" do
+      inserted = insert_uuids()
+
+      assert {0, nil} =
+               Issue90
+               |> where(ecto_uuid: ^inserted.ecto_uuid)
+               |> TestRepo.delete_all(@delete_opts)
+
+      refute TestRepo.one(Issue90)
+    end
+
+    test "can delete_all by ch_uuid" do
+      inserted = insert_uuids()
+
+      assert {0, nil} =
+               Issue90
+               |> where(ch_uuid: ^inserted.ch_uuid)
+               |> TestRepo.delete_all(@delete_opts)
+
+      refute TestRepo.one(Issue90)
+    end
+
+    test "can delete_all by ch_nullable_uuid" do
+      inserted = insert_uuids()
+
+      assert {0, nil} =
+               Issue90
+               |> where(ch_nullable_uuid: ^inserted.ch_nullable_uuid)
+               |> TestRepo.delete_all(@delete_opts)
+
+      refute TestRepo.one(Issue90)
+    end
+
+    test "can delete_all by all three" do
+      inserted = insert_uuids()
+
+      assert {0, nil} =
+               Issue90
+               |> where(ecto_uuid: ^inserted.ecto_uuid)
+               |> where(ch_uuid: ^inserted.ch_uuid)
+               |> where(ch_nullable_uuid: ^inserted.ch_nullable_uuid)
+               |> TestRepo.delete_all(@delete_opts)
+
+      refute TestRepo.one(Issue90)
+    end
+
+    test "can delete_all by all three (schemaless)" do
+      inserted = insert_uuids()
+
+      assert {0, nil} =
+               "ecto_ch_issue_90"
+               |> where(ecto_uuid: ^inserted.ecto_uuid)
+               |> where(ch_uuid: ^inserted.ch_uuid)
+               |> where(ch_nullable_uuid: ^inserted.ch_nullable_uuid)
+               |> TestRepo.delete_all(@delete_opts)
+
+      refute "ecto_ch_issue_90"
+             |> select([u], map(u, [:ecto_uuid, :ch_uuid, :ch_nullable_uuid]))
+             |> TestRepo.one()
+    end
+
+    test "can select" do
+      inserted = insert_uuids()
+      assert [selected] = TestRepo.all(Issue90)
+      assert selected.ecto_uuid == inserted.ecto_uuid
+      assert selected.ch_uuid == inserted.ch_uuid
+      assert selected.ch_nullable_uuid == inserted.ch_nullable_uuid
+    end
+
+    test "can filter by ecto_uuid" do
+      inserted = insert_uuids()
+      assert [selected] = Issue90 |> where(ecto_uuid: ^inserted.ecto_uuid) |> TestRepo.all()
+      assert selected.ecto_uuid == inserted.ecto_uuid
+    end
+
+    test "can filter by ch_uuid" do
+      inserted = insert_uuids()
+      assert [selected] = Issue90 |> where(ch_uuid: ^inserted.ch_uuid) |> TestRepo.all()
+      assert selected.ch_uuid == inserted.ch_uuid
+    end
+
+    test "can filter by ch_nullable_uuid" do
+      inserted = insert_uuids()
+
+      assert [selected] =
+               Issue90
+               |> where(ch_nullable_uuid: ^inserted.ch_nullable_uuid)
+               |> TestRepo.all()
+
+      assert selected.ch_nullable_uuid == inserted.ch_nullable_uuid
+    end
+
+    test "can filter by all three" do
+      inserted = insert_uuids()
+
+      assert [selected] =
+               Issue90
+               |> where(ecto_uuid: ^inserted.ecto_uuid)
+               |> where(ch_uuid: ^inserted.ch_uuid)
+               |> where(ch_nullable_uuid: ^inserted.ch_nullable_uuid)
+               |> TestRepo.all()
+
+      assert selected.ecto_uuid == inserted.ecto_uuid
+      assert selected.ch_uuid == inserted.ch_uuid
+      assert selected.ch_nullable_uuid == inserted.ch_nullable_uuid
+    end
+
+    test "can filter by all three (schemaless)" do
+      inserted = insert_uuids()
+
+      assert [selected] =
+               "ecto_ch_issue_90"
+               |> where(ecto_uuid: ^inserted.ecto_uuid)
+               |> where(ch_uuid: ^inserted.ch_uuid)
+               |> where(ch_nullable_uuid: ^inserted.ch_nullable_uuid)
+               |> select([u], map(u, [:ecto_uuid, :ch_uuid, :ch_nullable_uuid]))
+               |> TestRepo.all()
+
+      # note that without a schema we are getting the raw bytes back
+      # since Ecto doesn't know that these bytes need to be casted to Ecto.UUID
+      assert selected.ecto_uuid == Ecto.UUID.dump!(inserted.ecto_uuid)
+      assert selected.ch_uuid == Ecto.UUID.dump!(inserted.ch_uuid)
+      assert selected.ch_nullable_uuid == Ecto.UUID.dump!(inserted.ch_nullable_uuid)
+    end
+  end
 end
