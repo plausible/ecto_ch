@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 (2023-07-28)
+
+- refactor dumpers and loaders https://github.com/plausible/ecto_ch/pull/92 -- this is the reason for minor version bumping
+- improve `ecto.ch.schema` mix task https://github.com/plausible/ecto_ch/pull/83
+
 ## 0.1.11 (2023-06-12)
 
 - add support for `:array_join` and `:left_array_join` types https://github.com/plausible/ecto_ch/pull/76

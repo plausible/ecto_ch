@@ -79,6 +79,13 @@ defmodule Ecto.Integration.MathTest do
       query = from(p in Product, select: avg(p.price))
 
       [average] = TestRepo.all(query)
+
+      average =
+        case average do
+          %Decimal{} -> average
+          _ when is_float(average) -> Decimal.from_float(average)
+        end
+
       assert Decimal.equal?(average, Decimal.new("1.9666666666666668"))
     end
   end
