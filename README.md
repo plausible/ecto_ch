@@ -70,19 +70,15 @@ Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others
 
 [`ecto.ch.schema`](https://hexdocs.pm/ecto_ch/Mix.Tasks.Ecto.Ch.Schema.html) mix task can be used to generate a schema from an existing ClickHouse table.
 
-Usage: `mix ecto.ch.schema <database>.<table>`
-
-Example: `mix ecto.ch.schema system.numbers`
-
 #### Schemaless inserts
 
 For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided:
 
 ```elixir
 types = [
-  number: "UInt64",
-  # or `number: :u64`
-  # or `number: Ch.Types.u64()`
+  number: "UInt32",
+  # or `number: :u32`
+  # or `number: Ch.Types.u32()`
   # etc.
 ]
 
