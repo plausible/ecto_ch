@@ -94,7 +94,7 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   defp run_with_cmd(cmd, cmd_args, opts) do
     args = ["--host", opts[:hostname] || "localhost"]
-    args = if username = opts[:username], do: ["--username", username | args], else: args
+    args = if username = opts[:username], do: ["--user", username | args], else: args
     args = if password = opts[:password], do: ["--password", password | args], else: args
     args = if port = opts[:port], do: ["--port", to_string(port) | args], else: args
     args = if database = opts[:database], do: ["--database", database | args], else: args
