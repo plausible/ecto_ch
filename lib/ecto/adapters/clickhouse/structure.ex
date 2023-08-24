@@ -15,8 +15,6 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     end
   end
 
-  # TODO include views
-
   def structure_dump(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
     migration_source = config[:migration_source] || "schema_migrations"
