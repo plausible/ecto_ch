@@ -2057,21 +2057,21 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(drop) == [~s|DROP TABLE "foo"."posts"|]
   end
 
-  @tag skip: true
   test "drop constraint" do
     drop = {:drop, constraint(:products, "price_must_be_positive", prefix: :foo), :restrict}
 
     assert execute_ddl(drop) == [
-             ~s{DROP CONSTRAINT}
+             ~s|ALTER TABLE "foo"."products" DROP CONSTRAINT "price_must_be_positive"|
            ]
   end
 
-  @tag skip: true
   test "drop_if_exists constraint" do
     drop =
       {:drop_if_exists, constraint(:products, "price_must_be_positive", prefix: :foo), :restrict}
 
-    assert execute_ddl(drop) == []
+    assert execute_ddl(drop) == [
+             ~s|ALTER TABLE "foo"."products" DROP CONSTRAINT IF EXISTS "price_must_be_positive"|
+           ]
   end
 
   test "alter table" do

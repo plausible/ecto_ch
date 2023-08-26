@@ -119,9 +119,22 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     raise "TODO"
   end
 
-  def execute_ddl({command, %Constraint{} = _constraint, _mode})
+  def execute_ddl({command, %Constraint{} = constraint, _mode})
       when command in [:drop, :drop_if_exists] do
-    raise "TODO"
+    drop =
+      case command do
+        :drop -> " DROP CONSTRAINT "
+        :drop_if_exists -> " DROP CONSTRAINT IF EXISTS "
+      end
+
+    [
+      [
+        "ALTER TABLE ",
+        @conn.quote_table(constraint.prefix, constraint.table),
+        drop,
+        @conn.quote_name(constraint.name)
+      ]
+    ]
   end
 
   def execute_ddl({:rename, %Table{} = current_table, %Table{} = new_table}) do
