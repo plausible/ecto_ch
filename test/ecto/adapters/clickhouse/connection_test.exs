@@ -2355,16 +2355,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(drop) == [~s|DROP INDEX "posts$main"|]
   end
 
-  @tag skip: true
-  test "create constraint" do
-    assert_raise ArgumentError,
-                 "ClickHouse does not support ALTER TABLE ADD CONSTRAINT",
-                 fn ->
-                   {:create, constraint(:products, "price_must_be_positive", check: "price > 0")}
-                   |> execute_ddl()
-                 end
-  end
-
   test "drop index with prefix" do
     drop = {:drop, index(:posts, [:id], name: "posts$main", prefix: :foo), :restrict}
     assert execute_ddl(drop) == [~s|DROP INDEX "foo"."posts$main"|]
@@ -2398,6 +2388,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              ~s|ALTER TABLE "foo"."products" ADD CONSTRAINT "price_must_be_positive" CHECK (price > 0)|
+           ]
+  end
+
+  test "create check constraint if not exists" do
+    create =
+      {:create_if_not_exists, constraint(:products, "price_must_be_positive", check: "price > 0")}
+
+    assert execute_ddl(create) == [
+             ~s|ALTER TABLE "products" ADD CONSTRAINT IF NOT EXISTS "price_must_be_positive" CHECK (price > 0)|
            ]
   end
 

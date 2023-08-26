@@ -108,15 +108,19 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     [[drop | @conn.quote_table(index.prefix, index.name)]]
   end
 
-  def execute_ddl({:create, %Constraint{} = constraint}) do
+  def execute_ddl({command, %Constraint{} = constraint})
+      when command in [:create, :create_if_not_exists] do
     table_name = @conn.quote_table(constraint.prefix, constraint.table)
+
+    add =
+      case command do
+        :create -> " ADD CONSTRAINT "
+        :create_if_not_exists -> " ADD CONSTRAINT IF NOT EXISTS "
+      end
+
     constraint_expr = constraint |> constraint_expr() |> Enum.join("")
 
-    [["ALTER TABLE ", table_name, " ADD ", constraint_expr]]
-  end
-
-  def execute_ddl({:create_if_not_exists, %Constraint{} = _constraint}) do
-    raise "TODO"
+    [["ALTER TABLE ", table_name, add, constraint_expr]]
   end
 
   def execute_ddl({command, %Constraint{} = constraint, _mode})
@@ -327,7 +331,6 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   defp constraint_expr(%Constraint{check: check, validate: true, comment: nil} = constraint)
        when is_binary(check) do
     [
-      "CONSTRAINT ",
       @conn.quote_name(constraint.name),
       " CHECK (",
       check,
