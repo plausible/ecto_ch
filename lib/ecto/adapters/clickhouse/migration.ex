@@ -122,6 +122,10 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       raise "Clickhouse adapter does not support exclude constraints"
     end
 
+    unless constraint.check do
+      raise "Clickhouse adapter requires check option for constraints"
+    end
+
     add =
       case command do
         :create -> " ADD CONSTRAINT "
