@@ -2382,10 +2382,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(drop) == [~s|DROP INDEX "posts$main"|]
   end
 
-  @tag skip: true
   test "create check constraint" do
     create = {:create, constraint(:products, "price_must_be_positive", check: "price > 0")}
-    assert execute_ddl(create) == []
+
+    assert execute_ddl(create) == [
+             ~s|ALTER TABLE "products" ADD CONSTRAINT "price_must_be_positive" CHECK (price > 0)|
+           ]
 
     create =
       {:create,
@@ -2394,7 +2396,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
          prefix: "foo"
        )}
 
-    assert execute_ddl(create) == []
+    assert execute_ddl(create) == [
+             ~s|ALTER TABLE "foo"."products" ADD CONSTRAINT "price_must_be_positive" CHECK (price > 0)|
+           ]
   end
 
   @tag skip: true
