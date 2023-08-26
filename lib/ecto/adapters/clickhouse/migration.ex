@@ -110,7 +110,17 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   def execute_ddl({command, %Constraint{} = constraint})
       when command in [:create, :create_if_not_exists] do
-    table_name = @conn.quote_table(constraint.prefix, constraint.table)
+    if constraint.comment do
+      raise "Clickhouse adapter does not support comments on check constraints"
+    end
+
+    unless constraint.validate do
+      raise "Clickhouse adapter does not support check constraints without validation on creation"
+    end
+
+    if constraint.exclude do
+      raise "Clickhouse adapter does not support exclude constraints"
+    end
 
     add =
       case command do
@@ -118,9 +128,17 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
         :create_if_not_exists -> " ADD CONSTRAINT IF NOT EXISTS "
       end
 
-    constraint_expr = constraint |> constraint_expr() |> Enum.join("")
-
-    [["ALTER TABLE ", table_name, add, constraint_expr]]
+    [
+      [
+        "ALTER TABLE ",
+        @conn.quote_table(constraint.prefix, constraint.table),
+        add,
+        @conn.quote_name(constraint.name),
+        " CHECK (",
+        constraint.check,
+        ")"
+      ]
+    ]
   end
 
   def execute_ddl({command, %Constraint{} = constraint, _mode})
@@ -327,29 +345,6 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   defp index_expr(literal) when is_binary(literal), do: literal
   defp index_expr(literal), do: @conn.quote_name(literal)
-
-  defp constraint_expr(%Constraint{check: check, validate: true, comment: nil} = constraint)
-       when is_binary(check) do
-    [
-      @conn.quote_name(constraint.name),
-      " CHECK (",
-      check,
-      ")"
-    ]
-  end
-
-  defp constraint_expr(%Constraint{check: check, validate: true, comment: comment})
-       when is_binary(check) and is_binary(comment) do
-    raise "Clickhouse adapter does not support comments on check constraints"
-  end
-
-  defp constraint_expr(%Constraint{check: check, validate: false}) when is_binary(check) do
-    raise "Clickhouse adapter does not support check constraints without validation on creation"
-  end
-
-  defp constraint_expr(%Constraint{exclude: exclude}) when is_binary(exclude) do
-    raise "Clickhouse adapter does not support exclude constraints"
-  end
 
   defp options_expr(nil), do: []
 
