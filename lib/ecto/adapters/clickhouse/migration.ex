@@ -108,14 +108,59 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     [[drop | @conn.quote_table(index.prefix, index.name)]]
   end
 
-  def execute_ddl({command, %Constraint{} = _constraint})
+  def execute_ddl({command, %Constraint{} = constraint})
       when command in [:create, :create_if_not_exists] do
-    raise "TODO"
+    if constraint.comment do
+      raise "Clickhouse adapter does not support comments on check constraints"
+    end
+
+    unless constraint.validate do
+      raise "Clickhouse adapter does not support check constraints without validation on creation"
+    end
+
+    if constraint.exclude do
+      raise "Clickhouse adapter does not support exclude constraints"
+    end
+
+    unless constraint.check do
+      raise "Clickhouse adapter requires check option for constraints"
+    end
+
+    add =
+      case command do
+        :create -> " ADD CONSTRAINT "
+        :create_if_not_exists -> " ADD CONSTRAINT IF NOT EXISTS "
+      end
+
+    [
+      [
+        "ALTER TABLE ",
+        @conn.quote_table(constraint.prefix, constraint.table),
+        add,
+        @conn.quote_name(constraint.name),
+        " CHECK (",
+        constraint.check,
+        ")"
+      ]
+    ]
   end
 
-  def execute_ddl({command, %Constraint{} = _constraint, _mode})
+  def execute_ddl({command, %Constraint{} = constraint, _mode})
       when command in [:drop, :drop_if_exists] do
-    raise "TODO"
+    drop =
+      case command do
+        :drop -> " DROP CONSTRAINT "
+        :drop_if_exists -> " DROP CONSTRAINT IF EXISTS "
+      end
+
+    [
+      [
+        "ALTER TABLE ",
+        @conn.quote_table(constraint.prefix, constraint.table),
+        drop,
+        @conn.quote_name(constraint.name)
+      ]
+    ]
   end
 
   def execute_ddl({:rename, %Table{} = current_table, %Table{} = new_table}) do
