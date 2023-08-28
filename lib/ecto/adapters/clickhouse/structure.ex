@@ -7,11 +7,23 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   def structure_load(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
-    {cmd, cmd_args} = clickhouse_client_cmd()
 
-    case run_with_cmd(cmd, cmd_args ++ ["--queries-file", path], config) do
-      {_output, 0} -> {:ok, path}
-      {output, _} -> {:error, output}
+    with {:ok, conn} <- Conn.connect(config),
+         {:ok, queries} <- File.read(path) do
+      multiquery_result =
+        queries
+        |> String.split(";", trim: true)
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.reduce_while({:ok, _prev_result = nil, conn}, fn
+          query, {:ok, _prev_result, conn} -> {:cont, exec(conn, query)}
+          _query, {:error, _reason} = error -> {:halt, error}
+        end)
+
+      case multiquery_result do
+        {:ok, _last_result, _conn} -> {:ok, path}
+        {:error, reason} -> {:error, Exception.message(reason)}
+      end
     end
   end
 
@@ -79,28 +91,5 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
       {:disconnect, reason, _conn} -> {:error, reason}
       {:error, reason, _conn} -> {:error, reason}
     end
-  end
-
-  defp clickhouse_client_cmd do
-    candidates = [
-      {"clickhouse-client", _args = []},
-      {"clickhouse", _args = ["client"]}
-    ]
-
-    cmd_with_args = Enum.find(candidates, fn {cmd, _args} -> System.find_executable(cmd) end)
-
-    cmd_with_args ||
-      raise "could not find `clickhouse-client` nor `clickhouse` executables in path, " <>
-              "please guarantee that one of them is available before running ecto commands"
-  end
-
-  defp run_with_cmd(cmd, cmd_args, opts) do
-    args = ["--host", opts[:hostname] || "localhost"]
-    args = if username = opts[:username], do: ["--username", username | args], else: args
-    args = if password = opts[:password], do: ["--password", password | args], else: args
-    args = if port = opts[:port], do: ["--port", to_string(port) | args], else: args
-    args = if database = opts[:database], do: ["--database", database | args], else: args
-
-    System.cmd(cmd, cmd_args ++ args, stderr_to_stdout: true)
   end
 end

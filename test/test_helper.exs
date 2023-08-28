@@ -20,4 +20,4 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 {:ok, _} = TestRepo.start_link()
 :ok = Ecto.Migrator.up(TestRepo, 0, EctoClickHouse.Integration.Migration, log: false)
 
-ExUnit.start(exclude: [:clickhouse_client])
+ExUnit.start()

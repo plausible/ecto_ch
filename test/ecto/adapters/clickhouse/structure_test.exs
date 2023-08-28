@@ -233,8 +233,6 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
   end
 
   describe "structure_load/2" do
-    @describetag :clickhouse_client
-
     setup do
       database = "ecto_ch_temp_structure_load"
       opts = [database: database]
