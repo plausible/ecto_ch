@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- use our http client for `structure_load` https://github.com/plausible/ecto_ch/pull/111
+
 ## 0.2.1 (2023-08-28)
 
 - added constraint support in migrations https://github.com/plausible/ecto_ch/pull/108
