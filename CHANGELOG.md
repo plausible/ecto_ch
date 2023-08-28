@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2023-08-28)
+
+- added constraint support in migrations https://github.com/plausible/ecto_ch/pull/108
+
 ## 0.2.0 (2023-07-28)
 
 - refactor dumpers and loaders https://github.com/plausible/ecto_ch/pull/92 -- this is the reason for minor version bumping
