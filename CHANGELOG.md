@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 (2023-08-29)
 
 - use our http client for `structure_load` https://github.com/plausible/ecto_ch/pull/111
 
