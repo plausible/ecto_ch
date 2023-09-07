@@ -11,12 +11,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @impl true
   def child_spec(opts) do
-    Ch.child_spec(opts)
+    Ch.Local.child_spec(opts)
   end
 
   @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
-    query = Ch.Query.build(statement, opts[:command])
+    query = Ch.Local.Query.build(statement, opts[:command])
     DBConnection.prepare_execute(conn, query, params, opts)
   end
 
@@ -28,7 +28,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # TODO what should be done about transactions? probably will need to build custom Repo.stream
   @impl true
   def query(conn, statement, params, opts) do
-    Ch.query(conn, statement, params, opts)
+    Ch.Local.query(conn, statement, params, opts)
   end
 
   @impl true
@@ -37,8 +37,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def stream(conn, statement, params, opts) do
-    Ch.stream(conn, statement, params, opts)
+  def stream(_conn, _statement, _params, _opts) do
+    raise "not implemented"
   end
 
   @impl true

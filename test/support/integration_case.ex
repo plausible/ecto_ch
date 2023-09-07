@@ -4,14 +4,16 @@ defmodule Ecto.Integration.Case do
 
   setup do
     on_exit(fn ->
-      %{rows: rows} = TestRepo.query!("show tables")
+      # workaround for SHOW TABLES in clickhouse-local
+      %{rows: rows} =
+        TestRepo.query!("select name from system.tables where database = 'ecto_ch_test'")
 
       # this includes schema_migrations as well, but we don't
       # care since the database is recreated each time anew
       tables = Enum.map(rows, fn [table] -> table end)
 
       for table <- tables do
-        TestRepo.query!("truncate #{table}")
+        TestRepo.query!("truncate ecto_ch_test.#{table}")
       end
     end)
   end

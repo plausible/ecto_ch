@@ -38,7 +38,8 @@ defmodule EctoCh.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, "~> 0.2.0"},
+      # {:ch, "~> 0.2.0"},
+      {:ch_local, github: "ruslandoga/ch_local"},
       {:ecto_sql, "~> 3.9"},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},

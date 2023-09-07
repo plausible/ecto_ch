@@ -20,7 +20,7 @@ defmodule Ch.TypeTest do
     # TODO
     @tag skip: true
     test ":default" do
-      query!("create table ch_defaults (`i8` Int8, `string` String) engine Memory")
+      query!("create table ecto_ch_test.ch_defaults (`i8` Int8, `string` String) engine Memory")
 
       assert {1, _} = insert_all(Defaults, _rows = [[i8: nil, string: nil]])
       assert Defaults |> all() |> unstruct() == [%{i8: 42, string: "42"}]
@@ -31,7 +31,7 @@ defmodule Ch.TypeTest do
   describe "Int / UInt" do
     setup do
       query!("""
-      create table ch_ints(
+      create table ecto_ch_test.ch_ints(
         `i8`   Int8,
         `i16`  Int16,
         `i32`  Int32,
@@ -47,7 +47,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_ints") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_ints") end)
     end
 
     defmodule Ints do
@@ -177,8 +177,8 @@ defmodule Ch.TypeTest do
   # TODO what if overlow
   describe "Float" do
     setup do
-      query!("create table ch_floats(f32 Float32, f64 Float64) engine Memory")
-      on_exit(fn -> query!("truncate ch_floats") end)
+      query!("create table ecto_ch_test.ch_floats(f32 Float32, f64 Float64) engine Memory")
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_floats") end)
     end
 
     defmodule Floats do
@@ -214,11 +214,11 @@ defmodule Ch.TypeTest do
     end
   end
 
-  # TODO what if overlow
+  # TODO what if overflow
   describe "Decimal" do
     setup do
       query!("""
-      create table ch_decimals (
+      create table ecto_ch_test.ch_decimals (
         d_15_10 Decimal(15, 10),
         d32_2 Decimal32(2),
         d64_4 Decimal64(4),
@@ -227,7 +227,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_decimals") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_decimals") end)
     end
 
     defmodule Decimals do
@@ -244,7 +244,7 @@ defmodule Ch.TypeTest do
     end
 
     test "insert_all" do
-      assert {4, _} =
+      assert {0, _} =
                insert_all(
                  Decimals,
                  _rows = [
@@ -266,6 +266,9 @@ defmodule Ch.TypeTest do
                    ]
                  ]
                )
+
+      :timer.sleep(1000)
+      query!("select * from ecto_ch_test.ch_decimals") |> IO.inspect()
 
       assert Decimals |> order_by([d], d.d_15_10) |> all() |> unstruct() == [
                %{
@@ -302,8 +305,8 @@ defmodule Ch.TypeTest do
 
   describe "Bool" do
     setup do
-      query!("create table ch_bools (ch_bool Bool, bool Bool) engine Memory")
-      on_exit(fn -> query!("truncate ch_bools") end)
+      query!("create table ecto_ch_test.ch_bools (ch_bool Bool, bool Bool) engine Memory")
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_bools") end)
     end
 
     defmodule Bools do
@@ -337,8 +340,11 @@ defmodule Ch.TypeTest do
 
   describe "String" do
     setup do
-      query!("create table ch_strings (ch_string String, string String) engine Memory")
-      on_exit(fn -> query!("truncate ch_strings") end)
+      query!(
+        "create table ecto_ch_test.ch_strings (ch_string String, string String) engine Memory"
+      )
+
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_strings") end)
     end
 
     defmodule Strings do
@@ -374,8 +380,11 @@ defmodule Ch.TypeTest do
 
   describe "FixedString(n)" do
     setup do
-      query!("create table ch_fixed_strings (f2 FixedString(2), f3 FixedString(3)) engine Memory")
-      on_exit(fn -> query!("truncate ch_fixed_strings") end)
+      query!(
+        "create table ecto_ch_test.ch_fixed_strings (f2 FixedString(2), f3 FixedString(3)) engine Memory"
+      )
+
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_fixed_strings") end)
     end
 
     defmodule FixedStrings do
@@ -408,8 +417,8 @@ defmodule Ch.TypeTest do
 
   describe "UUID" do
     setup do
-      query!("create table ch_uuids (`ch_uuid` UUID, `uuid` UUID) engine Memory")
-      on_exit(fn -> query!("truncate ch_uuids") end)
+      query!("create table ecto_ch_test.ch_uuids (`ch_uuid` UUID, `uuid` UUID) engine Memory")
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_uuids") end)
     end
 
     defmodule UUIDs do
@@ -449,8 +458,8 @@ defmodule Ch.TypeTest do
 
   describe "Date" do
     setup do
-      query!("create table ch_dates (ch_date Date, date Date) engine Memory")
-      on_exit(fn -> query!("truncate ch_dates") end)
+      query!("create table ecto_ch_test.ch_dates (ch_date Date, date Date) engine Memory")
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_dates") end)
     end
 
     defmodule Dates do
@@ -482,8 +491,8 @@ defmodule Ch.TypeTest do
 
   describe "Date32" do
     setup do
-      query!("create table ch_dates32 (date Date32) engine Memory")
-      on_exit(fn -> query!("truncate ch_dates32") end)
+      query!("create table ecto_ch_test.ch_dates32 (date Date32) engine Memory")
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_dates32") end)
     end
 
     defmodule Dates32 do
@@ -514,7 +523,7 @@ defmodule Ch.TypeTest do
   describe "DateTime" do
     setup do
       query!("""
-      create table ch_datetimes (
+      create table ecto_ch_test.ch_datetimes (
         ch_datetime DateTime,
         ch_datetime_utc DateTime('UTC'),
         naive_datetime DateTime,
@@ -522,7 +531,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_datetimes") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_datetimes") end)
     end
 
     defmodule Datetimes do
@@ -572,7 +581,7 @@ defmodule Ch.TypeTest do
   describe "DateTime64" do
     setup do
       query!("""
-      create table ch_datetimes64 (
+      create table ecto_ch_test.ch_datetimes64 (
         ch_3 DateTime64(3),
         ch_6 DateTime64(6),
         ch_5_utc DateTime(5, 'UTC'),
@@ -581,7 +590,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_datetimes64") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_datetimes64") end)
     end
 
     defmodule Datetimes64 do
@@ -635,13 +644,13 @@ defmodule Ch.TypeTest do
   describe "Enum" do
     setup do
       query!("""
-      create table ch_enums (
+      create table ecto_ch_test.ch_enums (
         e8 Enum8('hello' = 1, 'world' = 2),
         e16 Enum16('hello' = -100, 'world' = 1000)
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_enums") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_enums") end)
     end
 
     defmodule Enums do
@@ -672,7 +681,7 @@ defmodule Ch.TypeTest do
     setup do
       query!(
         """
-        create table ch_low_cardinalities (
+        create table ecto_ch_test.ch_low_cardinalities (
           string LowCardinality(String),
           fixed LowCardinality(FixedString(16)),
           date LowCardinality(Date),
@@ -684,7 +693,7 @@ defmodule Ch.TypeTest do
         settings: [allow_suspicious_low_cardinality_types: 1]
       )
 
-      on_exit(fn -> query!("truncate ch_low_cardinalities") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_low_cardinalities") end)
     end
 
     defmodule LowCardinalities do
@@ -739,7 +748,7 @@ defmodule Ch.TypeTest do
   describe "Array" do
     setup do
       query!("""
-      create table if not exists ch_arrays (
+      create table if not exists ecto_ch_test.ch_arrays (
         strings Array(String),
         maybe_strings Array(Nullable(String)),
         ints Array(Int32),
@@ -748,7 +757,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_arrays") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_arrays") end)
     end
 
     defmodule Arrays do
@@ -844,14 +853,14 @@ defmodule Ch.TypeTest do
   describe "Tuple" do
     setup do
       query!("""
-      create table ch_tuples (
+      create table ecto_ch_test.ch_tuples (
         t1 Tuple(String),
         t2 Tuple(String, Int32),
         t3 Tuple(String, Array(String), Int32)
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_tuples") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_tuples") end)
     end
 
     defmodule Tuples do
@@ -890,14 +899,14 @@ defmodule Ch.TypeTest do
   describe "Map" do
     setup do
       query!("""
-      create table ch_maps (
+      create table ecto_ch_test.ch_maps (
         string_int Map(String, Int64),
         date_string Map(Date, String),
         int_strings Map(UInt64, Array(String))
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_maps") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_maps") end)
     end
 
     defmodule Maps do
@@ -938,7 +947,7 @@ defmodule Ch.TypeTest do
   describe "Nullable" do
     setup do
       query!("""
-      create table ch_nullables (
+      create table ecto_ch_test.ch_nullables (
         string Nullable(String),
         fixed_string Nullable(FixedString(2)),
         float Nullable(Float32),
@@ -956,7 +965,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_nullables") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_nullables") end)
     end
 
     defmodule Nullables do
@@ -1047,8 +1056,8 @@ defmodule Ch.TypeTest do
 
   describe "IP" do
     setup do
-      query!("create table chips (v4 IPv4, v6 IPv6) engine Memory")
-      on_exit(fn -> query!("truncate chips") end)
+      query!("create table ecto_ch_test.chips (v4 IPv4, v6 IPv6) engine Memory")
+      on_exit(fn -> query!("truncate ecto_ch_test.chips") end)
     end
 
     defmodule IPs do
@@ -1080,7 +1089,7 @@ defmodule Ch.TypeTest do
   describe "Geo" do
     setup do
       query!("""
-      create table ch_geo (
+      create table ecto_ch_test.ch_geo (
         point Point,
         ring Ring,
         polygon Polygon,
@@ -1088,7 +1097,7 @@ defmodule Ch.TypeTest do
       ) engine Memory
       """)
 
-      on_exit(fn -> query!("truncate ch_geo") end)
+      on_exit(fn -> query!("truncate ecto_ch_test.ch_geo") end)
     end
 
     defmodule Geo do

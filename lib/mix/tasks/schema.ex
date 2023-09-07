@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
       $ mix ecto.ch.schema system.numbers --repo MyApp.Repo
   """
   use Mix.Task
-  alias Ch.Connection, as: Conn
+  alias Ch.Local.Connection, as: Conn
 
   def run([]) do
     IO.puts(@moduledoc)
@@ -82,7 +82,7 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
   end
 
   defp query(conn, statement, params, opts \\ []) do
-    query = Ch.Query.build(statement)
+    query = Ch.Local.Query.build(statement)
     params = DBConnection.Query.encode(query, params, opts)
 
     case Conn.handle_execute(query, params, opts, conn) do

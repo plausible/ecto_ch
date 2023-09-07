@@ -31,7 +31,7 @@ defmodule Ecto.Adapters.ClickHouse do
   @behaviour Ecto.Adapter.Structure
 
   @conn __MODULE__.Connection
-  @driver :ch
+  @driver :ch_local
 
   @impl Ecto.Adapter
   defmacro __before_compile__(_env) do
@@ -234,6 +234,8 @@ defmodule Ecto.Adapters.ClickHouse do
         placeholders,
         opts
       ) do
+    schema_meta = ensure_prefix(adapter_meta, schema_meta)
+
     Ecto.Adapters.ClickHouse.Schema.insert_all(
       adapter_meta,
       schema_meta,
@@ -248,12 +250,14 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @impl Ecto.Adapter.Schema
   def insert(adapter_meta, schema_meta, params, _, _, opts) do
+    schema_meta = ensure_prefix(adapter_meta, schema_meta)
     Ecto.Adapters.ClickHouse.Schema.insert(adapter_meta, schema_meta, params, opts)
   end
 
   @dialyzer {:no_return, update: 6}
   @impl Ecto.Adapter.Schema
-  def update(adapter_meta, %{source: source, prefix: prefix}, fields, params, returning, opts) do
+  def update(adapter_meta, schema_meta, fields, params, returning, opts) do
+    %{source: source, prefix: prefix} = ensure_prefix(adapter_meta, schema_meta)
     {fields, field_values} = :lists.unzip(fields)
     filter_values = Keyword.values(params)
     sql = @conn.update(prefix, source, fields, params, returning)
@@ -274,6 +278,7 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @impl Ecto.Adapter.Schema
   def delete(adapter_meta, schema_meta, params, opts) do
+    schema_meta = ensure_prefix(adapter_meta, schema_meta)
     Ecto.Adapters.ClickHouse.Schema.delete(adapter_meta, schema_meta, params, opts)
   end
 
@@ -287,6 +292,23 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @impl Ecto.Adapter.Queryable
   def execute(adapter_meta, query_meta, {:nocache, {operation, query}}, params, opts) do
+    database = adapter_meta.repo.config()[:database]
+
+    query =
+      %{
+        query
+        | sources:
+            Tuple.to_list(query.sources)
+            |> Enum.map(fn {table, schema, prefix} = source ->
+              if prefix do
+                source
+              else
+                {table, schema, database}
+              end
+            end)
+            |> List.to_tuple()
+      }
+
     sql = prepare_sql(operation, query, params)
 
     opts =
@@ -342,5 +364,14 @@ defmodule Ecto.Adapters.ClickHouse do
 
   defp put_source(opts, _) do
     opts
+  end
+
+  defp ensure_prefix(adapter_meta, schema_meta) do
+    if schema_meta.prefix do
+      schema_meta
+    else
+      config = adapter_meta.repo.config()
+      %{schema_meta | prefix: config[:database]}
+    end
   end
 end

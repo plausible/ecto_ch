@@ -1,7 +1,7 @@
 defmodule Ecto.Adapters.ClickHouse.Structure do
   @moduledoc false
-  alias Ch.Query
-  alias Ch.Connection, as: Conn
+  alias Ch.Local.Query
+  alias Ch.Local.Connection, as: Conn
 
   @conn Ecto.Adapters.ClickHouse.Connection
 
