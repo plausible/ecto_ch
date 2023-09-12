@@ -40,6 +40,27 @@ Optionally you can also set the default table engine to use in migrations
 config :ecto_ch, default_table_engine: "TinyLog"
 ```
 
+Optionally you can have the migrations perform the changes using [`ON CLUSTER`](https://clickhouse.com/docs/en/sql-reference/distributed-ddl)
+Either globally
+
+```elixir
+config :ecto_ch, cluster_name: "name-of-cluster"
+```
+
+Or for a specific migration.
+
+```elixir
+  use Ecto.Migration
+
+  def up() do
+    :ok = Application.put_env(:ecto_ch, :cluster_name, "name-of-cluster")
+    create table(...
+
+
+    :ok = Application.delete_env(:ecto_ch, :cluster_name)
+  end
+```
+
 #### Ecto schemas
 
 For automatic RowBinary encoding please use the custom `Ch` Ecto type:

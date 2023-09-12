@@ -1842,6 +1842,21 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=TinyLog}]
   end
 
+  test "create table uses :cluster when set" do
+    prev = Application.get_env(:ecto_ch, :cluster_name)
+    :ok = Application.put_env(:ecto_ch, :cluster_name, "cluster-name")
+
+    on_exit(fn ->
+      Application.put_env(:ecto_ch, :cluster_name, prev)
+    end)
+
+    create = {:create, table(:posts, engine: "ReplicatedMergeTree"), []}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" ON CLUSTER "cluster-name" () ENGINE=ReplicatedMergeTree}
+           ]
+  end
+
   test "create empty table" do
     create = {:create, table(:posts), []}
     assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=TinyLog}]

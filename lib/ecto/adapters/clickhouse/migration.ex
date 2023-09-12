@@ -25,6 +25,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       [
         create,
         @conn.quote_table(prefix, name),
+        on_cluster(),
         ?(,
         columns,
         pk,
@@ -44,7 +45,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       end
 
     [
-      [drop | @conn.quote_table(table.prefix, table.name)]
+      [drop, @conn.quote_table(table.prefix, table.name), on_cluster()]
     ]
   end
 
@@ -53,6 +54,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       [
         "ALTER TABLE ",
         @conn.quote_table(table.prefix, table.name),
+        on_cluster(),
         ?\s | column_change(change)
       ]
     end)
@@ -87,6 +89,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
         @conn.quote_name(index.name),
         " ON ",
         @conn.quote_table(index.prefix, index.table),
+        on_cluster(),
         " (",
         fields,
         ") TYPE ",
@@ -105,7 +108,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
         :drop_if_exists -> "DROP INDEX IF EXISTS "
       end
 
-    [[drop | @conn.quote_table(index.prefix, index.name)]]
+    [[drop, @conn.quote_table(index.prefix, index.name), on_cluster()]]
   end
 
   def execute_ddl({command, %Constraint{} = constraint})
@@ -136,6 +139,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       [
         "ALTER TABLE ",
         @conn.quote_table(constraint.prefix, constraint.table),
+        on_cluster(),
         add,
         @conn.quote_name(constraint.name),
         " CHECK (",
@@ -157,6 +161,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       [
         "ALTER TABLE ",
         @conn.quote_table(constraint.prefix, constraint.table),
+        on_cluster(),
         drop,
         @conn.quote_name(constraint.name)
       ]
@@ -169,7 +174,8 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
         "RENAME TABLE ",
         @conn.quote_table(current_table.prefix, current_table.name),
         " TO ",
-        @conn.quote_table(new_table.prefix, new_table.name)
+        @conn.quote_table(new_table.prefix, new_table.name),
+        on_cluster()
       ]
     ]
   end
@@ -179,6 +185,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       [
         "ALTER TABLE ",
         @conn.quote_table(table.prefix, table.name),
+        on_cluster(),
         " RENAME COLUMN ",
         @conn.quote_name(column),
         " TO ",
@@ -357,6 +364,16 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   end
 
   defp options_expr(options), do: [?\s | to_string(options)]
+
+  defp on_cluster() do
+    cluster = Application.get_env(:ecto_ch, :cluster_name)
+
+    if is_nil(cluster) do
+      []
+    else
+      [" ON CLUSTER ", @conn.quote_name(cluster), ?\s]
+    end
+  end
 
   defp column_type(type) when type in [:serial, :bigserial] do
     raise ArgumentError,
