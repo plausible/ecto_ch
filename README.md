@@ -34,10 +34,12 @@ defmodule MyApp.Repo do
 end
 ```
 
-Optionally you can also set the default table engine to use in migrations
+Optionally you can also set the default table engine and options to use in migrations
 
 ```elixir
-config :ecto_ch, default_table_engine: "TinyLog"
+config :ecto_ch,
+  default_table_engine: "TinyLog",
+  default_table_options: [cluster: "little-giant", order_by: "tuple()"]
 ```
 
 #### Ecto schemas

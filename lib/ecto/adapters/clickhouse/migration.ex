@@ -174,7 +174,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   defp add(:create_if_not_exists, %Constraint{}), do: "ADD CONSTRAINT IF NOT EXISTS"
 
   def table(%Table{} = table) do
-    if cluster = cluster(table.options) do
+    if cluster = cluster(merge_table_options_with_defaults(table.options)) do
       [@conn.quote_table(table.prefix, table.name), " ON CLUSTER ", @conn.quote_name(cluster)]
     else
       @conn.quote_table(table.prefix, table.name)
@@ -182,7 +182,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   end
 
   def table(%Index{} = index) do
-    if cluster = cluster(index.options) do
+    if cluster = cluster(merge_table_options_with_defaults(index.options)) do
       [@conn.quote_table(index.prefix, index.table), " ON CLUSTER ", @conn.quote_name(cluster)]
     else
       @conn.quote_table(index.prefix, index.table)
@@ -232,17 +232,25 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     table.engine || Application.get_env(:ecto_ch, :default_table_engine) || "TinyLog"
   end
 
+  defp default_table_options do
+    List.wrap(Application.get_env(:ecto_ch, :default_table_options))
+  end
+
+  defp merge_table_options_with_defaults(options) do
+    Keyword.merge(default_table_options(), List.wrap(options))
+  end
+
   defp engine(%Table{} = table) do
     ["ENGINE=", find_engine(table) | engine_options(table.options)]
   end
 
   defp engine_options(options) when is_binary(options), do: [?\s | options]
 
-  defp engine_options(options) when is_list(options) do
-    options |> Keyword.drop(@cluster_options) |> Enum.map(&option_expr/1)
+  defp engine_options(options) when is_list(options) or is_nil(options) do
+    merge_table_options_with_defaults(options)
+    |> Keyword.drop(@cluster_options)
+    |> Enum.map(&option_expr/1)
   end
-
-  defp engine_options(nil), do: []
 
   defp index_options(%Index{} = index), do: index_options(index.options)
   defp index_options(options) when is_binary(options), do: [?\s | options]
