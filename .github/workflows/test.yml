@@ -27,7 +27,7 @@ jobs:
 
     strategy:
       matrix:
-        elixir: ["1.14"]
+        elixir: ["1.14", "1.15"]
         otp: ["25", "26"]
 
     steps:
@@ -50,5 +50,6 @@ jobs:
 
       - run: mix deps.get
       - run: mix format --check-formatted
+        if: matrix.elixir == '1.15'
       - run: mix compile --warnings-as-errors
       - run: mix test
