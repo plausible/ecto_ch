@@ -103,13 +103,28 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   def execute_ddl({command, %Index{} = index, _mode})
       when command in [:drop, :drop_if_exists] do
+    if index.unique do
+      raise ArgumentError, "ClickHouse does not support UNIQUE INDEX"
+    end
+
+    if index.concurrently do
+      raise ArgumentError, "ClickHouse does not support DROP INDEX CONCURRENTLY"
+    end
+
     drop =
       case command do
-        :drop -> "DROP INDEX "
-        :drop_if_exists -> "DROP INDEX IF EXISTS "
+        :drop -> " DROP INDEX "
+        :drop_if_exists -> " DROP INDEX IF EXISTS "
       end
 
-    [[drop | @conn.quote_table(index.prefix, index.name)]]
+    [
+      [
+        "ALTER TABLE ",
+        @conn.quote_table(index.prefix, index.table),
+        drop,
+        @conn.quote_name(index.name)
+      ]
+    ]
   end
 
   def execute_ddl({command, %Constraint{} = constraint})

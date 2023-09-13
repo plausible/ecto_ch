@@ -2355,24 +2355,25 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "drop index" do
     drop = {:drop, index(:posts, [:id], name: "posts$main"), :restrict}
-    assert execute_ddl(drop) == [~s|DROP INDEX "posts$main"|]
+    assert execute_ddl(drop) == [~s|ALTER TABLE "posts" DROP INDEX "posts$main"|]
   end
 
   test "drop index with prefix" do
     drop = {:drop, index(:posts, [:id], name: "posts$main", prefix: :foo), :restrict}
-    assert execute_ddl(drop) == [~s|DROP INDEX "foo"."posts$main"|]
+    assert execute_ddl(drop) == [~s|ALTER TABLE "foo"."posts" DROP INDEX "posts$main"|]
   end
 
   test "drop index if exists" do
     drop = {:drop_if_exists, index(:posts, [:id], name: "posts$main"), :restrict}
-    assert execute_ddl(drop) == [~s|DROP INDEX IF EXISTS "posts$main"|]
+    assert execute_ddl(drop) == [~s|ALTER TABLE "posts" DROP INDEX IF EXISTS "posts$main"|]
   end
 
-  # TODO
   test "drop index concurrently" do
     drop = {:drop, index(:posts, [:id], name: "posts$main", concurrently: true), :restrict}
 
-    assert execute_ddl(drop) == [~s|DROP INDEX "posts$main"|]
+    assert_raise ArgumentError, "ClickHouse does not support DROP INDEX CONCURRENTLY", fn ->
+      execute_ddl(drop)
+    end
   end
 
   test "create check constraint" do
