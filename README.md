@@ -103,7 +103,7 @@ ClickHouse-specific options can be passed into `table.options` and `index.option
 ```elixir
 table_options = [cluster: "my-cluster"]
 engine_options = [order_by: "tuple()"]
-optiosn = table_options ++ engine_options
+options = table_options ++ engine_options
 
 create table(:posts, primary_key: false, engine: "ReplicatedMergeTree", options: options) do
   add :message, :string
