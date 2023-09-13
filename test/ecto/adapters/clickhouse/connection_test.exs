@@ -2189,14 +2189,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "create index" do
     create =
       {:create,
-       index(:posts, [:category_id, :permalink], options: [type: :range, granularity: 8126])}
+       index(:posts, [:category_id, :permalink],
+         options: [type: :bloom_filter, granularity: 8126]
+       )}
 
     assert execute_ddl(create) ==
              [
                """
-               CREATE INDEX "posts_category_id_permalink_index" \
-               ON "posts" ("category_id","permalink") \
-               TYPE range GRANULARITY 8126\
+               ALTER TABLE "posts" \
+               ADD INDEX "posts_category_id_permalink_index" ("category_id","permalink") \
+               TYPE bloom_filter GRANULARITY 8126\
                """
              ]
 
@@ -2204,14 +2206,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       {:create,
        index(:posts, ["lower(permalink)"],
          name: "posts$main",
-         options: [type: :range, granularity: 8126]
+         options: [type: :bloom_filter, granularity: 8126]
        )}
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX "posts$main" \
-             ON "posts" (lower(permalink)) \
-             TYPE range GRANULARITY 8126\
+             ALTER TABLE "posts" \
+             ADD INDEX "posts$main" (lower(permalink)) \
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
   end
@@ -2219,13 +2221,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "create index if not exists" do
     create =
       {:create_if_not_exists,
-       index(:posts, [:category_id, :permalink], options: [type: :range, granularity: 8126])}
+       index(:posts, [:category_id, :permalink],
+         options: [type: :bloom_filter, granularity: 8126]
+       )}
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX IF NOT EXISTS "posts_category_id_permalink_index" \
-             ON "posts" ("category_id","permalink") \
-             TYPE range GRANULARITY 8126\
+             ALTER TABLE "posts" \
+             ADD INDEX IF NOT EXISTS "posts_category_id_permalink_index" ("category_id","permalink") \
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
   end
@@ -2235,14 +2239,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       {:create,
        index(:posts, [:category_id, :permalink],
          prefix: :foo,
-         options: [type: :range, granularity: 8126]
+         options: [type: :bloom_filter, granularity: 8126]
        )}
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX "posts_category_id_permalink_index" \
-             ON "foo"."posts" ("category_id","permalink") \
-             TYPE range GRANULARITY 8126\
+             ALTER TABLE "foo"."posts" \
+             ADD INDEX "posts_category_id_permalink_index" ("category_id","permalink") \
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
 
@@ -2251,14 +2255,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
        index(:posts, ["lower(permalink)"],
          name: "posts$main",
          prefix: :foo,
-         options: [type: :range, granularity: 8126]
+         options: [type: :bloom_filter, granularity: 8126]
        )}
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX "posts$main" \
-             ON "foo"."posts" (lower(permalink)) \
-             TYPE range GRANULARITY 8126\
+             ALTER TABLE "foo"."posts" \
+             ADD INDEX "posts$main" (lower(permalink)) \
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
   end
@@ -2270,14 +2274,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
        index(:posts, [:category_id, :permalink],
          prefix: :foo,
          comment: "comment",
-         options: [type: :range, granularity: 8126]
+         options: [type: :bloom_filter, granularity: 8126]
        )}
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX "posts_category_id_permalink_index" \
-             ON "foo"."posts" ("category_id","permalink") \
-             TYPE range GRANULARITY 8126\
+             ALTER TABLE "foo"."posts" \
+             ADD INDEX "posts_category_id_permalink_index" ("category_id","permalink") \
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
   end
@@ -2316,13 +2320,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "create index concurrently" do
     create =
       {:create,
-       index(:posts, [:permalink], concurrently: true, options: [type: :range, granularity: 8126])}
+       index(:posts, [:permalink],
+         concurrently: true,
+         options: [type: :bloom_filter, granularity: 8126]
+       )}
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX "posts_permalink_index" \
-             ON "posts" ("permalink") \
-             TYPE range GRANULARITY 8126\
+             ALTER TABLE "posts" \
+             ADD INDEX "posts_permalink_index" ("permalink") \
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
   end
@@ -2343,8 +2350,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE INDEX "posts_permalink_index" \
-             ON "posts" ("permalink") \
+             ALTER TABLE "posts" \
+             ADD INDEX "posts_permalink_index" ("permalink") \
              TYPE range GRANULARITY 8126\
              """
            ]
