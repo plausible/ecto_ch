@@ -75,18 +75,18 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
     fields = @conn.intersperse_map(index.columns, ?,, &index_expr/1)
 
-    create =
+    add =
       case command do
-        :create -> "CREATE INDEX "
-        :create_if_not_exists -> "CREATE INDEX IF NOT EXISTS "
+        :create -> " ADD INDEX "
+        :create_if_not_exists -> " ADD INDEX IF NOT EXISTS "
       end
 
     [
       [
-        create,
-        @conn.quote_name(index.name),
-        " ON ",
+        "ALTER TABLE ",
         @conn.quote_table(index.prefix, index.table),
+        add,
+        @conn.quote_name(index.name),
         " (",
         fields,
         ") TYPE ",
