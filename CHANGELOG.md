@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2023-09-13)
 
 - ensure all colums are for the same table in `ecto.ch.schema` mix task https://github.com/plausible/ecto_ch/pull/118
 - switch from `CREATE INDEX` to `ALTER TABLE ... ADD INDEX` syntax for indexes https://github.com/plausible/ecto_ch/pull/120
