@@ -1833,6 +1833,68 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(create) == [~s{CREATE TABLE "posts" () ENGINE=Memory}]
   end
 
+  test "create table uses :default_table_options if set" do
+    prev = Application.get_env(:ecto_ch, :default_table_options)
+
+    :ok =
+      Application.put_env(:ecto_ch, :default_table_options,
+        cluster: "little-giant",
+        order_by: "tuple()"
+      )
+
+    on_exit(fn -> Application.put_env(:ecto_ch, :default_table_options, prev) end)
+
+    create = {:create, table(:posts), []}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" ON CLUSTER "little-giant" () ENGINE=TinyLog ORDER BY tuple()}
+           ]
+  end
+
+  test "create table merged options with :default_table_options" do
+    prev = Application.get_env(:ecto_ch, :default_table_options)
+
+    :ok =
+      Application.put_env(:ecto_ch, :default_table_options,
+        cluster: "little-giant",
+        order_by: "tuple()"
+      )
+
+    on_exit(fn -> Application.put_env(:ecto_ch, :default_table_options, prev) end)
+
+    create =
+      {:create, table(:posts, options: [order_by: "timestamp"]),
+       [{:add, :timestamp, :UInt64, []}]}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" ON CLUSTER "little-giant" ("timestamp" UInt64) ENGINE=TinyLog ORDER BY timestamp}
+           ]
+  end
+
+  test "create index uses :cluster from :default_table_options" do
+    prev = Application.get_env(:ecto_ch, :default_table_options)
+
+    :ok =
+      Application.put_env(:ecto_ch, :default_table_options,
+        cluster: "little-giant",
+        order_by: "tuple()"
+      )
+
+    on_exit(fn -> Application.put_env(:ecto_ch, :default_table_options, prev) end)
+
+    create =
+      {:create,
+       index(:posts, ["lower(permalink)"], options: [type: :bloom_filter, granularity: 8126])}
+
+    assert execute_ddl(create) == [
+             """
+             ALTER TABLE "posts" ON CLUSTER "little-giant" \
+             ADD INDEX "posts_lower_permalink_index" (lower(permalink)) \
+             TYPE bloom_filter GRANULARITY 8126\
+             """
+           ]
+  end
+
   test "TinyLog engine is used if :default_table_engine is nil" do
     prev = Application.get_env(:ecto_ch, :default_table_engine)
     :ok = Application.put_env(:ecto_ch, :default_table_engine, nil)
