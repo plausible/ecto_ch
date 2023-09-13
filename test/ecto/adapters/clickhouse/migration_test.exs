@@ -14,8 +14,11 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
       create table("events",
                primary_key: false,
                engine: "MergeTree",
-               options:
-                 "PARTITION BY toYYYYMM(timestamp) ORDER BY (domain, toDate(timestamp), user_id) SETTINGS index_granularity = 8192"
+               options: [
+                 partition_by: "toYYYYMM(timestamp)",
+                 order_by: "(domain, toDate(timestamp), user_id)",
+                 settings: "index_granularity = 8192"
+               ]
              ) do
         add :name, :string
         add :domain, :string
