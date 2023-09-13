@@ -77,19 +77,19 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   def execute_ddl({command, %Constraint{} = constraint}) when is_create(command) do
     if constraint.comment do
-      raise "Clickhouse adapter does not support comments on check constraints"
+      raise "ClickHouse does not support comments on constraints"
     end
 
-    unless constraint.validate do
-      raise "Clickhouse adapter does not support check constraints without validation on creation"
+    if constraint.validate do
+      raise "ClickHouse does not support CHECK constraints with validation on creation"
     end
 
     if constraint.exclude do
-      raise "Clickhouse adapter does not support exclude constraints"
+      raise "ClickHouse does not support exclusion constraints"
     end
 
     unless constraint.check do
-      raise "Clickhouse adapter requires check option for constraints"
+      raise "ClickHouse supports only CHECK constraints"
     end
 
     [

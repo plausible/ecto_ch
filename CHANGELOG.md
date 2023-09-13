@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- raise on `validate: true` in `CHECK` constraints https://github.com/plausible/ecto_ch/pull/124
+
 ## 0.3.0 (2023-09-13)
 
 - ensure all colums are for the same table in `ecto.ch.schema` mix task https://github.com/plausible/ecto_ch/pull/118

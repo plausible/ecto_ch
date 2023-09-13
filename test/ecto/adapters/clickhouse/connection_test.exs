@@ -2533,7 +2533,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "create check constraint" do
-    create = {:create, constraint(:products, "price_must_be_positive", check: "price > 0")}
+    create =
+      {:create,
+       constraint(:products, "price_must_be_positive", check: "price > 0", validate: false)}
 
     assert execute_ddl(create) == [
              ~s|ALTER TABLE "products" ADD CONSTRAINT "price_must_be_positive" CHECK (price > 0)|
@@ -2543,7 +2545,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       {:create,
        constraint(:products, "price_must_be_positive",
          check: "price > 0",
-         prefix: "foo"
+         prefix: "foo",
+         validate: false
        )}
 
     assert execute_ddl(create) == [
@@ -2553,7 +2556,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "create check constraint if not exists" do
     create =
-      {:create_if_not_exists, constraint(:products, "price_must_be_positive", check: "price > 0")}
+      {:create_if_not_exists,
+       constraint(:products, "price_must_be_positive", check: "price > 0", validate: false)}
 
     assert execute_ddl(create) == [
              ~s|ALTER TABLE "products" ADD CONSTRAINT IF NOT EXISTS "price_must_be_positive" CHECK (price > 0)|
