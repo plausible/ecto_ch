@@ -4,6 +4,7 @@
 
 - ensure all colums are for the same table in `ecto.ch.schema` mix task https://github.com/plausible/ecto_ch/pull/118
 - switch from `CREATE INDEX` to `ALTER TABLE ... ADD INDEX` syntax for indexes https://github.com/plausible/ecto_ch/pull/120
+- raise on `CREATE INDEX CONCURRENTLY` https://github.com/plausible/ecto_ch/pull/121
 
 ## 0.2.2 (2023-08-29)
 
