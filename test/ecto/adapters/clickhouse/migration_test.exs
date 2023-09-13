@@ -42,6 +42,14 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
     end
   end
 
+  defmodule DropIndex do
+    use Ecto.Migration
+
+    def change do
+      drop index(:events, [:name])
+    end
+  end
+
   test "events (table+index)" do
     database = "ecto_ch_migration_test_events"
     opts = [database: database]
@@ -88,6 +96,42 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
                `browser` LowCardinality(String), \
                `timestamp` DateTime, \
                INDEX events_name_index name TYPE bloom_filter GRANULARITY 8192\
+               ) \
+               ENGINE = MergeTree \
+               PARTITION BY toYYYYMM(timestamp) \
+               ORDER BY (domain, toDate(timestamp), user_id) \
+               SETTINGS index_granularity = 8192\
+               """
+             ]
+           ]
+
+    assert [3] ==
+             Ecto.Migrator.run(MigrationRepo, [{3, DropIndex}], :up,
+               all: true,
+               log: false
+             )
+
+    assert Ch.query!(
+             conn,
+             "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
+             %{"database" => database, "table" => "events"}
+           ).rows == [
+             [
+               """
+               CREATE TABLE ecto_ch_migration_test_events.events (\
+               `name` String, \
+               `domain` String, \
+               `user_id` UInt64, \
+               `session_id` UInt64, \
+               `hostname` String, \
+               `pathname` String, \
+               `referrer` String, \
+               `referrer_source` String, \
+               `country_code` LowCardinality(FixedString(2)), \
+               `screen_size` LowCardinality(String), \
+               `operating_system` LowCardinality(String), \
+               `browser` LowCardinality(String), \
+               `timestamp` DateTime\
                ) \
                ENGINE = MergeTree \
                PARTITION BY toYYYYMM(timestamp) \
