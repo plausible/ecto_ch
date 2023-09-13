@@ -6,6 +6,7 @@
 - switch from `CREATE INDEX` to `ALTER TABLE ... ADD INDEX` syntax for indexes https://github.com/plausible/ecto_ch/pull/120
 - raise on `CREATE INDEX CONCURRENTLY` https://github.com/plausible/ecto_ch/pull/121
 - switch from `DROP INDEX` to `ALTER TABLE ... DROP INDEX` syntax for indexes https://github.com/plausible/ecto_ch/pull/122
+- add support for structured `:options` in migrations https://github.com/plausible/ecto_ch/pull/116
 
 ## 0.2.2 (2023-08-29)
 

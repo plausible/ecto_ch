@@ -1809,7 +1809,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE TABLE "posts"(\
+             CREATE TABLE "posts" (\
              "name" String DEFAULT 'Untitled' NOT NULL,\
              "token" String NOT NULL,\
              "on_hand" Int32 DEFAULT 0 NULL,\
@@ -1830,7 +1830,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     on_exit(fn -> Application.put_env(:ecto_ch, :default_table_engine, prev) end)
 
     create = {:create, table(:posts), []}
-    assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=Memory}]
+    assert execute_ddl(create) == [~s{CREATE TABLE "posts" () ENGINE=Memory}]
   end
 
   test "TinyLog engine is used if :default_table_engine is nil" do
@@ -1839,12 +1839,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     on_exit(fn -> Application.put_env(:ecto_ch, :default_table_engine, prev) end)
 
     create = {:create, table(:posts), []}
-    assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=TinyLog}]
+    assert execute_ddl(create) == [~s{CREATE TABLE "posts" () ENGINE=TinyLog}]
   end
 
   test "create empty table" do
     create = {:create, table(:posts), []}
-    assert execute_ddl(create) == [~s{CREATE TABLE "posts"() ENGINE=TinyLog}]
+    assert execute_ddl(create) == [~s{CREATE TABLE "posts" () ENGINE=TinyLog}]
   end
 
   test "create table with prefix" do
@@ -1853,7 +1853,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
        [{:add, :name, :string, [default: "Untitled", null: false]}]}
 
     assert execute_ddl(create) == [
-             ~s{CREATE TABLE "foo"."posts"("name" String DEFAULT 'Untitled' NOT NULL) ENGINE=TinyLog}
+             ~s{CREATE TABLE "foo"."posts" ("name" String DEFAULT 'Untitled' NOT NULL) ENGINE=TinyLog}
            ]
 
     create =
@@ -1909,7 +1909,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE TABLE "posts"("content" String) \
+             CREATE TABLE "posts" ("content" String) \
              ENGINE=MergeTree \
              ORDER BY tuple()\
              """
@@ -1917,15 +1917,44 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "create table with list as options" do
-    assert_raise ArgumentError,
-                 "ClickHouse adapter does not support lists in :options",
-                 fn ->
-                   {:create, table(:posts, options: ["WITH FOO=BAR"]),
-                    [
-                      {:add, :created_at, :datetime, []}
-                    ]}
-                   |> execute_ddl()
-                 end
+    assert_raise FunctionClauseError, fn ->
+      {:create, table(:posts, options: ["WITH FOO=BAR"]),
+       [
+         {:add, :created_at, :datetime, []}
+       ]}
+      |> execute_ddl()
+    end
+  end
+
+  test "create table with keyword options" do
+    create =
+      {:create,
+       table(:posts,
+         engine: "ReplicatedMergeTree",
+         options: [
+           on_cluster: "cluster-name",
+           order_by: "tuple()",
+           partition_by: "created_at",
+           sample_by: "created_at",
+           ttl: "created_at + INTERVAL 12 HOUR",
+           settings: "index_granularity = 8192, storage_policy = 'default'"
+         ]
+       ),
+       [
+         {:add, :created_at, :datetime, []}
+       ]}
+
+    assert execute_ddl(create) == [
+             """
+             CREATE TABLE "posts" ON CLUSTER "cluster-name" ("created_at" datetime) \
+             ENGINE=ReplicatedMergeTree \
+             ORDER BY tuple() \
+             PARTITION BY created_at \
+             SAMPLE BY created_at \
+             TTL created_at + INTERVAL 12 HOUR \
+             SETTINGS index_granularity = 8192, storage_policy = 'default'\
+             """
+           ]
   end
 
   test "create table with composite key" do
@@ -1939,7 +1968,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE TABLE "posts"(\
+             CREATE TABLE "posts" (\
              "a" Int32,\
              "b" Int32,\
              "name" String,\
@@ -1965,7 +1994,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
        ]}
 
     assert execute_ddl(create) == [
-             ~s{CREATE TABLE "posts"("a" JSON) ENGINE=TinyLog}
+             ~s{CREATE TABLE "posts" ("a" JSON) ENGINE=TinyLog}
            ]
 
     create =
@@ -1976,7 +2005,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE TABLE "posts"(\
+             CREATE TABLE "posts" (\
              "a" Map(String,String) DEFAULT Map('foo','bar')\
              ) ENGINE=TinyLog\
              """
@@ -1987,7 +2016,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     create = {:create, table(:posts), [{:add, :order, :integer, []}]}
 
     assert execute_ddl(create) == [
-             ~s[CREATE TABLE "posts"("order" Int32) ENGINE=TinyLog]
+             ~s[CREATE TABLE "posts" ("order" Int32) ENGINE=TinyLog]
            ]
   end
 
@@ -2011,7 +2040,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE TABLE "posts"(\
+             CREATE TABLE "posts" (\
              "published_at" DateTime64(6),\
              "submitted_at" DateTime\
              ) ENGINE=TinyLog\
@@ -2029,7 +2058,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert execute_ddl(create) == [
              """
-             CREATE TABLE "posts"(\
+             CREATE TABLE "posts" (\
              "published_at" DateTime64(6),\
              "submitted_at" DateTime\
              ) ENGINE=TinyLog\
@@ -2052,6 +2081,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(drop) == [~s|DROP TABLE "posts"|]
   end
 
+  test "drop table with options" do
+    drop =
+      {:drop, table(:posts, options: [on_cluster: "cluster-name", order_by: "tuple()"]),
+       :restrict}
+
+    assert execute_ddl(drop) == [~s|DROP TABLE "posts" ON CLUSTER "cluster-name"|]
+  end
+
   test "drop table with prefixes" do
     drop = {:drop, table(:posts, prefix: :foo), :restrict}
     assert execute_ddl(drop) == [~s|DROP TABLE "foo"."posts"|]
@@ -2064,6 +2101,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ~s|ALTER TABLE "foo"."products" DROP CONSTRAINT "price_must_be_positive"|
            ]
   end
+
+  # TODO?
+  @tag :skip
+  test "drop constraint on cluster"
 
   test "drop_if_exists constraint" do
     drop =
@@ -2103,6 +2144,25 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """,
              """
              ALTER TABLE "posts" ADD COLUMN "author_id" Int32\
+             """
+           ]
+  end
+
+  test "alter table with options" do
+    alter =
+      {:alter, table(:posts, options: [on_cluster: "cluster-name", order_by: "tuple()"]),
+       [
+         {:add, :title, :string, [default: "Untitled", null: false]},
+         {:add, :author_id, :integer, []}
+       ]}
+
+    assert execute_ddl(alter) == [
+             """
+             ALTER TABLE "posts" ON CLUSTER "cluster-name" \
+             ADD COLUMN "title" String DEFAULT 'Untitled' NOT NULL\
+             """,
+             """
+             ALTER TABLE "posts" ON CLUSTER "cluster-name" ADD COLUMN "author_id" Int32\
              """
            ]
   end
@@ -2213,6 +2273,27 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
              ALTER TABLE "posts" \
              ADD INDEX "posts$main" (lower(permalink)) \
+             TYPE bloom_filter GRANULARITY 8126\
+             """
+           ]
+  end
+
+  # TODO
+  test "create index with table options" do
+    create =
+      {:create,
+       index(:posts, [:category_id, :permalink],
+         options: [
+           type: :bloom_filter,
+           granularity: 8126,
+           cluster: "cluster-name"
+         ]
+       )}
+
+    assert execute_ddl(create) == [
+             """
+             ALTER TABLE "posts" ON CLUSTER "cluster-name" \
+             ADD INDEX "posts_category_id_permalink_index" ("category_id","permalink") \
              TYPE bloom_filter GRANULARITY 8126\
              """
            ]
@@ -2342,13 +2423,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "create an index using a different type" do
     create =
       {:create,
-       index(:posts, [:permalink], using: :hash, options: [type: :range, granularity: 8126])}
+       index(:posts, [:permalink],
+         using: :hash,
+         options: [type: :bloom_filter, granularity: 8126]
+       )}
 
     assert execute_ddl(create) == [
              """
              ALTER TABLE "posts" \
              ADD INDEX "posts_permalink_index" ("permalink") \
-             TYPE range GRANULARITY 8126\
+             TYPE bloom_filter GRANULARITY 8126\
              """
            ]
   end
@@ -2356,6 +2440,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "drop index" do
     drop = {:drop, index(:posts, [:id], name: "posts$main"), :restrict}
     assert execute_ddl(drop) == [~s|ALTER TABLE "posts" DROP INDEX "posts$main"|]
+  end
+
+  test "drop index with table options" do
+    drop =
+      {:drop, index(:posts, [:id], options: [on_cluster: "cluster-name", order_by: "tuple()"]),
+       :restrict}
+
+    assert execute_ddl(drop) == [
+             ~s|ALTER TABLE "posts" ON CLUSTER "cluster-name" DROP INDEX "posts_id_index"|
+           ]
   end
 
   test "drop index with prefix" do
@@ -2437,6 +2531,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
+  test "rename table with options" do
+    rename =
+      {:rename, table(:posts, options: [cluster: "cluster-name"]),
+       table(:new_posts, options: [on_cluster: "cluster-name", order_by: "tuple()"])}
+
+    assert execute_ddl(rename) == [
+             ~s|RENAME TABLE "posts" TO "new_posts" ON CLUSTER "cluster-name"|
+           ]
+  end
+
   test "rename table with prefix" do
     rename = {:rename, table(:posts, prefix: :foo), table(:new_posts, prefix: :bar)}
 
@@ -2502,7 +2606,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert_raise ArgumentError, ~r/type :id is ambiguous/, fn -> execute_ddl(id) end
 
     assert execute_ddl(integer) == [
-             ~s/CREATE TABLE "posts"("id" Int32,PRIMARY KEY ("id")) ENGINE=MergeTree/
+             ~s/CREATE TABLE "posts" ("id" Int32,PRIMARY KEY ("id")) ENGINE=MergeTree/
            ]
   end
 

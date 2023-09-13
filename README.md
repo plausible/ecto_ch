@@ -94,6 +94,30 @@ MyApp.Repo.insert_all(MyApp.Example, rows, settings: [async_insert: 1])
 MyApp.Repo.delete_all("example", settings: [allow_experimental_lightweight_delete: 1])
 ```
 
+#### Migrations
+
+ClickHouse-specific options can be passed into `table.options` and `index.options`
+
+```elixir
+table_options = [cluster: "my-cluster"]
+engine_options = [order_by: "tuple()"]
+optiosn = table_options ++ engine_options
+
+create table(:posts, primary_key: false, engine: "ReplicatedMergeTree", options: options) do
+  add :message, :string
+  add :user_id, :UInt64
+end
+```
+
+is equivalent to
+
+```sql
+CREATE TABLE `posts` ON CLUSTER `my-cluster` (
+  `message` String,
+  `user_id` UInt64
+) ENGINE ReplicatedMergeTree ORDER BY tuple()
+```
+
 ## Caveats
 
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)

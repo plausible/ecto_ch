@@ -5,61 +5,39 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   @dialyzer :no_improper_lists
 
+  defguardp is_create(command) when command in [:create, :create_if_not_exists]
+  defguardp is_drop(command) when command in [:drop, :drop_if_exists]
+
   @spec execute_ddl(Ecto.Adapter.Migration.command()) :: iodata
-  def execute_ddl({command, %Table{} = table, columns})
-      when command in [:create, :create_if_not_exists] do
-    %Table{prefix: prefix, name: name, options: options, engine: engine} = table
-
-    create =
-      case command do
-        :create -> "CREATE TABLE "
-        :create_if_not_exists -> "CREATE TABLE IF NOT EXISTS "
-      end
-
-    engine = engine || Application.get_env(:ecto_ch, :default_table_engine) || "TinyLog"
-    pk = if engine in ["TinyLog", "Memory"], do: [], else: pk_definition(columns)
-    columns = @conn.intersperse_map(columns, ?,, &column_definition/1)
-    options = options_expr(options)
-
+  def execute_ddl({command, %Table{} = table, columns}) when is_create(command) do
     [
       [
-        create,
-        @conn.quote_table(prefix, name),
-        ?(,
-        columns,
-        pk,
-        ?),
-        " ENGINE=",
-        engine,
-        options
+        create(command, table),
+        ?\s,
+        table(table),
+        " (",
+        columns(columns),
+        pk(table, columns),
+        ") ",
+        engine(table),
+        comment(table)
       ]
     ]
   end
 
-  def execute_ddl({command, %Table{} = table, _mode}) when command in [:drop, :drop_if_exists] do
-    drop =
-      case command do
-        :drop_if_exists -> "DROP TABLE IF EXISTS "
-        :drop -> "DROP TABLE "
-      end
-
+  def execute_ddl({command, %Table{} = table, _mode}) when is_drop(command) do
     [
-      [drop | @conn.quote_table(table.prefix, table.name)]
+      [drop(command, table), ?\s, table(table)]
     ]
   end
 
   def execute_ddl({:alter, %Table{} = table, changes}) do
     Enum.map(changes, fn change ->
-      [
-        "ALTER TABLE ",
-        @conn.quote_table(table.prefix, table.name),
-        ?\s | column_change(change)
-      ]
+      ["ALTER TABLE ", table(table), ?\s | column_change(change)]
     end)
   end
 
-  def execute_ddl({command, %Index{} = index})
-      when command in [:create, :create_if_not_exists] do
+  def execute_ddl({command, %Index{} = index}) when is_create(command) do
     if index.unique do
       raise ArgumentError, "ClickHouse does not support UNIQUE INDEX"
     end
@@ -68,41 +46,22 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       raise ArgumentError, "ClickHouse does not support CREATE INDEX CONCURRENTLY"
     end
 
-    # TODO or :using?
-    type = index.options[:type]
-    type || raise ArgumentError, "expected :type in options, got: #{inspect(type)}"
-
-    granularity = index.options[:granularity]
-
-    granularity ||
-      raise ArgumentError, "expected :granularity in options, got: #{inspect(granularity)}"
-
-    fields = @conn.intersperse_map(index.columns, ?,, &index_expr/1)
-
-    add =
-      case command do
-        :create -> " ADD INDEX "
-        :create_if_not_exists -> " ADD INDEX IF NOT EXISTS "
-      end
-
     [
       [
         "ALTER TABLE ",
-        @conn.quote_table(index.prefix, index.table),
-        add,
+        table(index),
+        ?\s,
+        add(command, index),
+        ?\s,
         @conn.quote_name(index.name),
         " (",
-        fields,
-        ") TYPE ",
-        to_string(type),
-        " GRANULARITY "
-        | to_string(granularity)
+        index_expr(index),
+        ?) | index_options(index)
       ]
     ]
   end
 
-  def execute_ddl({command, %Index{} = index, _mode})
-      when command in [:drop, :drop_if_exists] do
+  def execute_ddl({command, %Index{} = index, _mode}) when is_drop(command) do
     if index.unique do
       raise ArgumentError, "ClickHouse does not support UNIQUE INDEX"
     end
@@ -111,24 +70,12 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       raise ArgumentError, "ClickHouse does not support DROP INDEX CONCURRENTLY"
     end
 
-    drop =
-      case command do
-        :drop -> " DROP INDEX "
-        :drop_if_exists -> " DROP INDEX IF EXISTS "
-      end
-
     [
-      [
-        "ALTER TABLE ",
-        @conn.quote_table(index.prefix, index.table),
-        drop,
-        @conn.quote_name(index.name)
-      ]
+      ["ALTER TABLE ", table(index), ?\s, drop(command, index), ?\s, @conn.quote_name(index.name)]
     ]
   end
 
-  def execute_ddl({command, %Constraint{} = constraint})
-      when command in [:create, :create_if_not_exists] do
+  def execute_ddl({command, %Constraint{} = constraint}) when is_create(command) do
     if constraint.comment do
       raise "Clickhouse adapter does not support comments on check constraints"
     end
@@ -145,63 +92,62 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       raise "Clickhouse adapter requires check option for constraints"
     end
 
-    add =
-      case command do
-        :create -> " ADD CONSTRAINT "
-        :create_if_not_exists -> " ADD CONSTRAINT IF NOT EXISTS "
-      end
-
     [
       [
         "ALTER TABLE ",
-        @conn.quote_table(constraint.prefix, constraint.table),
-        add,
+        table(constraint),
+        ?\s,
+        add(command, constraint),
+        ?\s,
         @conn.quote_name(constraint.name),
         " CHECK (",
         constraint.check,
-        ")"
+        ?)
       ]
     ]
   end
 
-  def execute_ddl({command, %Constraint{} = constraint, _mode})
-      when command in [:drop, :drop_if_exists] do
-    drop =
-      case command do
-        :drop -> " DROP CONSTRAINT "
-        :drop_if_exists -> " DROP CONSTRAINT IF EXISTS "
-      end
-
+  def execute_ddl({command, %Constraint{} = constraint, _mode}) when is_drop(command) do
     [
       [
         "ALTER TABLE ",
-        @conn.quote_table(constraint.prefix, constraint.table),
-        drop,
+        table(constraint),
+        ?\s,
+        drop(command, constraint),
+        ?\s,
         @conn.quote_name(constraint.name)
       ]
     ]
   end
 
   def execute_ddl({:rename, %Table{} = current_table, %Table{} = new_table}) do
+    cluster = cluster(current_table)
+    new_cluster = cluster(new_table)
+
+    unless cluster == new_cluster do
+      raise ArgumentError, """
+      RENAME TABLE requires CLUSTER to be the same for both tables: current=#{inspect(cluster)}, new=#{inspect(new_cluster)}
+      """
+    end
+
     [
       [
         "RENAME TABLE ",
         @conn.quote_table(current_table.prefix, current_table.name),
-        " TO ",
-        @conn.quote_table(new_table.prefix, new_table.name)
+        " TO " | table(new_table)
       ]
     ]
   end
 
-  def execute_ddl({:rename, %Table{} = table, column, name}) do
+  def execute_ddl({:rename, %Table{} = table, column_name, new_column_name}) do
     [
       [
         "ALTER TABLE ",
-        @conn.quote_table(table.prefix, table.name),
+        table(table),
         " RENAME COLUMN ",
-        @conn.quote_name(column),
+        @conn.quote_name(column_name),
         " TO ",
-        @conn.quote_name(name)
+        @conn.quote_name(new_column_name)
       ]
     ]
   end
@@ -212,6 +158,112 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   def execute_ddl(list) when is_list(list) do
     raise ArgumentError, "ClickHouse adapter does not support lists in execute_ddl"
+  end
+
+  defp create(:create, %Table{}), do: "CREATE TABLE"
+  defp create(:create_if_not_exists, %Table{}), do: "CREATE TABLE IF NOT EXISTS"
+  defp drop(:drop, %Table{}), do: "DROP TABLE"
+  defp drop(:drop_if_exists, %Table{}), do: "DROP TABLE IF EXISTS"
+  defp drop(:drop, %Index{}), do: "DROP INDEX"
+  defp drop(:drop_if_exists, %Index{}), do: "DROP INDEX IF EXISTS"
+  defp drop(:drop, %Constraint{}), do: "DROP CONSTRAINT"
+  defp drop(:drop_if_exists, %Constraint{}), do: "DROP CONSTRAINT IF EXISTS"
+  defp add(:create, %Index{}), do: "ADD INDEX"
+  defp add(:create_if_not_exists, %Index{}), do: "ADD INDEX IF NOT EXISTS"
+  defp add(:create, %Constraint{}), do: "ADD CONSTRAINT"
+  defp add(:create_if_not_exists, %Constraint{}), do: "ADD CONSTRAINT IF NOT EXISTS"
+
+  def table(%Table{} = table) do
+    if cluster = cluster(table.options) do
+      [@conn.quote_table(table.prefix, table.name), " ON CLUSTER ", @conn.quote_name(cluster)]
+    else
+      @conn.quote_table(table.prefix, table.name)
+    end
+  end
+
+  def table(%Index{} = index) do
+    if cluster = cluster(index.options) do
+      [@conn.quote_table(index.prefix, index.table), " ON CLUSTER ", @conn.quote_name(cluster)]
+    else
+      @conn.quote_table(index.prefix, index.table)
+    end
+  end
+
+  # TODO ON CLUSTER (can't right now since constraint doesn't have :options)
+  def table(%Constraint{} = constraint) do
+    @conn.quote_table(constraint.prefix, constraint.table)
+  end
+
+  @cluster_options [:cluster, :on_cluster]
+  defp cluster(%{options: options}), do: cluster(options)
+
+  defp cluster(options) when is_list(options) do
+    clusters =
+      Enum.filter(options, fn option ->
+        case option do
+          {k, _} when k in @cluster_options -> true
+          _ -> false
+        end
+      end)
+
+    case clusters do
+      [] ->
+        nil
+
+      [{_, v}] ->
+        v
+
+      [_ | _] ->
+        raise ArgumentError, "multiple cluster options were provided: " <> inspect(clusters)
+    end
+  end
+
+  defp cluster(_other), do: nil
+
+  defp columns(columns) do
+    @conn.intersperse_map(columns, ?,, &column_definition/1)
+  end
+
+  defp pk(%Table{} = table, columns) do
+    if find_engine(table) in ["TinyLog", "Memory"], do: [], else: pk_definition(columns)
+  end
+
+  defp find_engine(%Table{} = table) do
+    table.engine || Application.get_env(:ecto_ch, :default_table_engine) || "TinyLog"
+  end
+
+  defp engine(%Table{} = table) do
+    ["ENGINE=", find_engine(table) | engine_options(table.options)]
+  end
+
+  defp engine_options(options) when is_binary(options), do: [?\s | options]
+
+  defp engine_options(options) when is_list(options) do
+    options |> Keyword.drop(@cluster_options) |> Enum.map(&option_expr/1)
+  end
+
+  defp engine_options(nil), do: []
+
+  defp index_options(%Index{} = index), do: index_options(index.options)
+  defp index_options(options) when is_binary(options), do: [?\s | options]
+
+  defp index_options(options) when is_list(options) do
+    options |> Keyword.drop(@cluster_options) |> Enum.map(&option_expr/1)
+  end
+
+  defp index_options(nil), do: []
+
+  defp option_expr({k, v}) do
+    k = to_string(k) |> String.split("_") |> Enum.map(&String.upcase/1) |> Enum.intersperse(?\s)
+    [?\s, k, ?\s, to_string(v)]
+  end
+
+  defp comment(%Table{} = table) do
+    if comment = table.comment do
+      [" COMMENT ", @conn.quote_name(comment, ?')]
+    else
+      []
+    end
   end
 
   defp pk_definition(columns) do
@@ -249,23 +301,14 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   end
 
   defp column_definition({:add, name, type, opts}) do
-    [
-      @conn.quote_name(name),
-      ?\s,
-      column_type(type)
-      | column_options(type, opts)
-    ]
+    [@conn.quote_name(name), ?\s, column_type(type) | column_options(type, opts)]
   end
 
   # TODO collate support?
   defp column_options(type, opts) do
     default = Keyword.fetch(opts, :default)
     null = Keyword.get(opts, :null)
-
-    [
-      default_expr(default, type),
-      null_expr(null)
-    ]
+    [default_expr(default, type), null_expr(null)]
   end
 
   defp column_change({:add, _name, %Reference{}, _opts}) do
@@ -366,16 +409,9 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   defp default_expr(:error, _), do: []
 
+  defp index_expr(%Index{} = index), do: @conn.intersperse_map(index.columns, ?,, &index_expr/1)
   defp index_expr(literal) when is_binary(literal), do: literal
   defp index_expr(literal), do: @conn.quote_name(literal)
-
-  defp options_expr(nil), do: []
-
-  defp options_expr(options) when is_list(options) do
-    raise ArgumentError, "ClickHouse adapter does not support lists in :options"
-  end
-
-  defp options_expr(options), do: [?\s | to_string(options)]
 
   defp column_type(type) when type in [:serial, :bigserial] do
     raise ArgumentError,
