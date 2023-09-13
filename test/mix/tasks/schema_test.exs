@@ -108,9 +108,6 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
                field :tags, {:array, :string}
                field :session_id, Ch, type: "UInt64"
                field :inserted_at, Ch, type: "DateTime"
-               field :event, :string
-               field :value, Ch, type: "UInt64"
-               field :description, :string
              end
              """
     end
