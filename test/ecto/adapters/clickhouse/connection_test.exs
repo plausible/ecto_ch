@@ -2325,13 +2325,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
          options: [type: :bloom_filter, granularity: 8126]
        )}
 
-    assert execute_ddl(create) == [
-             """
-             ALTER TABLE "posts" \
-             ADD INDEX "posts_permalink_index" ("permalink") \
-             TYPE bloom_filter GRANULARITY 8126\
-             """
-           ]
+    assert_raise ArgumentError, "ClickHouse does not support CREATE INDEX CONCURRENTLY", fn ->
+      execute_ddl(create)
+    end
   end
 
   test "create unique index concurrently" do

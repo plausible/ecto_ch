@@ -64,6 +64,10 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       raise ArgumentError, "ClickHouse does not support UNIQUE INDEX"
     end
 
+    if index.concurrently do
+      raise ArgumentError, "ClickHouse does not support CREATE INDEX CONCURRENTLY"
+    end
+
     # TODO or :using?
     type = index.options[:type]
     type || raise ArgumentError, "expected :type in options, got: #{inspect(type)}"
