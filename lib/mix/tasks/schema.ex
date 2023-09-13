@@ -31,18 +31,6 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
         [_prefix, _table] = source -> source
       end
 
-    {where, params} =
-      case source do
-        [nil, table] ->
-          {"where table = {table:String}", %{"table" => table}}
-
-        [database, table] ->
-          {"where database = {database:String} and table = {table:String}",
-           %{"database" => database, "table" => table}}
-      end
-
-    statement = "select name, type from system.columns " <> where
-
     repos = Mix.Ecto.parse_repo(kvs)
 
     config =
@@ -54,16 +42,37 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
         end
       end)
 
+    {where, params} =
+      case source do
+        [nil, table] ->
+          if config do
+            database = Keyword.fetch!(config, :database)
+
+            {"where database = {database:String} and table = {table:String}",
+             %{"database" => database, "table" => table}}
+          else
+            {"where table = {table:String}", %{"table" => table}}
+          end
+
+        [database, table] ->
+          {"where database = {database:String} and table = {table:String}",
+           %{"database" => database, "table" => table}}
+      end
+
+    statement = "select database, name, type from system.columns " <> where
+
     conn = connect(config || [])
 
     case query(conn, statement, params) do
       {%Ch.Result{rows: [_ | _] = rows}, _conn} ->
+        ensure_single_table!(rows)
+
         schema = [
           """
           @primary_key false
           schema "#{table}" do
           """,
-          Enum.map(rows, fn [name, type] -> ["  ", build_field(name, type), ?\n] end),
+          Enum.map(rows, fn [_db, name, type] -> ["  ", build_field(name, type), ?\n] end),
           "end"
         ]
 
@@ -117,4 +126,19 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
   defp clickhouse_type({:array, type}), do: clickhouse_type(type)
   defp clickhouse_type(type) when type in [:uuid, :string, :date, :boolean], do: nil
   defp clickhouse_type(type), do: Ch.Types.encode(type)
+
+  defp ensure_single_table!(rows) do
+    rows
+    |> Enum.group_by(fn [db, _, _] -> db end, fn [_, name, type] -> [name, type] end)
+    |> Map.keys()
+    |> case do
+      [_db] ->
+        :ok
+
+      dbs ->
+        raise """
+        table is present in multiple databases: #{Enum.join(dbs, ", ")}
+        """
+    end
+  end
 end
