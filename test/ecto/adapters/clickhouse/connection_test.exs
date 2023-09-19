@@ -116,21 +116,27 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "from with hints" do
-    query =
-      Schema
-      |> from(hints: ["INDEXED BY FOO", "INDEXED BY BAR"])
-      |> select([r], r.x)
+    # With string
+    query = Schema |> from(hints: "USE INDEX FOO") |> select([r], r.x)
+    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX FOO}
 
-    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 INDEXED BY FOO,INDEXED BY BAR]
+    # With list of strings
+    query = Schema |> from(hints: ["INDEXED BY FOO", "INDEXED BY BAR"]) |> select([r], r.x)
+    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 INDEXED BY FOO INDEXED BY BAR]
   end
 
-  test "from with keyword hints" do
-    query =
-      Schema
-      |> from(hints: [sample: 10_000_000])
-      |> select([r], r.x)
+  # TODO merge with test above once ecto 3.10.4 is released
+  @tag :skip
+  test "from with unsafe hints" do
+    # # With unsafe fragment
+    # hint = "USE INDEX BAR"
+    # query = Schema |> from(hints: unsafe_fragment(^hint)) |> select([r], r.x)
+    # assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX BAR}
 
-    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 sample 10000000]
+    # # With list of string and unsafe fragment
+    # hint = "USE INDEX BAR"
+    # query = Schema |> from(hints: ["USE INDEX FOO", unsafe_fragment(^hint)]) |> select([r], r.x)
+    # assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX FOO USE INDEX BAR}
   end
 
   test "from without schema" do
