@@ -4,6 +4,7 @@
 
 - raise on `validate: true` in `CHECK` constraints https://github.com/plausible/ecto_ch/pull/124
 - add support for unsafe hints https://github.com/plausible/ecto_ch/pull/102
+- leave type name validation to ClickHouse
 
 ## 0.3.0 (2023-09-13)
 
