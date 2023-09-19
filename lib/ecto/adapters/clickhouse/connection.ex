@@ -474,13 +474,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp hints([_ | _] = hints) do
-    [" " | intersperse_map(hints, ?,, &hint/1)]
+    [" " | intersperse_map(hints, ?\s, &hint/1)]
   end
 
   defp hints([]), do: []
 
   defp hint(hint) when is_binary(hint), do: hint
 
+  # TODO remove once it's no longer used in plausible/analytics
+  #      https://github.com/elixir-ecto/ecto/pull/4254
   defp hint({k, v}) when is_atom(k) and is_integer(v) do
     [Atom.to_string(k), ?\s, Integer.to_string(v)]
   end
