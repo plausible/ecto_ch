@@ -89,7 +89,7 @@ MyApp.Repo.insert_all("example", rows, types: types)
 
 #### Settings
 
-`:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweight [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) [FINAL modifier,](https://clickhouse.com/docs/en/sql-reference/statements/select/from#final-modifier) and [more:](https://clickhouse.com/docs/en/operations/settings/settings)
+`:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweight [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) global [FINAL](https://clickhouse.com/docs/en/operations/settings/settings#final) modifier, and [more:](https://clickhouse.com/docs/en/operations/settings/settings)
 
 ```elixir
 MyApp.Repo.insert_all(MyApp.Example, rows, settings: [async_insert: 1])
