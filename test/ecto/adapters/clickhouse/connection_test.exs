@@ -115,6 +115,45 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0]
   end
 
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/sample#select-sample-k
+  test "from with sample k" do
+    query =
+      from hd in fragment("? SAMPLE ?", literal(^"hits_distributed"), 0.1),
+        where: hd.counter_id == 32,
+        group_by: hd.title,
+        order_by: [desc: selected_as(:page_views)],
+        limit: 1000,
+        select: %{title: hd.title, page_views: selected_as(count() * 10, :page_views)}
+
+    assert all(query) == """
+           SELECT f0."title",count(*) * 10 AS "page_views" \
+           FROM "hits_distributed" AS f0 SAMPLE 0.1 \
+           WHERE (f0."counter_id" = 32) \
+           GROUP BY f0."title" \
+           ORDER BY "page_views" DESC \
+           LIMIT 1000\
+           """
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/sample#select-sample-n
+  test "from with sample n" do
+    query =
+      from v in fragment("? SAMPLE ?", literal(^"visits"), 10_000_000),
+        select: sum(v.page_views * fragment("_sample_factor"))
+
+    assert all(query) == """
+           SELECT sum(f0."page_views" * _sample_factor) \
+           FROM "visits" AS f0 \
+           SAMPLE 10000000\
+           """
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/from#final-modifier
+  test "from with final" do
+    query = from t in fragment("? FINAL", literal(^"table")), select: map(t, [:a, :b])
+    assert all(query) == ~s[SELECT f0."a",f0."b" FROM "table" AS f0 FINAL]
+  end
+
   test "from with hints" do
     # With string
     query = Schema |> from(hints: "USE INDEX FOO") |> select([r], r.x)
