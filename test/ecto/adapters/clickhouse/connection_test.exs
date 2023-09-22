@@ -118,40 +118,60 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   # https://clickhouse.com/docs/en/sql-reference/statements/select/sample#select-sample-k
   test "from with sample k" do
     query =
-      from hd in fragment("? SAMPLE ?", literal(^"hits_distributed"), 0.1),
-        where: hd.counter_id == 32,
+      from hd in Ecto.Adapters.ClickHouse.API.sample("hits_distributed", 0.1),
+        where: hd.counter_id == ^32,
         group_by: hd.title,
         order_by: [desc: selected_as(:page_views)],
-        limit: 1000,
+        limit: ^1000,
         select: %{title: hd.title, page_views: selected_as(count() * 10, :page_views)}
 
     assert all(query) == """
-           SELECT f0."title",count(*) * 10 AS "page_views" \
-           FROM "hits_distributed" AS f0 SAMPLE 0.1 \
-           WHERE (f0."counter_id" = 32) \
-           GROUP BY f0."title" \
+           SELECT h0."title",count(*) * 10 AS "page_views" \
+           FROM "hits_distributed" AS h0 SAMPLE 0.1 \
+           WHERE (h0."counter_id" = {$0:Int64}) \
+           GROUP BY h0."title" \
            ORDER BY "page_views" DESC \
-           LIMIT 1000\
+           LIMIT {$1:Int64}\
            """
   end
 
   # https://clickhouse.com/docs/en/sql-reference/statements/select/sample#select-sample-n
   test "from with sample n" do
     query =
-      from v in fragment("? SAMPLE ?", literal(^"visits"), 10_000_000),
+      from v in Ecto.Adapters.ClickHouse.API.sample("visits", 10_000_000),
         select: sum(v.page_views * fragment("_sample_factor"))
 
     assert all(query) == """
-           SELECT sum(f0."page_views" * _sample_factor) \
-           FROM "visits" AS f0 \
+           SELECT sum(v0."page_views" * _sample_factor) \
+           FROM "visits" AS v0 \
            SAMPLE 10000000\
            """
   end
 
   # https://clickhouse.com/docs/en/sql-reference/statements/select/from#final-modifier
   test "from with final" do
-    query = from t in fragment("? FINAL", literal(^"table")), select: map(t, [:a, :b])
-    assert all(query) == ~s[SELECT f0."a",f0."b" FROM "table" AS f0 FINAL]
+    query = from t in Ecto.Adapters.ClickHouse.API.final("table"), select: map(t, [:a, :b])
+    assert all(query) == ~s[SELECT t0."a",t0."b" FROM "table" AS t0 FINAL]
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/table-functions/input
+  test "from with input" do
+    query =
+      from i in Ecto.Adapters.ClickHouse.API.input(
+             uid: "Int16",
+             updated: "DateTime",
+             name: "String"
+           ),
+           select: %{
+             uid: i.uid,
+             updated: i.updated,
+             name: fragment("arrayReduce('argMaxState', [?], [?])", i.name, i.updated)
+           }
+
+    assert all(query) == """
+           SELECT f0."uid",f0."updated",arrayReduce('argMaxState', [f0."name"], [f0."updated"]) \
+           FROM input("uid Int16, updated DateTime, name String") AS f0\
+           """
   end
 
   test "from with hints" do
