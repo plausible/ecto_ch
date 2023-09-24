@@ -53,4 +53,8 @@ jobs:
       - run: mix format --check-formatted
         if: matrix.elixir == '1.15'
       - run: mix compile --warnings-as-errors
+
+      - run: curl https://clickhouse.com/ | sh
+      - run: sudo ./clickhouse install
+
       - run: mix test

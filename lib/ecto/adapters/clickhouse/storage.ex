@@ -1,7 +1,8 @@
 defmodule Ecto.Adapters.ClickHouse.Storage do
   @moduledoc false
-  alias Ch.{Query, Error}
-  alias Ch.Connection, as: Conn
+  alias Ch.Error
+  alias Ch.Local.Query
+  alias Ch.Local.Connection, as: Conn
 
   @conn Ecto.Adapters.ClickHouse.Connection
 

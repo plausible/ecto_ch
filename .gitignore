@@ -24,3 +24,5 @@ ecto_ch-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+/.ch/
+/.dev/
