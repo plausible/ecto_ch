@@ -278,11 +278,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     do: {a, remap_type(t, original, schema, field)}
 
   defp remap_type(:integer, _original, Ecto.Migration.SchemaMigration, :version), do: :i64
-
-  defp remap_type(time, _original, _schema, _field) when time in [:time, :time_usec] do
-    raise ArgumentError,
-          "`#{inspect(time)}` type is not supported as there is no `Time` type in ClickHouse."
-  end
+  defp remap_type(:integer, _original, _schema, _field), do: :i32
+  defp remap_type(:float, _original, _schema, _field), do: :f32
+  defp remap_type(:time, _original, _schema, _field), do: :i64
 
   defp remap_type(other, original, schema, field) do
     ch_type = ch_type_hint(original)
@@ -305,8 +303,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   # https://hexdocs.pm/ecto/Ecto.Schema.html#module-primitive-types
   defp ch_type_hint(:id), do: "Int64"
-  defp ch_type_hint(:integer), do: "Int64"
-  defp ch_type_hint(:float), do: "Float32"
   defp ch_type_hint({:array, type}), do: "{:array, #{ch_type_hint(type)}}"
   defp ch_type_hint(:map), do: "Map(String, Int64)"
   defp ch_type_hint({:map, type}), do: "Map(String, #{ch_type_hint(type)})"

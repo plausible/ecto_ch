@@ -430,34 +430,22 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     raise ArgumentError, "type :id is ambiguous, use a literal (e.g. :Int64 or :UInt64) instead"
   end
 
-  defp column_type(:numeric) do
-    raise ArgumentError, "type :numeric is not supported"
-  end
-
-  defp column_type(:time) do
-    raise ArgumentError, "type :time is not supported"
-  end
-
   defp column_type(:map) do
     raise ArgumentError,
           ~s[type :map is ambiguous, use a literal (e.g. :JSON or :"Map(String, UInt8)") instead]
   end
 
-  defp column_type(:decimal) do
+  defp column_type(type) when type in [:decimal, :numeric] do
     raise ArgumentError,
-          ~s[type :decimal is ambiguous, use a literal (e.g. :"Decimal(p, s)") instead]
+          ~s[type #{inspect(type)} is ambiguous, use a literal (e.g. :"Decimal(p, s)") instead]
   end
 
   defp column_type(:uuid), do: "UUID"
   defp column_type(:boolean), do: "Bool"
-  defp column_type(:integer), do: "Int32"
-  defp column_type(:bigint), do: "Int64"
 
   defp column_type(type) when type in [:string, :binary, :binary_id] do
     "String"
   end
-
-  defp column_type(:float), do: "Float64"
 
   defp column_type({:array, type}) do
     ["Array(", column_type(type), ?)]
