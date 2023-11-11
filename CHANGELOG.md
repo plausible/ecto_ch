@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 (2023-11-11)
 
 - raise on `validate: true` in `CHECK` constraints https://github.com/plausible/ecto_ch/pull/124
 - add support for unsafe hints https://github.com/plausible/ecto_ch/pull/102
+- lookup types for aliased Ecto.Schema fields https://github.com/plausible/ecto_ch/pull/137
 
 ## 0.3.0 (2023-09-13)
 
