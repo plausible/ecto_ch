@@ -194,9 +194,7 @@ defmodule Ecto.Integration.Permalink do
   use Ecto.Integration.Schema
 
   schema "permalinks" do
-    # TODO support aliased fields
-    # field :url, :string, source: :uniform_resource_locator
-    field :url, :string, default: ""
+    field :url, :string, source: :uniform_resource_locator, default: ""
     field :title, :string, default: ""
     field :posted, :date, virtual: true
 

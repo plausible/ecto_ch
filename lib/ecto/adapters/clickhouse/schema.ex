@@ -226,9 +226,21 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp extract_types(schema, fields) do
     Enum.map(fields, fn field ->
-      type = schema.__schema__(:type, field) || raise "missing type for field " <> inspect(field)
+      type =
+        schema.__schema__(:type, field) || find_field_source_type(schema, field) ||
+          raise "missing type for field " <> inspect(field)
+
       type |> Ecto.Type.type() |> remap_type(type, schema, field)
     end)
+  end
+
+  defp find_field_source_type(schema, field) do
+    reverse_field_source =
+      Enum.find(schema.__schema__(:fields), &(schema.__schema__(:field_source, &1) == field))
+
+    if reverse_field_source do
+      schema.__schema__(:type, reverse_field_source)
+    end
   end
 
   defp prepare_types(schema, header, opts) do
