@@ -221,7 +221,10 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       conn = start_supervised!({Ch, opts})
 
       %{rows: [[1, inserted_at_1], [2, inserted_at_2]]} =
-        Ch.query!(conn, "select * from schema_migrations order by version")
+        Ch.query!(
+          conn,
+          "select version, toString(inserted_at) from schema_migrations order by version"
+        )
 
       assert List.last(parts) ==
                """
