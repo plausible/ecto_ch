@@ -50,8 +50,7 @@ defmodule EctoClickHouse.Integration.Migration do
 
     create table(:permalinks, primary_key: false, engine: "MergeTree") do
       add :id, :UInt64, primary_key: true
-      # add :uniform_resource_locator, :string
-      add :url, :string
+      add :uniform_resource_locator, :string
       add :title, :string
       add :post_id, :UInt64
       add :user_id, :UInt64
