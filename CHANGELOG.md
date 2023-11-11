@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.3.1 (2023-11-11)
 
 - raise on `validate: true` in `CHECK` constraints https://github.com/plausible/ecto_ch/pull/124
