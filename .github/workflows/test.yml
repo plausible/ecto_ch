@@ -17,10 +17,11 @@ jobs:
         elixir: ["1.14", "1.15"]
         otp: ["25", "26"]
         clickhouse: ["23.3.7.5"]
+        timezone: ["UTC"]
         include:
           - elixir: "1.15"
             otp: "26"
-            clickhouse: "23.3.7.5" 
+            clickhouse: "23.3.7.5"
             timezone: "Europe/Berlin"
 
     services:
@@ -30,7 +31,7 @@ jobs:
           - 8123:8123
           - 9000:9000
         env:
-          TZ: ${{ matrix.timezone || 'UTC' }}
+          TZ: ${{ matrix.timezone }}
           options: >-
             --health-cmd nc -zw3 localhost 8124
             --health-interval 10s
