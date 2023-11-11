@@ -94,7 +94,7 @@ defmodule Ecto.Integration.TimestampsTest do
     |> Product.changeset(%{
       account_id: account.id,
       name: "Foo",
-      approved_at: ~U[2023-01-01T01:00:00Z]
+      approved_at: to_clickhouse_naive(~N[2023-01-01T01:00:00])
     })
     |> TestRepo.insert!()
 
@@ -102,7 +102,7 @@ defmodule Ecto.Integration.TimestampsTest do
     |> Product.changeset(%{
       account_id: account.id,
       name: "Bar",
-      approved_at: ~U[2023-01-01T02:00:00Z]
+      approved_at: to_clickhouse_naive(~N[2023-01-01T02:00:00])
     })
     |> TestRepo.insert!()
 
@@ -110,11 +110,11 @@ defmodule Ecto.Integration.TimestampsTest do
     |> Product.changeset(%{
       account_id: account.id,
       name: "Qux",
-      approved_at: ~U[2023-01-01T03:00:00Z]
+      approved_at: to_clickhouse_naive(~N[2023-01-01T03:00:00])
     })
     |> TestRepo.insert!()
 
-    since = ~U[2023-01-01T01:59:00Z]
+    since = ~N[2023-01-01T01:59:00]
 
     assert [
              %{name: "Qux"},
@@ -125,5 +125,36 @@ defmodule Ecto.Integration.TimestampsTest do
              |> where([p], p.approved_at >= ^since)
              |> order_by([p], desc: p.approved_at)
              |> TestRepo.all()
+  end
+
+  # https://github.com/plausible/ecto_ch/issues/45
+  test "filtering with UTC datetimes" do
+    time = ~U[2023-04-20 17:00:25Z]
+
+    account =
+      %Account{}
+      |> Account.changeset(%{name: "Test"})
+      |> TestRepo.insert!()
+
+    %Product{}
+    |> Product.changeset(%{account_id: account.id, name: "Qux1", approved_at: time})
+    |> TestRepo.insert!()
+
+    assert product = TestRepo.one(Product)
+    assert product.approved_at == ~N[2023-04-20 17:00:25]
+
+    [[timezone]] = TestRepo.query!("select timezone()").rows
+
+    # Ecto casts ~U[] to ~N[] since Product schema uses `:naive_datetime` for timestamps
+    if timezone == "UTC" do
+      assert Product |> where(approved_at: ^time) |> TestRepo.exists?()
+    else
+      refute Product |> where(approved_at: ^time) |> TestRepo.exists?()
+    end
+
+    assert "products"
+           |> select([p], p.id)
+           |> where(approved_at: ^time)
+           |> TestRepo.exists?()
   end
 end

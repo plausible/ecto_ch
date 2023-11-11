@@ -9,7 +9,7 @@ defmodule Ecto.Integration.IntervalTest do
   @inserted_at ~N[2014-01-01 02:00:00]
 
   setup do
-    TestRepo.insert!(%Post{posted: @posted, inserted_at: @inserted_at})
+    TestRepo.insert!(%Post{posted: @posted, inserted_at: to_clickhouse_naive(@inserted_at)})
     :ok
   end
 
@@ -123,10 +123,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with year" do
     # dec = Decimal.new(1)
-    assert [~N[2015-01-01 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2015-01-01 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 1, "year"))
 
-    assert [~N[2015-01-01 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2015-01-01 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 1.0, "year"))
 
     # assert [~N[2015-01-01 02:00:00]] =
@@ -139,10 +139,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with month" do
     # dec = Decimal.new(3)
-    assert [~N[2014-04-01 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-04-01 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 3, "month"))
 
-    assert [~N[2014-04-01 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-04-01 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 3.0, "month"))
 
     # assert [~N[2014-04-01 02:00:00]] =
@@ -155,10 +155,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with week" do
     # dec = Decimal.new(3)
-    assert [~N[2014-01-22 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-22 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 3, "week"))
 
-    assert [~N[2014-01-22 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-22 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 3.0, "week"))
 
     # assert [~N[2014-01-22 02:00:00]] =
@@ -171,10 +171,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with day" do
     # dec = Decimal.new(5)
-    assert [~N[2014-01-06 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-06 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 5, "day"))
 
-    assert [~N[2014-01-06 02:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-06 02:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 5.0, "day"))
 
     # assert [~N[2014-01-06 02:00:00]] =
@@ -187,10 +187,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with hour" do
     # dec = Decimal.new(60)
-    assert [~N[2014-01-03 14:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-03 14:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 60, "hour"))
 
-    assert [~N[2014-01-03 14:00:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-03 14:00:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 60.0, "hour"))
 
     # assert [~N[2014-01-03 14:00:00]] =
@@ -203,10 +203,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with minute" do
     # dec = Decimal.new(90)
-    assert [~N[2014-01-01 03:30:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-01 03:30:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 90, "minute"))
 
-    assert [~N[2014-01-01 03:30:00]] =
+    assert [to_clickhouse_naive(~N[2014-01-01 03:30:00])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 90.0, "minute"))
 
     # assert [~N[2014-01-01 03:30:00]] =
@@ -219,10 +219,10 @@ defmodule Ecto.Integration.IntervalTest do
 
   test "datetime_add with second" do
     # dec = Decimal.new(90)
-    assert [~N[2014-01-01 02:01:30]] =
+    assert [to_clickhouse_naive(~N[2014-01-01 02:01:30])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 90, "second"))
 
-    assert [~N[2014-01-01 02:01:30]] =
+    assert [to_clickhouse_naive(~N[2014-01-01 02:01:30])] ==
              TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, 90.0, "second"))
 
     # assert [~N[2014-01-01 02:01:30]] =

@@ -20,7 +20,7 @@ defmodule Ecto.Integration.TypeTest do
       visits: integer,
       uuid: uuid,
       counter: integer,
-      inserted_at: datetime,
+      inserted_at: to_clickhouse_naive(datetime),
       intensity: float
     })
 
@@ -87,7 +87,7 @@ defmodule Ecto.Integration.TypeTest do
              )
 
     # NaiveDatetime
-    assert [^datetime] =
+    assert [to_clickhouse_naive(datetime)] ==
              TestRepo.all(
                from p in Post,
                  where: p.inserted_at == ^datetime,
