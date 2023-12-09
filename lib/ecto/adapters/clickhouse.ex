@@ -272,8 +272,16 @@ defmodule Ecto.Adapters.ClickHouse do
     )
   end
 
-  @impl Ecto.Adapter.Schema
+  # TODO
+  # https://github.com/elixir-ecto/ecto/blob/master/CHANGELOG.md#v3110-2023-11-14
+  # https://github.com/elixir-ecto/ecto/pull/4277
+  # @impl Ecto.Adapter.Schema
   def delete(adapter_meta, schema_meta, params, opts) do
+    Ecto.Adapters.ClickHouse.Schema.delete(adapter_meta, schema_meta, params, opts)
+  end
+
+  @impl Ecto.Adapter.Schema
+  def delete(adapter_meta, schema_meta, params, _returning, opts) do
     Ecto.Adapters.ClickHouse.Schema.delete(adapter_meta, schema_meta, params, opts)
   end
 
