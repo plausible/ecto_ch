@@ -906,9 +906,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp param_type(f) when is_float(f), do: "Float64"
   defp param_type(b) when is_boolean(b), do: "Bool"
 
-  # TODO DateTime64 and Date32
+  # TODO Date32
   defp param_type(%NaiveDateTime{}), do: "DateTime"
-  defp param_type(%DateTime{}), do: "DateTime"
+  defp param_type(%DateTime{microsecond: microsecond}) do
+    case microsecond do
+      {_val, precision} when precision > 0 ->
+        "DateTime64"
+
+      _ -> "DateTime"
+    end
+  end
   defp param_type(%Date{}), do: "Date"
 
   defp param_type(%Decimal{exp: exp}) do

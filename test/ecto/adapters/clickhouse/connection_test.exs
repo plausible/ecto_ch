@@ -2683,7 +2683,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "build_params/3" do
-    params = [1, "a", true, Date.utc_today(), DateTime.utc_now()]
+    params = [1, "a", true, Date.utc_today(), DateTime.utc_now(), DateTime.utc_now() |> DateTime.truncate(:second)]
 
     assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
     assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
@@ -2708,12 +2708,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              "{$2:Bool},{$3:Date}"
 
     assert to_string(Connection.build_params(_ix = 2, _len = 3, params)) ==
-             "{$2:Bool},{$3:Date},{$4:DateTime}"
+             "{$2:Bool},{$3:Date},{$4:DateTime64}"
 
     assert to_string(Connection.build_params(_ix = 1, _len = 4, params)) ==
-             "{$1:String},{$2:Bool},{$3:Date},{$4:DateTime}"
+             "{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64}"
 
     assert to_string(Connection.build_params(_ix = 0, _len = 5, params)) ==
-             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime}"
+             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64}"
+
+    assert to_string(Connection.build_params(_ix = 0, _len = 6, params)) ==
+             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64},{$5:DateTime}"
   end
 end
