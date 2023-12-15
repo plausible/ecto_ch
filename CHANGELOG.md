@@ -7,6 +7,7 @@
 - raise on `validate: true` in `CHECK` constraints https://github.com/plausible/ecto_ch/pull/124
 - add support for unsafe hints https://github.com/plausible/ecto_ch/pull/102
 - lookup types for aliased Ecto.Schema fields https://github.com/plausible/ecto_ch/pull/137
+- use DateTime64 for usec timestamps https://github.com/plausible/ecto_ch/pull/142
 
 ## 0.3.0 (2023-09-13)
 

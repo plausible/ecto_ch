@@ -2683,7 +2683,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "build_params/3" do
-    params = [1, "a", true, Date.utc_today(), DateTime.utc_now(), DateTime.utc_now() |> DateTime.truncate(:second)]
+    params = [
+      1,
+      "a",
+      true,
+      Date.utc_today(),
+      DateTime.utc_now(),
+      DateTime.utc_now() |> DateTime.truncate(:second)
+    ]
 
     assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
     assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
