@@ -2682,61 +2682,114 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
-  describe "query params" do
-    test "build_params/3 multiple params" do
-      params = [1, "a", true, Date.utc_today()]
+  test "build_params/3" do
+    params = [1, "a", true, Date.utc_today()]
 
-      assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
-      assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
-      assert to_string(Connection.build_params(_ix = 2, _len = 0, params)) == ""
+    assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
+    assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
+    assert to_string(Connection.build_params(_ix = 2, _len = 0, params)) == ""
 
-      assert to_string(Connection.build_params(_ix = 0, _len = 1, params)) ==
-               "{$0:Int64}"
+    assert to_string(Connection.build_params(_ix = 0, _len = 1, params)) ==
+             "{$0:Int64}"
 
-      assert to_string(Connection.build_params(_ix = 0, _len = 2, params)) ==
-               "{$0:Int64},{$1:String}"
+    assert to_string(Connection.build_params(_ix = 0, _len = 2, params)) ==
+             "{$0:Int64},{$1:String}"
 
-      assert to_string(Connection.build_params(_ix = 1, _len = 1, params)) ==
-               "{$1:String}"
+    assert to_string(Connection.build_params(_ix = 1, _len = 1, params)) ==
+             "{$1:String}"
 
-      assert to_string(Connection.build_params(_ix = 1, _len = 2, params)) ==
-               "{$1:String},{$2:Bool}"
+    assert to_string(Connection.build_params(_ix = 1, _len = 2, params)) ==
+             "{$1:String},{$2:Bool}"
 
-      assert to_string(Connection.build_params(_ix = 2, _len = 1, params)) ==
-               "{$2:Bool}"
+    assert to_string(Connection.build_params(_ix = 2, _len = 1, params)) ==
+             "{$2:Bool}"
 
-      assert to_string(Connection.build_params(_ix = 2, _len = 2, params)) ==
-               "{$2:Bool},{$3:Date}"
+    assert to_string(Connection.build_params(_ix = 2, _len = 2, params)) ==
+             "{$2:Bool},{$3:Date}"
 
-      assert to_string(Connection.build_params(_ix = 0, _len = 4, params)) ==
-               "{$0:Int64},{$1:String},{$2:Bool},{$3:Date}"
+    assert to_string(Connection.build_params(_ix = 0, _len = 4, params)) ==
+             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date}"
+  end
+
+  test "query params" do
+    param = fn param ->
+      all(from b in "bag", where: [param: ^param], select: 1)
     end
 
-    test "build_params/3 all types" do
-      encode = fn params ->
-        encoded = Connection.build_params(_ix = 0, _len = length(params), params)
-        to_string(encoded)
-      end
+    assert param.("some string") == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:String})\
+           """
 
-      assert encode.(["some string"]) == "{$0:String}"
-      assert encode.([0x7FFFFFFFFFFFFFFF + 1]) == "{$0:UInt64}"
-      assert encode.([0x7FFFFFFFFFFFFFFF]) == "{$0:Int64}"
-      assert encode.([0]) == "{$0:Int64}"
-      assert encode.([-1]) == "{$0:Int64}"
-      assert encode.([1.0]) == "{$0:Float64}"
-      assert encode.([true]) == "{$0:Bool}"
-      assert encode.([NaiveDateTime.utc_now(:second)]) == "{$0:DateTime}"
-      assert encode.([NaiveDateTime.utc_now()]) == "{$0:DateTime64}"
-      assert encode.([DateTime.utc_now(:second)]) == "{$0:DateTime}"
-      assert encode.([DateTime.utc_now()]) == "{$0:DateTime64}"
-      assert encode.([Date.utc_today()]) == "{$0:Date}"
-      assert encode.([~D[1969-12-31]]) == "{$0:Date32}"
-      assert encode.([~D[2200-01-01]]) == "{$0:Date32}"
-      assert encode.([Decimal.new("1.0")]) == "{$0:Decimal64(1)}"
-      assert encode.([Decimal.new("321.123")]) == "{$0:Decimal64(3)}"
-      assert encode.([[]]) == "{$0:Array(Nothing)}"
-      assert encode.([[1]]) == "{$0:Array(Int64)}"
-      assert encode.([[[1]]]) == "{$0:Array(Array(Int64))}"
-    end
+    assert param.(0x7FFFFFFFFFFFFFFF + 1) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:UInt64})\
+           """
+
+    assert param.(0x7FFFFFFFFFFFFFFF) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Int64})\
+           """
+
+    assert param.(0) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Int64})\
+           """
+
+    assert param.(-1) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Int64})\
+           """
+
+    assert param.(1.0) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Float64})\
+           """
+
+    assert param.(true) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Bool})\
+           """
+
+    assert param.(NaiveDateTime.utc_now(:second)) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:DateTime64})\
+           """
+
+    assert param.(NaiveDateTime.utc_now()) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:DateTime64})\
+           """
+
+    assert param.(DateTime.utc_now(:second)) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:DateTime64})\
+           """
+
+    assert param.(DateTime.utc_now()) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:DateTime64})\
+           """
+
+    assert param.(Date.utc_today()) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Date32})\
+           """
+
+    assert param.(~D[1969-12-31]) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Date32})\
+           """
+
+    assert param.(~D[2200-01-01]) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Date32})\
+           """
+
+    assert param.(Decimal.new("1.0")) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Decimal64(1)})\
+           """
+
+    assert param.(Decimal.new("321.123")) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Decimal64(3)})\
+           """
+
+    assert param.([]) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Array(Nothing)})\
+           """
+
+    assert param.([1]) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Array(Int64)})\
+           """
+
+    assert param.([[1]]) == """
+           SELECT true FROM "bag" AS b0 WHERE (b0."param" = {$0:Array(Array(Int64))})\
+           """
   end
 end
