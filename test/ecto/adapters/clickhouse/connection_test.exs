@@ -2682,48 +2682,61 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
-  test "build_params/3" do
-    params = [
-      1,
-      "a",
-      true,
-      Date.utc_today(),
-      DateTime.utc_now(),
-      DateTime.utc_now() |> DateTime.truncate(:second)
-    ]
+  describe "query params" do
+    test "build_params/3 multiple params" do
+      params = [1, "a", true, Date.utc_today()]
 
-    assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
-    assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
-    assert to_string(Connection.build_params(_ix = 2, _len = 0, params)) == ""
+      assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
+      assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
+      assert to_string(Connection.build_params(_ix = 2, _len = 0, params)) == ""
 
-    assert to_string(Connection.build_params(_ix = 0, _len = 1, params)) ==
-             "{$0:Int64}"
+      assert to_string(Connection.build_params(_ix = 0, _len = 1, params)) ==
+               "{$0:Int64}"
 
-    assert to_string(Connection.build_params(_ix = 0, _len = 2, params)) ==
-             "{$0:Int64},{$1:String}"
+      assert to_string(Connection.build_params(_ix = 0, _len = 2, params)) ==
+               "{$0:Int64},{$1:String}"
 
-    assert to_string(Connection.build_params(_ix = 1, _len = 1, params)) ==
-             "{$1:String}"
+      assert to_string(Connection.build_params(_ix = 1, _len = 1, params)) ==
+               "{$1:String}"
 
-    assert to_string(Connection.build_params(_ix = 1, _len = 2, params)) ==
-             "{$1:String},{$2:Bool}"
+      assert to_string(Connection.build_params(_ix = 1, _len = 2, params)) ==
+               "{$1:String},{$2:Bool}"
 
-    assert to_string(Connection.build_params(_ix = 2, _len = 1, params)) ==
-             "{$2:Bool}"
+      assert to_string(Connection.build_params(_ix = 2, _len = 1, params)) ==
+               "{$2:Bool}"
 
-    assert to_string(Connection.build_params(_ix = 2, _len = 2, params)) ==
-             "{$2:Bool},{$3:Date}"
+      assert to_string(Connection.build_params(_ix = 2, _len = 2, params)) ==
+               "{$2:Bool},{$3:Date}"
 
-    assert to_string(Connection.build_params(_ix = 2, _len = 3, params)) ==
-             "{$2:Bool},{$3:Date},{$4:DateTime64}"
+      assert to_string(Connection.build_params(_ix = 0, _len = 4, params)) ==
+               "{$0:Int64},{$1:String},{$2:Bool},{$3:Date}"
+    end
 
-    assert to_string(Connection.build_params(_ix = 1, _len = 4, params)) ==
-             "{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64}"
+    test "build_params/3 all types" do
+      encode = fn params ->
+        encoded = Connection.build_params(_ix = 0, _len = length(params), params)
+        to_string(encoded)
+      end
 
-    assert to_string(Connection.build_params(_ix = 0, _len = 5, params)) ==
-             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64}"
-
-    assert to_string(Connection.build_params(_ix = 0, _len = 6, params)) ==
-             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64},{$5:DateTime}"
+      assert encode.(["some string"]) == "{$0:String}"
+      assert encode.([0x7FFFFFFFFFFFFFFF + 1]) == "{$0:UInt64}"
+      assert encode.([0x7FFFFFFFFFFFFFFF]) == "{$0:Int64}"
+      assert encode.([0]) == "{$0:Int64}"
+      assert encode.([-1]) == "{$0:Int64}"
+      assert encode.([1.0]) == "{$0:Float64}"
+      assert encode.([true]) == "{$0:Bool}"
+      assert encode.([NaiveDateTime.utc_now(:second)]) == "{$0:DateTime}"
+      assert encode.([NaiveDateTime.utc_now()]) == "{$0:DateTime64}"
+      assert encode.([DateTime.utc_now(:second)]) == "{$0:DateTime}"
+      assert encode.([DateTime.utc_now()]) == "{$0:DateTime64}"
+      assert encode.([Date.utc_today()]) == "{$0:Date}"
+      assert encode.([~D[1969-12-31]]) == "{$0:Date32}"
+      assert encode.([~D[2200-01-01]]) == "{$0:Date32}"
+      assert encode.([Decimal.new("1.0")]) == "{$0:Decimal64(1)}"
+      assert encode.([Decimal.new("321.123")]) == "{$0:Decimal64(3)}"
+      assert encode.([[]]) == "{$0:Array(Nothing)}"
+      assert encode.([[1]]) == "{$0:Array(Int64)}"
+      assert encode.([[[1]]]) == "{$0:Array(Array(Int64))}"
+    end
   end
 end
