@@ -14,12 +14,12 @@ jobs:
 
     strategy:
       matrix:
-        elixir: ["1.14", "1.15"]
+        elixir: ["1.14", "1.15", "1.16"]
         otp: ["25", "26"]
         clickhouse: ["23.3.7.5"]
         timezone: ["UTC"]
         include:
-          - elixir: "1.15"
+          - elixir: "1.16"
             otp: "26"
             clickhouse: "23.3.7.5"
             timezone: "Europe/Berlin"
