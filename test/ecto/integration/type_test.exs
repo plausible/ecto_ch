@@ -228,7 +228,7 @@ defmodule Ecto.Integration.TypeTest do
     # Comparison expression
     assert [12] = TestRepo.all(from p in Post, select: type(coalesce(p.visits, 0), :integer))
 
-    assert [0.0] =
+    assert [+0.0] =
              TestRepo.all(from p in Post, select: type(coalesce(p.intensity, 1.0), ^@float64))
 
     assert [1.0] =

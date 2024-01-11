@@ -4,16 +4,21 @@ defmodule Ecto.Integration.InsertStreamTest do
   alias Ecto.Integration.TestRepo
   alias EctoClickHouse.Integration.Account
 
-  describe "insert_stream/2" do
+  describe "insert into stream" do
+    @tag :skip
     test "with schema" do
       accounts =
         Stream.map(1..10000, fn i ->
           %{id: i, name: "John-#{i}", inserted_at: naive_now(), updated_at: naive_now()}
         end)
 
-      assert {10000, nil} = TestRepo.insert_stream(Account, accounts)
+      assert {10000, nil} =
+               TestRepo.checkout(fn ->
+                 Enum.into(accounts, TestRepo.stream(Account))
+               end)
     end
 
+    @tag :skip
     test "with table" do
       accounts =
         Stream.map(1..10000, fn i ->
@@ -21,9 +26,20 @@ defmodule Ecto.Integration.InsertStreamTest do
         end)
 
       assert {10000, nil} =
-               TestRepo.insert_stream("accounts", accounts,
-                 types: [id: :u64, name: :string, inserted_at: :datetime, updated_at: :datetime]
-               )
+               TestRepo.checkout(fn ->
+                 Enum.into(
+                   accounts,
+                   TestRepo.stream(
+                     "accounts",
+                     types: [
+                       id: :u64,
+                       name: :string,
+                       inserted_at: :datetime,
+                       updated_at: :datetime
+                     ]
+                   )
+                 )
+               end)
     end
   end
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- adapt to unreleased `Ch`
+  - replace [`:input`](https://github.com/plausible/ecto_ch/pull/79) and [`insert_stream`](https://github.com/plausible/ecto_ch/pull/74) with `Repo.stream`
+
 ## 0.3.2 (2023-12-19)
 
 - use DateTime64 for usec timestamps https://github.com/plausible/ecto_ch/pull/142

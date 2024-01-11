@@ -17,19 +17,29 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
     query = Ch.Query.build(statement, opts[:command])
-    DBConnection.prepare_execute(conn, query, params, opts)
+    DBConnection.prepare_execute(conn, query, named_params(params), opts)
   end
 
   @impl true
   def execute(conn, query, params, opts) do
-    DBConnection.execute(conn, query, params, opts)
+    DBConnection.execute(conn, query, named_params(params), opts)
   end
 
   # TODO what should be done about transactions? probably will need to build custom Repo.stream
   @impl true
   def query(conn, statement, params, opts) do
-    Ch.query(conn, statement, params, opts)
+    Ch.query(conn, statement, named_params(params), opts)
   end
+
+  defp named_params(params) do
+    named_params(params, 0)
+  end
+
+  defp named_params([value | params], idx) do
+    [{"$" <> String.Chars.Integer.to_string(idx), value} | named_params(params, idx + 1)]
+  end
+
+  defp named_params([] = empty, _idx), do: empty
 
   @impl true
   def query_many(_conn, _statement, _params, _opts) do
