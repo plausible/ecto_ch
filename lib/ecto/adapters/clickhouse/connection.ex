@@ -31,9 +31,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     Ch.query(conn, statement, named_params(params), opts)
   end
 
-  defp named_params(params) do
-    named_params(params, 0)
-  end
+  @doc false
+  def named_params(params), do: named_params(params, 0)
 
   defp named_params([value | params], idx) do
     [{"$" <> String.Chars.Integer.to_string(idx), value} | named_params(params, idx + 1)]

@@ -76,7 +76,7 @@ defmodule Ecto.Integration.UnionTest do
     {sql, params} = TestRepo.to_sql(:all, query)
 
     # ensures param idx=8 is 2 (from limit: ^2 above)
-    assert Enum.at(params, 8) == 2
+    assert Enum.at(params, 8) == {"$8", 2}
 
     assert sql == """
            SELECT p0."title" FROM "posts" AS p0 \

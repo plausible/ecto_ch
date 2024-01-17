@@ -128,6 +128,6 @@ defmodule EctoCh.Test do
     query = "example" |> where([e], e.user_id == ^user_id) |> select([e], e.name)
     assert {sql, params} = Ecto.Integration.TestRepo.to_sql(:all, query)
     assert sql == ~s[SELECT e0."name" FROM "example" AS e0 WHERE (e0."user_id" = {$0:Int64})]
-    assert params == [1]
+    assert params == [{"$0", 1}]
   end
 end

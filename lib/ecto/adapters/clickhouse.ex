@@ -310,7 +310,8 @@ defmodule Ecto.Adapters.ClickHouse do
       Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
 
     sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
-    {IO.iodata_to_binary(sql), dump_params}
+    named_params = @conn.named_params(dump_params)
+    {IO.iodata_to_binary(sql), named_params}
   end
 
   defp put_setting(opts, key, value) do
