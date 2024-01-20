@@ -277,10 +277,27 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ]
   end
 
-  defp from(%{from: %{source: source, hints: hints}} = query, sources, params) do
+  defp from(%{from: %{source: source, hints: hints} = query_from} = query, sources, params) do
     {from, name} = get_source(query, sources, params, 0, source)
-    [" FROM ", from, " AS ", name | hints(hints)]
+
+    [
+      " FROM ",
+      from,
+      " AS ",
+      name,
+      maybe_sample(query_from),
+      maybe_final(query_from) | hints(hints)
+    ]
   end
+
+  defp maybe_sample(%{ecto_ch: %{sample: sample}}) when is_number(sample) do
+    [" SAMPLE ", to_string(sample)]
+  end
+
+  defp maybe_sample(_other), do: []
+
+  defp maybe_final(%{ecto_ch: %{final: true}}), do: " FINAL"
+  defp maybe_final(_other), do: []
 
   def cte(
         %{with_ctes: %WithExpr{recursive: recursive, queries: [_ | _] = queries}} = query,

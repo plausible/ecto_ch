@@ -48,4 +48,33 @@ defmodule Ecto.Adapters.ClickHouse.API do
     # %{query | sources: {nil, schema}}
     query
   end
+
+  @doc """
+  Adds [SAMPLE](https://clickhouse.com/docs/en/sql-reference/statements/select/sample) clause to the query.
+
+      # sample k
+      from s in sample(Schema, 0.1)
+      from s in sample("table", 0.1)
+
+      # sample n
+      from s in sample(Schema, 10000)
+      from s in sample("table", 10000)
+
+  """
+  def sample(source, sample) when is_number(sample) do
+    %{from: from} = query = from(source)
+    %{query | from: Map.put(from, :ecto_ch, %{sample: sample})}
+  end
+
+  @doc """
+  Adds [FINAL](https://clickhouse.com/docs/en/sql-reference/statements/select/from#final-modifier) modifier to the query.
+
+      from f in final(Schema)
+      from f in final("table")
+
+  """
+  def final(source) do
+    %{from: from} = query = from(source)
+    %{query | from: Map.put(from, :ecto_ch, %{final: true})}
+  end
 end

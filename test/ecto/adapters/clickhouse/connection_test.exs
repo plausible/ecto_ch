@@ -115,6 +115,65 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0]
   end
 
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/sample#select-sample-k
+  test "from with sample k" do
+    query =
+      from hd in Ecto.Adapters.ClickHouse.API.sample("hits_distributed", 0.1),
+        where: hd.counter_id == ^32,
+        group_by: hd.title,
+        order_by: [desc: selected_as(:page_views)],
+        limit: ^1000,
+        select: %{title: hd.title, page_views: selected_as(count() * 10, :page_views)}
+
+    assert all(query) == """
+           SELECT h0."title",count(*) * 10 AS "page_views" \
+           FROM "hits_distributed" AS h0 SAMPLE 0.1 \
+           WHERE (h0."counter_id" = {$0:Int64}) \
+           GROUP BY h0."title" \
+           ORDER BY "page_views" DESC \
+           LIMIT {$1:Int64}\
+           """
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/sample#select-sample-n
+  test "from with sample n" do
+    query =
+      from v in Ecto.Adapters.ClickHouse.API.sample("visits", 10_000_000),
+        select: sum(v.page_views * fragment("_sample_factor"))
+
+    assert all(query) == """
+           SELECT sum(v0."page_views" * _sample_factor) \
+           FROM "visits" AS v0 \
+           SAMPLE 10000000\
+           """
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/statements/select/from#final-modifier
+  test "from with final" do
+    query = from t in Ecto.Adapters.ClickHouse.API.final("table"), select: map(t, [:a, :b])
+    assert all(query) == ~s[SELECT t0."a",t0."b" FROM "table" AS t0 FINAL]
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/table-functions/input
+  test "from with input" do
+    query =
+      from i in Ecto.Adapters.ClickHouse.API.input(
+             uid: "Int16",
+             updated: "DateTime",
+             name: "String"
+           ),
+           select: %{
+             uid: i.uid,
+             updated: i.updated,
+             name: fragment("arrayReduce('argMaxState', [?], [?])", i.name, i.updated)
+           }
+
+    assert all(query) == """
+           SELECT f0."uid",f0."updated",arrayReduce('argMaxState', [f0."name"], [f0."updated"]) \
+           FROM input("uid Int16, updated DateTime, name String") AS f0\
+           """
+  end
+
   test "from with hints" do
     # With string
     query = Schema |> from(hints: "USE INDEX FOO") |> select([r], r.x)
