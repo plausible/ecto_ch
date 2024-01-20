@@ -905,21 +905,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp param_type(i) when is_integer(i), do: "Int64"
   defp param_type(f) when is_float(f), do: "Float64"
   defp param_type(b) when is_boolean(b), do: "Bool"
-
-  # TODO Date32
-  defp param_type(%NaiveDateTime{}), do: "DateTime"
-
-  defp param_type(%DateTime{microsecond: microsecond}) do
-    case microsecond do
-      {_val, precision} when precision > 0 ->
-        "DateTime64"
-
-      _ ->
-        "DateTime"
-    end
-  end
-
-  defp param_type(%Date{}), do: "Date"
+  defp param_type(%NaiveDateTime{}), do: "DateTime64"
+  defp param_type(%DateTime{}), do: "DateTime64"
+  defp param_type(%Date{}), do: "Date32"
 
   defp param_type(%Decimal{exp: exp}) do
     # TODO use sizes 128 and 256 as well if needed
@@ -929,6 +917,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type([]), do: "Array(Nothing)"
 
-  # TODO check whole list
-  defp param_type([v | _]), do: ["Array(", param_type(v), ?)]
+  defp param_type([v | rest] = array) do
+    type =
+      Enum.reduce(rest, param_type(v), fn v, param_type ->
+        case param_type(v) do
+          ^param_type ->
+            param_type
+
+          _other ->
+            raise "cannot select single type for ambiguous Array(T) param: #{inspect(array)}"
+        end
+      end)
+
+    ["Array(", type, ?)]
+  end
 end
