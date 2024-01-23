@@ -336,7 +336,7 @@ defmodule Ecto.Integration.CrudTest do
         |> where(ch_nullable_uuid: ^ch_nullable_uuid)
 
       {_sql, params} = TestRepo.to_sql(:all, query)
-      assert params == [{"$0", ecto_uuid}, {"$1", ch_uuid}, {"$2", ch_nullable_uuid}]
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
     end
 
     test "to_sql all schemaless" do
@@ -352,7 +352,7 @@ defmodule Ecto.Integration.CrudTest do
         |> select([u], map(u, [:ecto_uuid, :ch_uuid, :ch_nullable_uuid]))
 
       {_sql, params} = TestRepo.to_sql(:all, query)
-      assert params == [{"$0", ecto_uuid}, {"$1", ch_uuid}, {"$2", ch_nullable_uuid}]
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
     end
 
     test "to_sql delete_all" do
@@ -367,7 +367,7 @@ defmodule Ecto.Integration.CrudTest do
         |> where(ch_nullable_uuid: ^ch_nullable_uuid)
 
       {_sql, params} = TestRepo.to_sql(:delete_all, query)
-      assert params == [{"$0", ecto_uuid}, {"$1", ch_uuid}, {"$2", ch_nullable_uuid}]
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
     end
 
     test "to_sql delete_all schemaless" do
@@ -382,7 +382,7 @@ defmodule Ecto.Integration.CrudTest do
         |> where(ch_nullable_uuid: ^ch_nullable_uuid)
 
       {_sql, params} = TestRepo.to_sql(:delete_all, query)
-      assert params == [{"$0", ecto_uuid}, {"$1", ch_uuid}, {"$2", ch_nullable_uuid}]
+      assert params == [ecto_uuid, ch_uuid, ch_nullable_uuid]
     end
 
     defp insert_uuids do
