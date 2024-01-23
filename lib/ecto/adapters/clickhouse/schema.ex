@@ -3,9 +3,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @conn Ecto.Adapters.ClickHouse.Connection
   @dialyzer :no_improper_lists
 
-  # ignores passing stream into Ecto.Adapters.SQL.query!
-  @dialyzer {:no_fail_call, do_insert_stream: 7}
-  @dialyzer {:no_return, insert_stream: 4, do_insert_stream: 7}
+  alias Ch.RowBinary
 
   def insert_all(
         adapter_meta,
@@ -18,7 +16,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         opts
       ) do
     %{source: source, prefix: prefix} = schema_meta
-    opts = [{:command, :insert} | opts]
 
     %{num_rows: num_rows} =
       case rows do
@@ -27,11 +24,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->
-          if input = opts[:input] do
-            insert_input(adapter_meta, schema_meta, input, rows, opts)
-          else
-            insert_rows(adapter_meta, schema_meta, header, rows, opts)
-          end
+          insert_rows(adapter_meta, schema_meta, header, rows, opts)
       end
 
     {num_rows, nil}
@@ -42,104 +35,15 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     names = prepare_names(header)
     types = prepare_types(schema, header, opts)
-    opts = [{:names, names}, {:types, types} | opts]
-    rows = unzip_rows(rows, header)
-    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinaryWithNamesAndTypes"]
-
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
-  end
-
-  defp insert_input(adapter_meta, schema_meta, query, rows, opts) do
-    %{repo: repo, adapter: adapter} = adapter_meta
-    %{source: source, prefix: prefix} = schema_meta
-
-    types =
-      case query.from.source do
-        {:fragment, [{:input, types}], _fragment} ->
-          types
-
-        _other ->
-          raise ArgumentError, """
-          unexpected source found in input query:
-
-            #{inspect(query)}
-
-          Please use Ecto.Adapters.ClickHouse.API.input/1 helper in :input queries:
-
-            import Ecto.Adapters.ClickHouse.API, only: [input: 1]
-            input = from i in input(schema_or_types), select: %{a: i.a}
-            insert_all("table", rows, input: input)
-
-          """
-      end
-
-    {query, opts} = repo.prepare_query(:insert_all, query, opts)
-
-    {query, _cast_params, dump_params} =
-      Ecto.Adapter.Queryable.plan_query(:insert_all, adapter, query)
-
-    unless dump_params == [] do
-      raise ArgumentError, """
-      cannot insert from parameterized input query:
-
-        #{inspect(query)}
-
-      Please remove all parameters from the query.
-      """
-    end
-
-    ix =
-      case query.select do
-        %Ecto.Query.SelectExpr{expr: {:&, _, [ix]}} -> ix
-        _ -> nil
-      end
-
-    header =
-      case query.select do
-        %Ecto.Query.SelectExpr{expr: {:%{}, _ctx, args}} ->
-          Enum.map(args, &elem(&1, 0))
-
-        %Ecto.Query.SelectExpr{take: %{^ix => {_fun, fields}}} ->
-          fields
-
-        # TODO might need more work
-        %Ecto.Query.SelectExpr{expr: {:merge, _, [{:&, _, [_]}, {:%{}, _, args}]}} ->
-          fields = Keyword.keys(types)
-          merged = Enum.map(args, &elem(&1, 0))
-          Enum.uniq(fields ++ merged) |> IO.inspect()
-
-        _ ->
-          raise ArgumentError, """
-          cannot generate a fields list for insert_all from the given input query
-          because it does not have a select clause that uses a map:
-
-            #{inspect(query)}
-
-          Please add a select clause that selects into a map, like this:
-
-            import Ecto.Adapters.ClickHouse.API, only: [input: 1]
-
-            from i in input(Source),
-              select: %{
-                field_a: i.bar,
-                field_b: i.foo
-              }
-
-          All keys must exist in the schema that is being inserted into
-          """
-      end
 
     sql = [
-      @conn.insert(prefix, source, header, {query, dump_params})
-      | " FORMAT RowBinaryWithNamesAndTypes"
+      @conn.insert(prefix, source, header, []),
+      " FORMAT RowBinaryWithNamesAndTypes\n",
+      RowBinary.encode_names_and_types(names, types)
+      | rows |> unzip_rows(header) |> RowBinary.encode_rows(types)
     ]
 
-    names = prepare_names(header)
-    types = prepare_types(_schema = nil, header, types: types)
-    opts = [{:names, names}, {:types, types} | opts]
-    rows = unzip_rows(rows, header)
-
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
   end
 
   def insert(adapter_meta, schema_meta, params, opts) do
@@ -148,68 +52,16 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     names = prepare_names(header)
     types = prepare_types(schema, header, opts)
-    sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
-    opts = [{:command, :insert}, {:names, names}, {:types, types} | opts]
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts)
+    sql = [
+      @conn.insert(prefix, source, [], []),
+      " FORMAT RowBinaryWithNamesAndTypes\n",
+      RowBinary.encode_names_and_types(names, types)
+      | RowBinary.encode_rows([row], types)
+    ]
+
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
     {:ok, []}
-  end
-
-  def insert_stream(repo, schema, rows, opts) when is_atom(schema) do
-    header = schema.__schema__(:fields)
-
-    do_insert_stream(
-      repo,
-      schema.__schema__(:prefix),
-      schema.__schema__(:source),
-      header,
-      extract_types(schema, header),
-      rows,
-      opts
-    )
-  end
-
-  def insert_stream(repo, table, rows, opts) when is_binary(table) do
-    types = Keyword.fetch!(opts, :types)
-    {header, types} = Enum.unzip(types)
-    do_insert_stream(repo, nil, table, header, types, rows, opts)
-  end
-
-  def insert_stream(repo, {source, schema}, rows, opts) when is_atom(schema) do
-    header = schema.__schema__(:fields)
-
-    do_insert_stream(
-      repo,
-      schema.__schema__(:prefix),
-      source,
-      header,
-      extract_types(schema, header),
-      rows,
-      opts
-    )
-  end
-
-  defp do_insert_stream(repo, prefix, source, header, types, rows, opts) do
-    chunk_every = opts[:chunk_every] || 1000
-
-    types = Ch.RowBinary.encoding_types(types)
-    names = prepare_names(header)
-    opts = [{:command, :insert}, {:encode, false} | opts]
-    sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
-
-    row_binary =
-      rows
-      |> Stream.chunk_every(chunk_every)
-      |> Stream.map(fn chunk ->
-        chunk
-        |> unzip_rows(header)
-        |> Ch.RowBinary._encode_rows(types)
-      end)
-
-    stream = Stream.concat([Ch.RowBinary.encode_names_and_types(names, types)], row_binary)
-    %{num_rows: num_rows} = Ecto.Adapters.SQL.query!(repo, sql, stream, opts)
-
-    {num_rows, nil}
   end
 
   def delete(adapter_meta, schema_meta, params, opts) do

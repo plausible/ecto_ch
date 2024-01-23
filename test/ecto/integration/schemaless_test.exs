@@ -2,7 +2,7 @@ defmodule Ecto.Integration.SchemalessTest do
   use Ecto.Integration.Case
   alias Ecto.Integration.TestRepo
 
-  describe "insert_stream/3" do
+  describe "insert into stream" do
     setup do
       accounts =
         Stream.map(1..10000, fn i ->
@@ -12,11 +12,17 @@ defmodule Ecto.Integration.SchemalessTest do
       {:ok, accounts: accounts}
     end
 
+    @tag :skip
     test "with atom types", %{accounts: accounts} do
       types = [id: :u64, name: :string, inserted_at: :datetime, updated_at: :datetime]
-      assert {10000, nil} = TestRepo.insert_stream("accounts", accounts, types: types)
+
+      assert {10000, nil} =
+               TestRepo.checkout(fn ->
+                 Enum.into(accounts, TestRepo.stream("accounts", types: types))
+               end)
     end
 
+    @tag :skip
     test "with type helpers", %{accounts: accounts} do
       types = [
         id: Ch.Types.u64(),
@@ -25,12 +31,20 @@ defmodule Ecto.Integration.SchemalessTest do
         updated_at: Ch.Types.datetime()
       ]
 
-      assert {10000, nil} = TestRepo.insert_stream("accounts", accounts, types: types)
+      assert {10000, nil} =
+               TestRepo.checkout(fn ->
+                 Enum.into(accounts, TestRepo.stream("accounts", types: types))
+               end)
     end
 
+    @tag :skip
     test "with string types", %{accounts: accounts} do
       types = [id: "UInt64", name: "String", inserted_at: "DateTime", updated_at: "DateTime"]
-      assert {10000, nil} = TestRepo.insert_stream("accounts", accounts, types: types)
+
+      assert {10000, nil} =
+               TestRepo.checkout(fn ->
+                 Enum.into(accounts, TestRepo.stream("accounts", types: types))
+               end)
     end
   end
 

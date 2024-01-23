@@ -75,9 +75,9 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     table = @conn.quote_table(database, table)
     stmt = "SELECT * FROM #{table} FORMAT Values"
 
-    with {:ok, %{rows: rows}, conn} <- exec(conn, stmt) do
-      rows = rows |> IO.iodata_to_binary() |> String.replace("),(", "),\n(")
-      versions = ["INSERT INTO ", table, " (version, inserted_at) VALUES\n", rows, ";\n"]
+    with {:ok, %{data: data}, conn} <- exec(conn, stmt) do
+      values = data |> IO.iodata_to_binary() |> String.replace("),(", "),\n(")
+      versions = ["INSERT INTO ", table, " (version, inserted_at) VALUES\n", values, ";\n"]
       {:ok, versions, conn}
     end
   end
