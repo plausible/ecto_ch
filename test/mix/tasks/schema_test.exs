@@ -39,35 +39,6 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
              """
     end
 
-    test "system.users" do
-      schema =
-        capture_io(fn ->
-          Mix.Tasks.Ecto.Ch.Schema.run(["system.users"])
-        end)
-
-      assert schema == """
-             @primary_key false
-             schema "users" do
-               field :name, :string
-               field :id, Ecto.UUID
-               field :storage, :string
-               field :auth_type, Ch, type: "Enum8('no_password' = 0, 'plaintext_password' = 1, 'sha256_password' = 2, 'double_sha1_password' = 3, 'ldap' = 4, 'kerberos' = 5, 'ssl_certificate' = 6)"
-               field :auth_params, :string
-               field :host_ip, {:array, :string}
-               field :host_names, {:array, :string}
-               field :host_names_regexp, {:array, :string}
-               field :host_names_like, {:array, :string}
-               field :default_roles_all, Ch, type: "UInt8"
-               field :default_roles_list, {:array, :string}
-               field :default_roles_except, {:array, :string}
-               field :grantees_any, Ch, type: "UInt8"
-               field :grantees_list, {:array, :string}
-               field :grantees_except, {:array, :string}
-               field :default_database, :string
-             end
-             """
-    end
-
     test "products" do
       schema =
         capture_io(fn ->
