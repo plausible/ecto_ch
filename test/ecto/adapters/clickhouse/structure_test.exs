@@ -285,7 +285,9 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       """)
 
       assert {:error, reason} = ClickHouse.structure_load(tmp, opts)
-      assert reason =~ "Database ecto_ch_temp_structure_migrated doesn't exist."
+      assert reason =~ "Code: 81."
+      assert reason =~ "ecto_ch_temp_structure_migrated"
+      assert reason =~ "UNKNOWN_DATABASE"
     end
 
     test "loads structure for current database", %{path: path, tmp: tmp, opts: opts} do

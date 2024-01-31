@@ -1,0 +1,94 @@
+name: mix
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        elixir: [1.14, 1.15, 1.16]
+        otp: [25, 26]
+        clickhouse: [latest]
+        timezone: [UTC]
+        include:
+          - elixir: 1.16
+            otp: 26
+            clickhouse: latest
+            timezone: Europe/Berlin
+          # Plausible
+          # - https://github.com/plausible/analytics/blob/master/.tool-versions
+          # - https://github.com/plausible/analytics/blob/master/.github/workflows/elixir.yml
+          - elixir: 1.16.0
+            otp: 26.2.1
+            clickhouse: 23.3.7.5-alpine
+            timezone: UTC
+
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:${{ matrix.clickhouse }}
+        ports:
+          - 8123:8123
+        env:
+          TZ: ${{ matrix.timezone }}
+          options: >-
+            --health-cmd nc -zw3 localhost 8124
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
+
+    env:
+      MIX_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-test-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            test-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-
+            test-${{ matrix.otp }}-${{ matrix.elixir }}-refs/heads/master-
+      - run: mix deps.get --only $MIX_ENV
+      - run: mix compile --warnings-as-errors
+      - run: mix test
+
+  format:
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: prod
+
+    strategy:
+      matrix:
+        elixir: [1]
+        otp: [26]
+
+    steps:
+      - uses: actions/checkout@v4 
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version:  ${{ matrix.elixir }}
+          otp-version:  ${{ matrix.otp }}
+      - run: elixir -v
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-format-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            format-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-
+            format-${{ matrix.otp }}-${{ matrix.elixir }}-refs/heads/master-
+      - run: mix deps.get --only $MIX_ENV
+      - run: mix format --check-formatted
