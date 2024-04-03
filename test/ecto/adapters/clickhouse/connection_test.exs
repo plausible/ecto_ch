@@ -2656,6 +2656,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s{SELECT [1,2,3] FROM "schema" AS s0}
   end
 
+  test "maps" do
+    assert all(select(Schema, [], fragment("?[site_id]", ^%{}))) ==
+             ~s|SELECT {$0:Map(Nothing,Nothing)}[site_id] FROM "schema" AS s0|
+
+    assert all(select(Schema, [], fragment("?[site_id]", ^%{1 => "UTC"}))) ==
+             ~s|SELECT {$0:Map(Int64,String)}[site_id] FROM "schema" AS s0|
+  end
+
   test "preloading" do
     query = from(p in Post, preload: [:comments], select: p)
 
