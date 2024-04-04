@@ -379,7 +379,59 @@ defmodule Ecto.Integration.TypeTest do
     assert tag.ints == [1, 0, 3]
   end
 
-  describe "unsopperted map" do
+  test "empty untyped map" do
+    timezones = %{}
+
+    assert TestRepo.all(
+             from n in fragment("numbers(3)"),
+               select: %{number: n.number, timezones: fragment("?", ^timezones)}
+           ) == [
+             %{number: 0, timezones: %{}},
+             %{number: 1, timezones: %{}},
+             %{number: 2, timezones: %{}}
+           ]
+
+    # can't lookup UInt64 in Map(Nothing, Nothing)
+    assert_raise Ch.Error, ~r/ILLEGAL_TYPE_OF_ARGUMENT/, fn ->
+      TestRepo.all(
+        from n in fragment("numbers(3)"),
+          select: %{number: n.number, timezone: fragment("?[?]", ^timezones, n.number)}
+      )
+    end
+  end
+
+  @map_int64_string Ecto.ParameterizedType.init(Ch, type: "Map(Int64,String)")
+  test "empty typed map" do
+    timezones = %{}
+
+    assert TestRepo.all(
+             from n in fragment("numbers(3)"),
+               select: %{
+                 number: n.number,
+                 timezone: fragment("?[?]", type(^timezones, ^@map_int64_string), n.number)
+               }
+           ) == [
+             %{number: 0, timezone: ""},
+             %{number: 1, timezone: ""},
+             %{number: 2, timezone: ""}
+           ]
+  end
+
+  test "map of inferred type" do
+    timezones = %{0 => "UTC", 1 => "Europe/Vienna", 2 => "Asia/Taipei"}
+
+    assert TestRepo.all(
+             from n in fragment("numbers(4)"),
+               select: %{number: n.number, timezone: fragment("?[?]", ^timezones, n.number)}
+           ) == [
+             %{number: 0, timezone: "UTC"},
+             %{number: 1, timezone: "Europe/Vienna"},
+             %{number: 2, timezone: "Asia/Taipei"},
+             %{number: 3, timezone: ""}
+           ]
+  end
+
+  describe "unsupported :map type" do
     @describetag skip: true
     test "untyped map"
     test "typed string map"

@@ -931,4 +931,21 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   # TODO check whole list
   defp param_type([v | _]), do: ["Array(", param_type(v), ?)]
+
+  defp param_type(%s{}) do
+    raise ArgumentError, "struct #{inspect(s)} is not supported in params"
+  end
+
+  defp param_type(m) when is_map(m) do
+    case Map.keys(m) do
+      # TODO check whole list
+      [k | _] ->
+        # TODO check whole list
+        [v | _] = Map.values(m)
+        ["Map(", param_type(k), ?,, param_type(v), ?)]
+
+      [] ->
+        "Map(Nothing,Nothing)"
+    end
+  end
 end
