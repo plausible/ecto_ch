@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 (2024-04-04)
 
 - allow `Map(K,V)` params https://github.com/plausible/ecto_ch/pull/155
 
