@@ -36,4 +36,9 @@ defmodule Ecto.Integration.Case do
         |> DateTime.to_naive()
     end
   end
+
+  def clickhouse_version do
+    [[version]] = TestRepo.query!("select version()").rows
+    version
+  end
 end

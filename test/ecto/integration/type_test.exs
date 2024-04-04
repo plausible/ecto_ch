@@ -249,7 +249,10 @@ defmodule Ecto.Integration.TypeTest do
         where: p.id in subquery(child),
         select: p.id
 
-    assert_raise Ch.Error, ~r/UNKNOWN_IDENTIFIER/, fn ->
+    expected_error_message =
+      if clickhouse_version() > "24", do: ~r/UNSUPPORTED_METHOD/, else: ~r/UNKNOWN_IDENTIFIER/
+
+    assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(query)
     end
   end
@@ -293,19 +296,22 @@ defmodule Ecto.Integration.TypeTest do
     # works: select 1 in [1,2,3]
     # fails: select * from tags t where 0 in t.ints
 
-    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+    expected_error_message =
+      if clickhouse_version() > "24", do: ~r/UNSUPPORTED_METHOD/, else: ~r/UNKNOWN_TABLE/
+
+    assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
     end
 
-    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+    assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints)
     end
 
-    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+    assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(from t in Tag, where: ^0 in t.ints, select: t.ints)
     end
 
-    assert_raise Ch.Error, ~r/UNKNOWN_TABLE/, fn ->
+    assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(from t in Tag, where: ^1 in t.ints, select: t.ints)
     end
 
