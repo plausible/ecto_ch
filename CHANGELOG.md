@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- allow `Map(K,V)` params https://github.com/plausible/ecto_ch/pull/155
+
 ## 0.3.2 (2023-12-19)
 
 - use DateTime64 for usec timestamps https://github.com/plausible/ecto_ch/pull/142
