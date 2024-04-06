@@ -252,7 +252,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       #
       #     "arrays_test"
       #     |> join(:array, [a], r in "arr")
-      #     |> select([a, r], {a.s, r})
+      #     |> select([a, r], {a.s, fragment("?", r)})
       #
       {:&, _, [idx]} ->
         {_, source, _} = elem(sources, idx)
@@ -313,15 +313,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join(%{joins: joins} = query, sources, params) do
     Enum.map(joins, fn
       %JoinExpr{qual: qual, ix: ix, source: source, on: %QueryExpr{expr: on_exrp}, hints: hints} ->
-        unless hints == [] do
-          raise Ecto.QueryError,
-            query: query,
-            message: "ClickHouse does not support hints on JOIN"
-        end
-
         {join, name} = get_source(query, sources, params, ix, source)
 
         [
+          join_hints(hints, query),
           join_qual(qual),
           join,
           " AS ",
@@ -329,6 +324,29 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
           | join_on(qual, on_exrp, sources, params, query)
         ]
     end)
+  end
+
+  valid_join_hints = ["ASOF", "ANY", "ANTI", "SEMI"]
+
+  for hint <- valid_join_hints do
+    hints = List.wrap(hint)
+
+    defp join_hints(unquote(hints), _query) do
+      [?\s, unquote(Enum.join(hints, " "))]
+    end
+  end
+
+  defp join_hints([], _query), do: []
+
+  defp join_hints(hints, query) do
+    supported = unquote(valid_join_hints) |> Enum.map(&inspect/1) |> Enum.join(", ")
+
+    raise Ecto.QueryError,
+      query: query,
+      message: """
+      unsupported JOIN strictness passed in hints: #{inspect(hints)}
+      supported: #{supported}
+      """
   end
 
   defp join_on(:cross, true, _sources, _params, _query), do: []
@@ -345,9 +363,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join_qual(:inner), do: " INNER JOIN "
   defp join_qual(t) when t in [:inner_lateral, :array], do: " ARRAY JOIN "
   defp join_qual(t) when t in [:left_lateral, :left_array], do: " LEFT ARRAY JOIN "
-  defp join_qual(:left), do: " LEFT OUTER JOIN "
-  defp join_qual(:right), do: " RIGHT OUTER JOIN "
-  defp join_qual(:full), do: " FULL OUTER JOIN "
+  defp join_qual(:left), do: " LEFT JOIN "
+  defp join_qual(:right), do: " RIGHT JOIN "
+  defp join_qual(:full), do: " FULL JOIN "
   defp join_qual(:cross), do: " CROSS JOIN "
 
   defp where(%{wheres: wheres} = query, sources, params) do
