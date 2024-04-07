@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 (2024-04-07)
 
 - support join strictness (ASOF, ANY, ANTI, SEMI) https://github.com/plausible/ecto_ch/pull/156
 
