@@ -1359,17 +1359,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
   end
 
-  test "join hints" do
-    query =
-      Schema
-      |> join(:inner, [p], q in Schema2, hints: ["INDEXED BY FOO", "INDEXED BY BAR"], on: true)
-      |> select([], true)
-
-    assert_raise Ecto.QueryError, ~r/ClickHouse does not support hints on JOIN/, fn ->
-      all(query)
-    end
-  end
-
   test "join with nothing bound" do
     query =
       Schema
@@ -1552,7 +1541,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
              SELECT s0."id",s1."id" \
              FROM "schema" AS s0 \
-             LEFT OUTER JOIN "schema2" AS s1 ON 1\
+             LEFT JOIN "schema2" AS s1 ON 1\
              """
   end
 
@@ -1674,6 +1663,200 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              FROM "schema" AS s0 \
              INNER JOIN "schema3" AS s1 ON s1."id" = s0."y"\
              """
+  end
+
+  describe "clickhouse joins blog" do
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#inner-join
+    test "INNER JOIN" do
+      assert all(
+               from m in "movies",
+                 inner_join: g in "genres",
+                 on: m.id == g.movie_id,
+                 order_by: [desc: m.year, asc: m.name, asc: g.genre],
+                 limit: 10,
+                 select: [selected_as(m.name, :name), selected_as(g.genre, :genre)]
+             ) == """
+             SELECT m0."name" AS "name",g1."genre" AS "genre" \
+             FROM "movies" AS m0 \
+             INNER JOIN "genres" AS g1 ON m0."id" = g1."movie_id" \
+             ORDER BY m0."year" DESC,m0."name",g1."genre" \
+             LIMIT 10\
+             """
+    end
+
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#left--right--full-outer-join
+    test "(LEFT / RIGHT / FULL) OUTER JOIN" do
+      assert all(
+               from m in "movies",
+                 left_join: g in "genres",
+                 on: m.id == g.movie_id,
+                 where: g.movie_id == 0,
+                 order_by: [desc: m.year, asc: m.name],
+                 limit: 10,
+                 select: m.name
+             ) == """
+             SELECT m0."name" \
+             FROM "movies" AS m0 \
+             LEFT JOIN "genres" AS g1 ON m0."id" = g1."movie_id" \
+             WHERE (g1."movie_id" = 0) \
+             ORDER BY m0."year" DESC,m0."name" \
+             LIMIT 10\
+             """
+    end
+
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#cross-join
+    test "CROSS JOIN" do
+      assert all(
+               from m in "movies",
+                 cross_join: g in "genres",
+                 limit: 10,
+                 select: [m.name, m.id, g.movie_id, g.genre]
+             ) == """
+             SELECT m0."name",m0."id",g1."movie_id",g1."genre" \
+             FROM "movies" AS m0 \
+             CROSS JOIN "genres" AS g1 \
+             LIMIT 10\
+             """
+    end
+
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#left--right-semi-join
+    test "(LEFT / RIGHT) SEMI JOIN" do
+      assert all(
+               from a in "actors",
+                 left_join: r in "roles",
+                 on: a.id == r.actor_id,
+                 hints: "SEMI",
+                 where: fragment("toYear(created_at)") == "2023",
+                 order_by: [asc: :id],
+                 limit: 10,
+                 select: [a.first_name, a.last_name]
+             ) == """
+             SELECT a0."first_name",a0."last_name" \
+             FROM "actors" AS a0 \
+             SEMI LEFT JOIN "roles" AS r1 ON a0."id" = r1."actor_id" \
+             WHERE (toYear(created_at) = '2023') \
+             ORDER BY a0."id" \
+             LIMIT 10\
+             """
+    end
+
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#left--right-anti-join
+    test "(LEFT / RIGHT) ANTI JOIN" do
+      assert all(
+               from m in "movies",
+                 left_join: g in "genres",
+                 on: m.id == g.movie_id,
+                 hints: "ANTI",
+                 order_by: [desc: :year, asc: :name],
+                 limit: 10,
+                 select: m.name
+             ) == """
+             SELECT m0."name" \
+             FROM "movies" AS m0 \
+             ANTI LEFT JOIN "genres" AS g1 ON m0."id" = g1."movie_id" \
+             ORDER BY m0."year" DESC,m0."name" \
+             LIMIT 10\
+             """
+    end
+
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#left--right--inner-any-join
+    test "(LEFT / RIGHT / INNER) ANY JOIN" do
+      left_table = from v in fragment("VALUES('c UInt32', 1, 2, 3)"), select: v.c
+      right_table = from v in fragment("VALUES('c UInt32', 2, 2, 3, 3, 4)"), select: v.c
+
+      query =
+        "left_table"
+        |> with_cte("left_table", as: ^left_table)
+        |> with_cte("right_table", as: ^right_table)
+
+      assert all(
+               from l in query,
+                 left_join: r in "right_table",
+                 on: l.c == r.c,
+                 hints: "ANY",
+                 select: [selected_as(l.c, :l_c), selected_as(r.c, :r_c)]
+             ) == """
+             WITH \
+             "left_table" AS (SELECT sf0."c" AS "c" FROM VALUES('c UInt32', 1, 2, 3) AS sf0),\
+             "right_table" AS (SELECT sf0."c" AS "c" FROM VALUES('c UInt32', 2, 2, 3, 3, 4) AS sf0) \
+             SELECT l0."c" AS "l_c",r1."c" AS "r_c" \
+             FROM "left_table" AS l0 \
+             ANY LEFT JOIN "right_table" AS r1 ON l0."c" = r1."c"\
+             """
+
+      assert all(
+               from l in query,
+                 right_join: r in "right_table",
+                 on: l.c == r.c,
+                 hints: "ANY",
+                 select: [selected_as(l.c, :l_c), selected_as(r.c, :r_c)]
+             ) == """
+             WITH \
+             "left_table" AS (SELECT sf0."c" AS "c" FROM VALUES('c UInt32', 1, 2, 3) AS sf0),\
+             "right_table" AS (SELECT sf0."c" AS "c" FROM VALUES('c UInt32', 2, 2, 3, 3, 4) AS sf0) \
+             SELECT l0."c" AS "l_c",r1."c" AS "r_c" \
+             FROM "left_table" AS l0 \
+             ANY RIGHT JOIN "right_table" AS r1 ON l0."c" = r1."c"\
+             """
+
+      assert all(
+               from l in query,
+                 inner_join: r in "right_table",
+                 on: l.c == r.c,
+                 hints: "ANY",
+                 select: [selected_as(l.c, :l_c), selected_as(r.c, :r_c)]
+             ) == """
+             WITH \
+             "left_table" AS (SELECT sf0."c" AS "c" FROM VALUES('c UInt32', 1, 2, 3) AS sf0),\
+             "right_table" AS (SELECT sf0."c" AS "c" FROM VALUES('c UInt32', 2, 2, 3, 3, 4) AS sf0) \
+             SELECT l0."c" AS "l_c",r1."c" AS "r_c" \
+             FROM "left_table" AS l0 \
+             ANY INNER JOIN "right_table" AS r1 ON l0."c" = r1."c"\
+             """
+    end
+
+    # https://clickhouse.com/blog/clickhouse-fully-supports-joins-part1#asof-join
+    test "ASOF JOIN" do
+      assert all(
+               from t in "trades",
+                 left_join: q in "quotes",
+                 on: t.symbol == q.symbol and t.time >= q.time,
+                 hints: "ASOF",
+                 select: [
+                   t.symbol,
+                   t.volume,
+                   selected_as(t.time, :trade_time),
+                   selected_as(q.time, :closest_quote_time),
+                   selected_as(q.price, :quote_price),
+                   selected_as(t.volume * q.price, :final_price)
+                 ]
+             ) == """
+             SELECT \
+             t0."symbol",\
+             t0."volume",\
+             t0."time" AS "trade_time",\
+             q1."time" AS "closest_quote_time",\
+             q1."price" AS "quote_price",\
+             t0."volume" * q1."price" AS "final_price" \
+             FROM "trades" AS t0 \
+             ASOF LEFT JOIN "quotes" AS q1 ON (t0."symbol" = q1."symbol") AND (t0."time" >= q1."time")\
+             """
+    end
+
+    test "invalid type" do
+      expected_message =
+        ~r/unsupported JOIN strictness passed in hints: \["INVALID"\]\nsupported: "ASOF", "ANY", "ANTI", "SEMI"/
+
+      assert_raise Ecto.QueryError, expected_message, fn ->
+        all(
+          from t1 in "table_1",
+            left_join: t2 in "table_2",
+            on: t1.a == t2.b and t2.t <= t1.t,
+            hints: "INVALID",
+            select: count()
+        )
+      end
+    end
   end
 
   test "insert" do

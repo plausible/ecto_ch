@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- support join strictness (ASOF, ANY, ANTI, SEMI) https://github.com/plausible/ecto_ch/pull/156
+
 ## 0.3.3 (2024-04-04)
 
 - allow `Map(K,V)` params https://github.com/plausible/ecto_ch/pull/155
