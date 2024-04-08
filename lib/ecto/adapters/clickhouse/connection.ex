@@ -326,13 +326,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end)
   end
 
+  # TODO mybe add GLOBAL and PASTE
   valid_join_hints = ["ASOF", "ANY", "ANTI", "SEMI"]
 
   for hint <- valid_join_hints do
     hints = List.wrap(hint)
 
     defp join_hints(unquote(hints), _query) do
-      [?\s, unquote(Enum.join(hints, " "))]
+      unquote(" " <> Enum.join(hints, " "))
     end
   end
 
