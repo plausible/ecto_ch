@@ -28,13 +28,14 @@ defmodule Ecto.Integration.InterpolateTest do
     test "with floats" do
       assert all(
                from n in fragment("numbers(3)"),
-                 where: n.number > ^0.09999999999999998,
+                 where: n.number > ^0.09999999999999998 and 0.0 < ^0.9999999999999999999999999,
                  having: 5.0 < ^10_000_000_000_000_000_000_000_000_000_000_000_000.0,
                  select: n.number
              ) == %{
                rows: [[1], [2]],
+               # notice that 0.9999999999999999999999999 is rounded to 1.0
                sql:
-                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE (f0."number" > 0.09999999999999998) HAVING (5.0 < 1.0e37)}
+                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 0.09999999999999998) AND (0.0 < 1.0)) HAVING (5.0 < 1.0e37)}
              }
     end
   end
