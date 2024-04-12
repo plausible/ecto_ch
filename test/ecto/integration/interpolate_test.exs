@@ -11,11 +11,15 @@ defmodule Ecto.Integration.InterpolateTest do
   describe "interpolate and exec" do
     # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
     test "with integers" do
+      uint64_max = 18_446_744_073_709_551_615
+      int64_min = -9_223_372_036_854_775_808
+      int32_max = 2_147_483_647
+
       assert all(
                from n in fragment("numbers(3)"),
-                 where: n.number > ^1 and ^18_446_744_073_709_551_615 > 0,
-                 having: 5 > ^(-9_223_372_036_854_775_808),
-                 limit: ^2_147_483_647,
+                 where: n.number > ^1 and ^uint64_max > 0,
+                 having: 5 > ^int64_min,
+                 limit: ^int32_max,
                  select: n.number
              ) == %{
                rows: [[2]],
@@ -26,14 +30,17 @@ defmodule Ecto.Integration.InterpolateTest do
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/float
     test "with floats" do
+      almost_zero = 0.09999999999999998
+      will_be_rounded_to_one = 0.9999999999999999999999999
+      will_be_scientific = 10_000_000_000_000_000_000_000_000_000_000_000_000.0
+
       assert all(
                from n in fragment("numbers(3)"),
-                 where: n.number > ^0.09999999999999998 and 0.0 < ^0.9999999999999999999999999,
-                 having: 5.0 < ^10_000_000_000_000_000_000_000_000_000_000_000_000.0,
+                 where: n.number > ^almost_zero and 0.0 < ^will_be_rounded_to_one,
+                 having: 5.0 < ^will_be_scientific,
                  select: n.number
              ) == %{
                rows: [[1], [2]],
-               # notice that 0.9999999999999999999999999 is rounded to 1.0
                sql:
                  ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 0.09999999999999998) AND (0.0 < 1.0)) HAVING (5.0 < 1.0e37)}
              }
@@ -41,7 +48,28 @@ defmodule Ecto.Integration.InterpolateTest do
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/decimal
     test "with decimals" do
-      assert all()
+      # no rounding for decimals!
+      almost_zero = Decimal.new("0.09999999999999998")
+      alomost_one = Decimal.new("0.9999999999999999999999999")
+      big = Decimal.new(10_000_000_000_000_000_000_000_000_000_000_000_000)
+
+      assert all(
+               from n in fragment("numbers(3)"),
+                 where: n.number > ^almost_zero and n.number > ^alomost_one,
+                 having: n.number < ^big,
+                 select: n.number
+             ) == %{
+               rows: [[2]],
+               sql: """
+               SELECT f0."number" FROM numbers(3) AS f0 \
+               WHERE ((f0."number" > 0.09999999999999998) AND (f0."number" > 0.9999999999999999999999999)) \
+               HAVING (f0."number" < 10000000000000000000000000000000000000)\
+               """
+             }
+    end
+
+    # https://clickhouse.com/docs/en/sql-reference/data-types/string
+    test "with strings" do
     end
   end
 end
