@@ -64,7 +64,7 @@ defmodule Ecto.Adapters.ClickHouse do
           - `:interpolate` -- boolean for weather to interpolate params into SQL
 
       """
-      @spec to_sql(:all | :delete_all, Ecto.Query.t(), [{:interpolate, boolean}]) ::
+      @spec to_sql(:all | :update_all | :delete_all, Ecto.Queryable.t(), [{:interpolate, boolean}]) ::
               {String.t(), [term]}
       def to_sql(operation, queryable, opts \\ []) do
         Ecto.Adapters.ClickHouse.to_sql(operation, queryable, opts)
