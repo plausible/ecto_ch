@@ -70,6 +70,42 @@ defmodule Ecto.Integration.InterpolateTest do
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/string
     test "with strings" do
+      trouble1 = "'\\  "
+      trouble2 = "'"
+
+      assert all(
+               from n in fragment("numbers(3)"),
+                 where: fragment("toString(?)", n.number) == ^"2" and ^"asdfgh" != "qwerty",
+                 having:
+                   ^trouble1 == selected_as(:trouble1) and ^trouble2 == selected_as(:trouble2),
+                 select: [n.number, selected_as("'\\  ", :trouble1), selected_as("'", :trouble2)]
+             ) == %{
+               rows: [[2, trouble1, trouble2]],
+               sql: """
+               SELECT f0."number",'''\\\\  ' AS "trouble1",'''' AS "trouble2" \
+               FROM numbers(3) AS f0 \
+               WHERE ((toString(f0."number") = '2') AND ('asdfgh' != 'qwerty')) \
+               HAVING (('''\\\\  ' = "trouble1") AND ('''' = "trouble2"))\
+               """
+             }
+    end
+
+    # https://clickhouse.com/docs/en/sql-reference/data-types/date
+    test "with dates" do
+      flight_to_cnx = ~D[2024-04-30]
+
+      assert all(
+               from n in fragment("numbers(3)"),
+                 where: selected_as(:date) == ^flight_to_cnx,
+                 select: [n.number, selected_as(fragment("toDate(?+19842)", n.number), :date)]
+             ) == %{
+               rows: [[1, flight_to_cnx]],
+               sql: """
+               SELECT f0."number",toDate(f0."number"+19842) AS "date" \
+               FROM numbers(3) AS f0 \
+               WHERE ("date" = '2024-04-30')\
+               """
+             }
     end
   end
 end
