@@ -1,5 +1,5 @@
 defmodule Ecto.Integration.InterpolateTest do
-  use Ecto.Integration.Case, async: true
+  use Ecto.Integration.Case
   import Ecto.Query
   alias Ecto.Integration.TestRepo
 
@@ -37,6 +37,11 @@ defmodule Ecto.Integration.InterpolateTest do
                sql:
                  ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 0.09999999999999998) AND (0.0 < 1.0)) HAVING (5.0 < 1.0e37)}
              }
+    end
+
+    # https://clickhouse.com/docs/en/sql-reference/data-types/decimal
+    test "with decimals" do
+      assert all()
     end
   end
 end
