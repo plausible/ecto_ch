@@ -927,7 +927,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp interpolate_param(false), do: "false"
   defp interpolate_param(s) when is_binary(s), do: [?', escape_string(s), ?']
   defp interpolate_param(i) when is_integer(i), do: Integer.to_string(i)
-  # TODO ensure not scientific notation, or ensure ClickHouse can read it
+  # ClickHouse understand scientific notation e.g. "1.0e3" from Float.to_string(1000.0)
   defp interpolate_param(f) when is_float(f), do: Float.to_string(f)
   defp interpolate_param(%NaiveDateTime{} = naive), do: [?', NaiveDateTime.to_string(naive), ?']
   # TODO DateTime64

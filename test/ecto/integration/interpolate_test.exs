@@ -18,13 +18,24 @@ defmodule Ecto.Integration.InterpolateTest do
                  limit: ^2_147_483_647,
                  select: n.number
              ) == %{
+               rows: [[2]],
                sql:
-                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 1) AND (18446744073709551615 > 0)) HAVING (5 > -9223372036854775808) LIMIT 2147483647},
-               rows: [[2]]
+                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 1) AND (18446744073709551615 > 0)) HAVING (5 > -9223372036854775808) LIMIT 2147483647}
              }
     end
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/float
-    test "with floats"
+    test "with floats" do
+      assert all(
+               from n in fragment("numbers(3)"),
+                 where: n.number > ^0.09999999999999998,
+                 having: 5.0 < ^10_000_000_000_000_000_000_000_000_000_000_000_000.0,
+                 select: n.number
+             ) == %{
+               rows: [[1], [2]],
+               sql:
+                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE (f0."number" > 0.09999999999999998) HAVING (5.0 < 1.0e37)}
+             }
+    end
   end
 end
