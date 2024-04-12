@@ -130,4 +130,40 @@ defmodule EctoCh.Test do
     assert sql == ~s[SELECT e0."name" FROM "example" AS e0 WHERE (e0."user_id" = {$0:Int64})]
     assert params == [1]
   end
+
+  test "to_sql interpolate" do
+    interpolate = fn query ->
+      {sql, _params} = Ecto.Integration.TestRepo.to_sql(:all, query, interpolate: true)
+      sql
+    end
+
+    # string escape
+    assert interpolate.("schema" |> where(foo: ^"'\\  ") |> select([], true)) ==
+             "SELECT true FROM \"schema\" AS s0 WHERE (s0.\"foo\" = '''\\\\  ')"
+
+    assert interpolate.("schema" |> where(foo: ^"'") |> select([], true)) ==
+             "SELECT true FROM \"schema\" AS s0 WHERE (s0.\"foo\" = '''')"
+
+    # literals
+    assert interpolate.("schema" |> where(foo: ^true) |> select([], true)) ==
+             ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = true)}
+
+    assert interpolate.("schema" |> where(foo: ^false) |> select([], true)) ==
+             ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = false)}
+
+    assert interpolate.("schema" |> where(foo: ^"abc") |> select([], true)) ==
+             ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 'abc')}
+
+    assert interpolate.("schema" |> where(foo: ^123) |> select([], true)) ==
+             ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 123)}
+
+    assert interpolate.("schema" |> where(foo: ^123.0) |> select([], true)) ==
+             ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 123.0)}
+
+    assert interpolate.(
+             "schema"
+             |> where(fragment("? = ?", literal(^"y"), ^"Main"))
+             |> select([], true)
+           ) == ~s|SELECT true FROM "schema" AS s0 WHERE ("y" = 'Main')|
+  end
 end

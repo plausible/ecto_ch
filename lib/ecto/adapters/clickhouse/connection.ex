@@ -183,7 +183,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
           [quote_name(field), " IS NULL"]
 
         {{field, value}, idx} ->
-          [quote_name(field), ?=, build_param(idx, param_type(value))]
+          [quote_name(field), ?=, build_param(idx, value)]
       end)
 
     ["DELETE FROM ", quote_table(prefix, table), " WHERE ", filters]
@@ -541,7 +541,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:^, [], [ix]}, _sources, params, _query) do
-    build_param(ix, param_type_at(params, ix))
+    build_param(ix, Enum.at(params, ix))
   end
 
   defp expr({:^, [], [ix, len]}, _sources, params, _query) when len > 0 do
@@ -806,17 +806,25 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   def intersperse_map([], _separator, _mapper), do: []
 
+  @interpolate_tag :__ecto_ch_interpolate__
+
+  @doc false
+  def mark_interpolate(param), do: {@interpolate_tag, param}
+
   @compile inline: [build_param: 2]
-  defp build_param(ix, type) do
-    ["{$", Integer.to_string(ix), ?:, type, ?}]
+  defp build_param(ix, param) do
+    case param do
+      {@interpolate_tag, param} -> interpolate_param(param)
+      param -> ["{$", Integer.to_string(ix), ?:, param_type(param), ?}]
+    end
   end
 
   @doc false
   def build_params(ix, len, params) when len > 1 do
-    [build_param(ix, param_type_at(params, ix)), ?, | build_params(ix + 1, len - 1, params)]
+    [build_param(ix, Enum.at(params, ix)), ?, | build_params(ix + 1, len - 1, params)]
   end
 
-  def build_params(ix, _len = 1, params), do: build_param(ix, param_type_at(params, ix))
+  def build_params(ix, _len = 1, params), do: build_param(ix, Enum.at(params, ix))
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
@@ -914,9 +922,35 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       message: "unknown or ambiguous (for ClickHouse) Ecto type #{inspect(type)}"
   end
 
-  defp param_type_at(params, ix) do
-    value = Enum.at(params, ix)
-    param_type(value)
+  defp interpolate_param(nil), do: "NULL"
+  defp interpolate_param(true), do: "true"
+  defp interpolate_param(false), do: "false"
+  defp interpolate_param(s) when is_binary(s), do: [?', escape_string(s), ?']
+  defp interpolate_param(i) when is_integer(i), do: Integer.to_string(i)
+  # TODO ensure not scientific notation, or ensure ClickHouse can read it
+  defp interpolate_param(f) when is_float(f), do: Float.to_string(f)
+  defp interpolate_param(%NaiveDateTime{} = naive), do: [?', NaiveDateTime.to_string(naive), ?']
+  # TODO DateTime64
+  defp interpolate_param(%DateTime{} = dt), do: Integer.to_string(DateTime.to_unix(dt, :second))
+  defp interpolate_param(%Date{} = date), do: [?', Date.to_string(date), ?']
+  defp interpolate_param(%Decimal{} = dec), do: Decimal.to_string(dec, :normal)
+
+  defp interpolate_param(a) when is_list(a) do
+    [?[, Enum.map_intersperse(a, ?,, &interpolate_param/1), ?]]
+  end
+
+  defp interpolate_param(%s{}) do
+    raise ArgumentError, "struct #{inspect(s)} is not supported in params"
+  end
+
+  defp interpolate_param(m) when is_map(m) do
+    [
+      ?{,
+      Enum.map_intersperse(m, ?,, fn {k, v} ->
+        [interpolate_param(k), ?:, interpolate_param(v)]
+      end),
+      ?}
+    ]
   end
 
   defp param_type(s) when is_binary(s), do: "String"

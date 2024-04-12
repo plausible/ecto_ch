@@ -58,9 +58,16 @@ defmodule Ecto.Adapters.ClickHouse do
       A convenience function for SQL-based repositories that translates the given query to SQL.
 
       See `Ecto.Adapters.SQL.to_sql/3` for more information.
+
+      Additional adapter-specific options include:
+
+          - `:interpolate` -- boolean for weather to interpolate params into SQL
+
       """
-      def to_sql(operation, queryable) do
-        Ecto.Adapters.ClickHouse.to_sql(operation, queryable)
+      @spec to_sql(:all | :delete_all, Ecto.Query.t(), [{:interpolate, boolean}]) ::
+              {String.t(), [term]}
+      def to_sql(operation, queryable, opts \\ []) do
+        Ecto.Adapters.ClickHouse.to_sql(operation, queryable, opts)
       end
 
       @doc """
@@ -320,7 +327,7 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @doc false
-  def to_sql(operation, queryable) do
+  def to_sql(operation, queryable, opts \\ []) do
     queryable =
       queryable
       |> Ecto.Queryable.to_query()
@@ -329,7 +336,14 @@ defmodule Ecto.Adapters.ClickHouse do
     {query, _cast_params, dump_params} =
       Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
 
-    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
+    params =
+      if opts[:interpolate] do
+        Enum.map(dump_params, &@conn.mark_interpolate/1)
+      else
+        dump_params
+      end
+
+    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, params)
     {IO.iodata_to_binary(sql), dump_params}
   end
 

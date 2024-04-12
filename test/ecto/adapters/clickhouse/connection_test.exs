@@ -2874,14 +2874,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "build_params/3" do
-    params = [
-      1,
-      "a",
-      true,
-      Date.utc_today(),
-      DateTime.utc_now(),
-      DateTime.utc_now() |> DateTime.truncate(:second)
-    ]
+    params =
+      [
+        1,
+        "a",
+        true,
+        ~D[2024-04-12],
+        ~U[2024-04-12 09:55:54.329788Z],
+        ~U[2024-04-12 09:55:54Z]
+      ]
 
     assert to_string(Connection.build_params(_ix = 0, _len = 0, params)) == ""
     assert to_string(Connection.build_params(_ix = 1, _len = 0, params)) == ""
@@ -2916,5 +2917,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert to_string(Connection.build_params(_ix = 0, _len = 6, params)) ==
              "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64},{$5:DateTime}"
+
+    assert to_string(
+             Connection.build_params(
+               _ix = 0,
+               _len = 6,
+               Enum.map(params, &Connection.mark_interpolate/1)
+             )
+           ) == "1,'a',true,'2024-04-12',1712915754,1712915754"
   end
 end
