@@ -342,11 +342,11 @@ defmodule EctoCh.Test do
 
     # maps
     assert interpolate_all.(select("schema", [], fragment("?[site_id]", ^%{}))) ==
-             ~s|SELECT {}[site_id] FROM "schema" AS s0|
+             ~s|SELECT map()[site_id] FROM "schema" AS s0|
 
     assert interpolate_all.(
              select("schema", [], fragment("?[site_id]", ^%{1 => "UTC", 2 => "Europe/Vienna"}))
            ) ==
-             ~s|SELECT {1:'UTC',2:'Europe/Vienna'}[site_id] FROM "schema" AS s0|
+             ~s|SELECT map(1,'UTC',2,'Europe/Vienna')[site_id] FROM "schema" AS s0|
   end
 end

@@ -945,11 +945,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp interpolate_param(m) when is_map(m) do
     [
-      ?{,
+      "map(",
       Enum.map_intersperse(m, ?,, fn {k, v} ->
-        [interpolate_param(k), ?:, interpolate_param(v)]
+        [interpolate_param(k), ?,, interpolate_param(v)]
       end),
-      ?}
+      ?)
     ]
   end
 
