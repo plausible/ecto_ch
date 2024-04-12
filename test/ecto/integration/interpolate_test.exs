@@ -91,19 +91,27 @@ defmodule Ecto.Integration.InterpolateTest do
     end
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/date
+    # https://clickhouse.com/docs/en/sql-reference/data-types/date32
     test "with dates" do
       flight_to_cnx = ~D[2024-04-30]
+      flight_to_pluto = ~D[2243-10-17]
 
       assert all(
                from n in fragment("numbers(3)"),
                  where: selected_as(:date) == ^flight_to_cnx,
-                 select: [n.number, selected_as(fragment("toDate(?+19842)", n.number), :date)]
+                 having: selected_as(:date32) == ^flight_to_pluto,
+                 select: [
+                   n.number,
+                   selected_as(fragment("toDate(?+19842)", n.number), :date),
+                   selected_as(fragment("toDate32(?+99999)", n.number), :date32)
+                 ]
              ) == %{
-               rows: [[1, flight_to_cnx]],
+               rows: [[1, flight_to_cnx, flight_to_pluto]],
                sql: """
-               SELECT f0."number",toDate(f0."number"+19842) AS "date" \
+               SELECT f0."number",toDate(f0."number"+19842) AS "date",toDate32(f0."number"+99999) AS "date32" \
                FROM numbers(3) AS f0 \
-               WHERE ("date" = '2024-04-30')\
+               WHERE ("date" = '2024-04-30') \
+               HAVING ("date32" = '2243-10-17')\
                """
              }
     end
