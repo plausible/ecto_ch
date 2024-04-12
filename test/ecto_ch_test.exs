@@ -131,6 +131,7 @@ defmodule EctoCh.Test do
     assert params == [1]
   end
 
+  # TODO cleanup
   test "to_sql interpolate" do
     interpolate = fn kind, query ->
       {_sql, params} = Ecto.Integration.TestRepo.to_sql(kind, query)
