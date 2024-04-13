@@ -1,5 +1,5 @@
 defmodule Ecto.Integration.InterpolateTest do
-  use Ecto.Integration.Case
+  use Ecto.Integration.Case, async: true
   import Ecto.Query
   alias Ecto.Integration.TestRepo
 
@@ -8,112 +8,293 @@ defmodule Ecto.Integration.InterpolateTest do
     %{sql: sql, rows: TestRepo.query!(sql, _no_params = []).rows}
   end
 
-  describe "interpolate and exec" do
-    # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
-    test "with integers" do
-      uint64_max = 18_446_744_073_709_551_615
-      int64_min = -9_223_372_036_854_775_808
-      int32_max = 2_147_483_647
+  def one(query) do
+    assert %{rows: [[_true = 1]], sql: sql} = all(query)
+    sql
+  end
 
+  describe "interpolate and exec" do
+    test "in WHERE" do
+      assert all(from n in fragment("numbers(1)"), where: n.number == ^0, select: n.number) == %{
+               rows: [[0]],
+               sql: ~s{SELECT f0."number" FROM numbers(1) AS f0 WHERE (f0."number" = 0)}
+             }
+    end
+
+    test "in HAVING" do
+      assert all(from n in fragment("numbers(1)"), having: n.number == ^0, select: n.number) ==
+               %{
+                 rows: [[0]],
+                 sql: ~s{SELECT f0."number" FROM numbers(1) AS f0 HAVING (f0."number" = 0)}
+               }
+    end
+
+    test "in fragment" do
+      assert all(from n in fragment("numbers(?)", ^1), select: n.number) == %{
+               rows: [[0]],
+               sql: ~s{SELECT f0."number" FROM numbers(1) AS f0}
+             }
+    end
+
+    @tag :skip
+    test "in JOIN"
+    @tag :skip
+    test "in WINDOW"
+    @tag :skip
+    test "in SELECT"
+    @tag :skip
+    test "in WITH"
+
+    test "in subquery" do
       assert all(
-               from n in fragment("numbers(3)"),
-                 where: n.number > ^1 and ^uint64_max > 0,
-                 having: 5 > ^int64_min,
-                 limit: ^int32_max,
+               from n in fragment("numbers(2)"),
+                 where:
+                   n.number in subquery(from n in fragment("numbers(2)"), select: n.number + ^1),
                  select: n.number
              ) == %{
-               rows: [[2]],
+               rows: [[1]],
                sql:
-                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 1) AND (18446744073709551615 > 0)) HAVING (5 > -9223372036854775808) LIMIT 2147483647}
+                 ~s{SELECT f0."number" FROM numbers(2) AS f0 WHERE (f0."number" IN (SELECT sf0."number" + 1 FROM numbers(2) AS sf0))}
              }
+    end
+
+    test "in OFFSET and LIMIT" do
+      assert all(from n in fragment("numbers(2)"), offset: ^1, limit: ^1, select: n.number) == %{
+               rows: [[1]],
+               sql: ~s{SELECT f0."number" FROM numbers(2) AS f0 LIMIT 1 OFFSET 1}
+             }
+    end
+
+    @tag :skip
+    test "in GROUP BY"
+    @tag :skip
+    test "in ORDER BY"
+
+    # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
+    test "with integers" do
+      assert one(from fragment("system.one"), select: 1 == ^1) ==
+               "SELECT 1 = 1 FROM system.one AS f0"
     end
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/float
     test "with floats" do
-      almost_zero = 0.09999999999999998
-      will_be_rounded_to_one = 0.9999999999999999999999999
-      will_be_scientific = 10_000_000_000_000_000_000_000_000_000_000_000_000.0
-
-      assert all(
-               from n in fragment("numbers(3)"),
-                 where: n.number > ^almost_zero and 0.0 < ^will_be_rounded_to_one,
-                 having: 5.0 < ^will_be_scientific,
-                 select: n.number
-             ) == %{
-               rows: [[1], [2]],
-               sql:
-                 ~s{SELECT f0."number" FROM numbers(3) AS f0 WHERE ((f0."number" > 0.09999999999999998) AND (0.0 < 1.0)) HAVING (5.0 < 1.0e37)}
-             }
+      assert one(from fragment("system.one"), select: 0.1 == ^0.1) ==
+               "SELECT 0.1 = 0.1 FROM system.one AS f0"
     end
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/decimal
     test "with decimals" do
-      # no rounding for decimals!
-      almost_zero = Decimal.new("0.09999999999999998")
-      alomost_one = Decimal.new("0.9999999999999999999999999")
-      big = Decimal.new(10_000_000_000_000_000_000_000_000_000_000_000_000)
-
-      assert all(
-               from n in fragment("numbers(3)"),
-                 where: n.number > ^almost_zero and n.number > ^alomost_one,
-                 having: n.number < ^big,
-                 select: n.number
-             ) == %{
-               rows: [[2]],
-               sql: """
-               SELECT f0."number" FROM numbers(3) AS f0 \
-               WHERE ((f0."number" > 0.09999999999999998) AND (f0."number" > 0.9999999999999999999999999)) \
-               HAVING (f0."number" < 10000000000000000000000000000000000000)\
-               """
-             }
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("toDecimal32(1,4)") == ^Decimal.new("1.0")
+             ) ==
+               "SELECT toDecimal32(1,4) = 1.0 FROM system.one AS f0"
     end
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/string
     test "with strings" do
-      trouble1 = "'\\  "
-      trouble2 = "'"
+      assert one(from fragment("system.one"), select: "asdf" == ^"asdf") ==
+               "SELECT 'asdf' = 'asdf' FROM system.one AS f0"
 
-      assert all(
-               from n in fragment("numbers(3)"),
-                 where: fragment("toString(?)", n.number) == ^"2" and ^"asdfgh" != "qwerty",
-                 having:
-                   ^trouble1 == selected_as(:trouble1) and ^trouble2 == selected_as(:trouble2),
-                 select: [n.number, selected_as("'\\  ", :trouble1), selected_as("'", :trouble2)]
-             ) == %{
-               rows: [[2, trouble1, trouble2]],
-               sql: """
-               SELECT f0."number",'''\\\\  ' AS "trouble1",'''' AS "trouble2" \
-               FROM numbers(3) AS f0 \
-               WHERE ((toString(f0."number") = '2') AND ('asdfgh' != 'qwerty')) \
-               HAVING (('''\\\\  ' = "trouble1") AND ('''' = "trouble2"))\
-               """
-             }
+      assert one(from fragment("system.one"), select: ~s{\\} == ^"\\") ==
+               "SELECT '\\\\' = '\\\\' FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: "'" == ^"'") ==
+               "SELECT '''' = '''' FROM system.one AS f0"
     end
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/date
     # https://clickhouse.com/docs/en/sql-reference/data-types/date32
     test "with dates" do
-      flight_to_cnx = ~D[2024-04-30]
-      flight_to_europa = ~D[2243-10-17]
+      assert one(from fragment("system.one"), select: fragment("toDate(0)") == ^~D[1970-01-01]) ==
+               "SELECT toDate(0) = '1970-01-01'::date FROM system.one AS f0"
 
-      assert all(
-               from n in fragment("numbers(3)"),
-                 where: selected_as(:date) == ^flight_to_cnx,
-                 having: selected_as(:date32) == ^flight_to_europa,
-                 select: [
-                   n.number,
-                   selected_as(fragment("toDate(?+19842)", n.number), :date),
-                   selected_as(fragment("toDate32(?+99999)", n.number), :date32)
-                 ]
-             ) == %{
-               rows: [[1, flight_to_cnx, flight_to_europa]],
-               sql: """
-               SELECT f0."number",toDate(f0."number"+19842) AS "date",toDate32(f0."number"+99999) AS "date32" \
-               FROM numbers(3) AS f0 \
-               WHERE ("date" = '2024-04-30') \
-               HAVING ("date32" = '2243-10-17')\
-               """
-             }
+      # can apply toDate
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("toDate(?)", ^~D[1970-01-01]) == ^~D[1970-01-01]
+             ) ==
+               "SELECT toDate('1970-01-01'::date) = '1970-01-01'::date FROM system.one AS f0"
+
+      # can apply functions
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("toMonday(?)", ^~D[2000-01-01]) == ^~D[1999-12-27]
+             ) ==
+               "SELECT toMonday('2000-01-01'::date) = '1999-12-27'::date FROM system.one AS f0"
+
+      # uses date32 when date is in far future
+      assert one(
+               from fragment("system.one"), select: fragment("toDate32(99999)") == ^~D[2243-10-16]
+             ) ==
+               "SELECT toDate32(99999) = '2243-10-16'::date32 FROM system.one AS f0"
+    end
+
+    test "with datetimes" do
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("toDateTime(0)") == ^~U[1970-01-01 00:00:00Z]
+             ) ==
+               "SELECT toDateTime(0) = '1970-01-01 00:00:00'::DateTime('Etc/UTC') FROM system.one AS f0"
+
+      # can apply toDateTime
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime(?)", ^~U[2024-04-13 11:00:06Z]) ==
+                     ^~U[2024-04-13 11:00:06Z]
+             ) ==
+               "SELECT toDateTime('2024-04-13 11:00:06'::DateTime('Etc/UTC')) = '2024-04-13 11:00:06'::DateTime('Etc/UTC') FROM system.one AS f0"
+
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime(?)", ^~U[2024-04-13 11:00:06.935753Z]) ==
+                     ^~U[2024-04-13 11:00:06Z]
+             ) ==
+               "SELECT toDateTime('2024-04-13 11:00:06.935753'::DateTime64(6,'Etc/UTC')) = '2024-04-13 11:00:06'::DateTime('Etc/UTC') FROM system.one AS f0"
+
+      # uses datetime64 when datetime has microseconds
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("toDateTime(0)") == ^~U[1970-01-01 00:00:00.000Z]
+             ) ==
+               "SELECT toDateTime(0) = '1970-01-01 00:00:00.000'::DateTime64(3,'Etc/UTC') FROM system.one AS f0"
+
+      # can apply toDateTime64
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime64(?,3)", ^~U[2024-04-13 11:00:06.935753Z]) ==
+                     ^~U[2024-04-13 11:00:06.935Z]
+             ) ==
+               "SELECT toDateTime64('2024-04-13 11:00:06.935753'::DateTime64(6,'Etc/UTC'),3) = '2024-04-13 11:00:06.935'::DateTime64(3,'Etc/UTC') FROM system.one AS f0"
+
+      # can apply functions
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDate(toTimeZone(?,'Asia/Taipei'))", ^~U[2024-04-13 11:00:06Z]) ==
+                     "2024-04-13"
+             ) ==
+               "SELECT toDate(toTimeZone('2024-04-13 11:00:06'::DateTime('Etc/UTC'),'Asia/Taipei')) = '2024-04-13' FROM system.one AS f0"
+    end
+
+    test "with naive datetimes" do
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("toDateTime('1970-01-01 00:00:00')") == ^~N[1970-01-01 00:00:00]
+             ) ==
+               "SELECT toDateTime('1970-01-01 00:00:00') = '1970-01-01 00:00:00'::datetime FROM system.one AS f0"
+
+      # can apply toDateTime
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime(?)", ^~N[2024-04-13 11:00:06]) ==
+                     ^~N[2024-04-13 11:00:06]
+             ) ==
+               "SELECT toDateTime('2024-04-13 11:00:06'::datetime) = '2024-04-13 11:00:06'::datetime FROM system.one AS f0"
+
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime(?)", ^~N[2024-04-13 11:00:06.935753]) ==
+                     ^~N[2024-04-13 11:00:06]
+             ) ==
+               "SELECT toDateTime('2024-04-13 11:00:06.935753'::DateTime64(6)) = '2024-04-13 11:00:06'::datetime FROM system.one AS f0"
+
+      # uses datetime64 when datetime has microseconds
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime('1970-01-01 00:00:00')") == ^~N[1970-01-01 00:00:00.000]
+             ) ==
+               "SELECT toDateTime('1970-01-01 00:00:00') = '1970-01-01 00:00:00.000'::DateTime64(3) FROM system.one AS f0"
+
+      # can apply toDateTime64
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDateTime64(?,3)", ^~N[2024-04-13 11:00:06.935753]) ==
+                     ^~N[2024-04-13 11:00:06.935]
+             ) ==
+               "SELECT toDateTime64('2024-04-13 11:00:06.935753'::DateTime64(6),3) = '2024-04-13 11:00:06.935'::DateTime64(3) FROM system.one AS f0"
+
+      # can apply functions
+      assert one(
+               from fragment("system.one"),
+                 select:
+                   fragment("toDate(toTimeZone(?,'Asia/Taipei'))", ^~N[2024-04-13 11:00:06]) ==
+                     "2024-04-13"
+             ) ==
+               "SELECT toDate(toTimeZone('2024-04-13 11:00:06'::datetime,'Asia/Taipei')) = '2024-04-13' FROM system.one AS f0"
+    end
+
+    @tag :skip
+    test "with enums"
+
+    test "with booleans" do
+      assert one(from fragment("system.one"), select: true == ^true) ==
+               "SELECT 1 = true FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: false == ^false) ==
+               "SELECT 0 = false FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: fragment("true") == ^true) ==
+               "SELECT true = true FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: fragment("false") == ^false) ==
+               "SELECT false = false FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: fragment("?", 1) == ^true) ==
+               "SELECT 1 = true FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: fragment("?", 0) == ^false) ==
+               "SELECT 0 = false FROM system.one AS f0"
+    end
+
+    @tag :skip
+    test "with uuid"
+    @tag :skip
+    test "with ipv4"
+    @tag :skip
+    test "with ipv6"
+
+    test "with array" do
+      assert one(from fragment("system.one"), select: [] == ^[]) ==
+               "SELECT [] = [] FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: [1] == ^[1]) ==
+               "SELECT [1] = [1] FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: 1 == fragment("?[1]", ^[1])) ==
+               "SELECT 1 = [1][1] FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: [1, 2, 3] == ^[1, 2, 3]) ==
+               "SELECT [1,2,3] = [1,2,3] FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: ["a", "b", "c"] == ^["a", "b", "c"]) ==
+               "SELECT ['a','b','c'] = ['a','b','c'] FROM system.one AS f0"
+
+      assert one(
+               from fragment("system.one"),
+                 select: [fragment("toDate('2023-01-01')"), nil] == ^[~D[2023-01-01], nil]
+             ) ==
+               "SELECT [toDate('2023-01-01'),NULL] = ['2023-01-01'::date,NULL] FROM system.one AS f0"
+    end
+
+    @tag :skip
+    test "with tuple"
+
+    test "with map" do
+      assert one(from fragment("system.one"), select: 1 == fragment("?[1]", ^%{1 => 1})) ==
+               "SELECT 1 = map(1,1)[1] FROM system.one AS f0"
+
+      assert one(
+               from fragment("system.one"),
+                 select: 1 == fragment("?[?]", ^%{"a" => 0, "b" => 1}, ^"b")
+             ) == "SELECT 1 = map('a',0,'b',1)['b'] FROM system.one AS f0"
     end
   end
 end

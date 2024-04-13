@@ -927,12 +927,43 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp interpolate_param(false), do: "false"
   defp interpolate_param(s) when is_binary(s), do: [?', escape_string(s), ?']
   defp interpolate_param(i) when is_integer(i), do: Integer.to_string(i)
-  # ClickHouse understand scientific notation e.g. "1.0e3" from Float.to_string(1000.0)
+
+  # ClickHouse understands scientific notation
   defp interpolate_param(f) when is_float(f), do: Float.to_string(f)
-  defp interpolate_param(%NaiveDateTime{} = naive), do: [?', NaiveDateTime.to_string(naive), ?']
-  # TODO DateTime64
-  defp interpolate_param(%DateTime{} = dt), do: Integer.to_string(DateTime.to_unix(dt, :second))
-  defp interpolate_param(%Date{} = date), do: [?', Date.to_string(date), ?']
+
+  defp interpolate_param(%NaiveDateTime{microsecond: microsecond} = naive) do
+    naive = NaiveDateTime.to_string(naive)
+
+    case microsecond do
+      {0, 0} -> [?', naive, "'::datetime"]
+      {_, precision} -> [?', naive, "'::DateTime64(", Integer.to_string(precision), ?)]
+    end
+  end
+
+  defp interpolate_param(%DateTime{microsecond: microsecond, time_zone: time_zone} = dt) do
+    time_zone = escape_string(time_zone)
+    dt = NaiveDateTime.to_string(DateTime.to_naive(dt))
+
+    case microsecond do
+      {0, 0} ->
+        [?', dt, "'::DateTime('", time_zone, "')"]
+
+      {_, precision} ->
+        [?', dt, "'::DateTime64(", Integer.to_string(precision), ",'", time_zone, "')"]
+    end
+  end
+
+  defp interpolate_param(%Date{year: year} = date) do
+    suffix =
+      if year < 1970 or year > 2148 do
+        "'::date32"
+      else
+        "'::date"
+      end
+
+    [?', Date.to_string(date), suffix]
+  end
+
   defp interpolate_param(%Decimal{} = dec), do: Decimal.to_string(dec, :normal)
 
   defp interpolate_param(a) when is_list(a) do
