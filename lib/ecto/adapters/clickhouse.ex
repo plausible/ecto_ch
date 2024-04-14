@@ -344,8 +344,7 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @doc """
-  Converts the given query to SQL according to its kind and inlines all parameters.
-  This is useful for debugging.
+  Converts the given query to SQL according to its kind and inlines all parameters. Useful for debugging.
 
   Example:
 
