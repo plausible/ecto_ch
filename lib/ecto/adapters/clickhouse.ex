@@ -344,7 +344,21 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @doc """
-  TODO
+  Converts the given query to SQL according to its kind and inlines all parameters.
+  This is useful for debugging.
+
+  Example:
+
+      iex> query = from n in fragment("numbers(10)"), where: n.number == ^-1, select: n.number
+      iex> Ecto.Adapters.ClickHouse.to_inline_sql(:all, query)
+      ~s{SELECT f0."number" FROM numbers(10) AS f0 WHERE (f0."number" = -1)}
+
+  Compare it with the output of `to_sql/2`
+
+      iex> query = from n in fragment("numbers(10)"), where: n.number == ^-1, select: n.number
+      iex> Ecto.Adapters.ClickHouse.to_sql(:all, query)
+      {~s[SELECT f0."number" FROM numbers(10) AS f0 WHERE (f0."number" = {$0:Int64})], [-1]}
+
   """
   @spec to_inline_sql(:all | :delete_all | :update_all, Ecto.Queryable.t()) :: String.t()
   def to_inline_sql(operation, queryable) do

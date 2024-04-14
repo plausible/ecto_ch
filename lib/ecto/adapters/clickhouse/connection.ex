@@ -970,6 +970,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?[, Enum.map_intersperse(a, ?,, &inline_param/1), ?]]
   end
 
+  defp inline_param(t) when is_tuple(t) do
+    [?(, t |> Tuple.to_list() |> Enum.map_intersperse(?,, &inline_param/1), ?)]
+  end
+
   defp inline_param(%s{}) do
     raise ArgumentError, "struct #{inspect(s)} is not supported in params"
   end

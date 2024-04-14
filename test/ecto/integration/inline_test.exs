@@ -13,63 +13,77 @@ defmodule Ecto.Integration.InlineSQLTest do
     sql
   end
 
-  describe "interpolate and exec" do
-    test "in WHERE" do
-      assert all(from n in fragment("numbers(1)"), where: n.number == ^0, select: n.number) == %{
-               rows: [[0]],
-               sql: ~s{SELECT f0."number" FROM numbers(1) AS f0 WHERE (f0."number" = 0)}
-             }
+  describe "to_inline_sql/2" do
+    test "everything query" do
+      cte1 =
+        "schema1"
+        |> select([m], %{id: m.id, smth: ^true})
+        |> where([], fragment("?", ^1))
+
+      union =
+        "schema1"
+        |> select([m], {m.id, ^true})
+        |> where([], fragment("?", ^5))
+
+      union_all =
+        "schema2"
+        |> select([m], {m.id, ^false})
+        |> where([], fragment("?", ^6))
+
+      query =
+        "schema"
+        |> with_cte("cte1", as: ^cte1)
+        |> with_cte("cte2", as: fragment("SELECT * FROM schema WHERE ?", ^2))
+        |> select([m], {m.id, ^0})
+        |> join(:inner, [], "schema2", on: fragment("?", ^true))
+        |> join(:inner, [], "schema2", on: fragment("?", ^false))
+        |> where([], fragment("?", ^true))
+        |> where([], fragment("?", ^false))
+        |> having([], fragment("?", ^true))
+        |> having([], fragment("?", ^false))
+        |> group_by([], fragment("?", ^3))
+        |> group_by([], fragment("?", ^4))
+        |> union(^union)
+        |> union_all(^union_all)
+        |> order_by([], fragment("?", ^7))
+        |> limit([], ^8)
+        |> offset([], ^9)
+
+      assert TestRepo.to_inline_sql(:all, query) ==
+               """
+               WITH \
+               "cte1" AS (\
+               SELECT ss0."id" AS "id",true AS "smth" FROM "schema1" AS ss0 \
+               WHERE (1)\
+               ),\
+               "cte2" AS (\
+               SELECT * FROM schema WHERE 2\
+               ) \
+               SELECT s0."id",0 FROM "schema" AS s0 \
+               INNER JOIN "schema2" AS s1 ON true \
+               INNER JOIN "schema2" AS s2 ON false \
+               WHERE (true) AND (false) \
+               GROUP BY 3,4 \
+               HAVING (true) AND (false) \
+               ORDER BY 7 \
+               LIMIT 8 \
+               OFFSET 9 \
+               UNION \
+               (SELECT s0."id",true FROM "schema1" AS s0 \
+               WHERE (5)) \
+               UNION ALL \
+               (SELECT s0."id",false FROM "schema2" AS s0 \
+               WHERE (6))\
+               """
     end
 
-    test "in HAVING" do
-      assert all(from n in fragment("numbers(1)"), having: n.number == ^0, select: n.number) ==
-               %{
-                 rows: [[0]],
-                 sql: ~s{SELECT f0."number" FROM numbers(1) AS f0 HAVING (f0."number" = 0)}
-               }
+    test "delete all" do
+      assert TestRepo.to_inline_sql(:delete_all, from(e in "schema", where: e.x == ^123)) ==
+               ~s[DELETE FROM "schema" WHERE ("x" = 123)]
     end
+  end
 
-    test "in fragment" do
-      assert all(from n in fragment("numbers(?)", ^1), select: n.number) == %{
-               rows: [[0]],
-               sql: ~s{SELECT f0."number" FROM numbers(1) AS f0}
-             }
-    end
-
-    @tag :skip
-    test "in JOIN"
-    @tag :skip
-    test "in WINDOW"
-    @tag :skip
-    test "in SELECT"
-    @tag :skip
-    test "in WITH"
-
-    test "in subquery" do
-      assert all(
-               from n in fragment("numbers(2)"),
-                 where:
-                   n.number in subquery(from n in fragment("numbers(2)"), select: n.number + ^1),
-                 select: n.number
-             ) == %{
-               rows: [[1]],
-               sql:
-                 ~s{SELECT f0."number" FROM numbers(2) AS f0 WHERE (f0."number" IN (SELECT sf0."number" + 1 FROM numbers(2) AS sf0))}
-             }
-    end
-
-    test "in OFFSET and LIMIT" do
-      assert all(from n in fragment("numbers(2)"), offset: ^1, limit: ^1, select: n.number) == %{
-               rows: [[1]],
-               sql: ~s{SELECT f0."number" FROM numbers(2) AS f0 LIMIT 1 OFFSET 1}
-             }
-    end
-
-    @tag :skip
-    test "in GROUP BY"
-    @tag :skip
-    test "in ORDER BY"
-
+  describe "inline and exec" do
     # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
     test "with integers" do
       assert one(from fragment("system.one"), select: 1 == ^1) ==
@@ -231,8 +245,17 @@ defmodule Ecto.Integration.InlineSQLTest do
                "SELECT toDate(toTimeZone('2024-04-13 11:00:06'::datetime,'Asia/Taipei')) = '2024-04-13' FROM system.one AS f0"
     end
 
-    @tag :skip
-    test "with enums"
+    test "with enums" do
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("CAST('a' AS Enum('a' = 1, 'b' = 2))") == ^"a"
+             ) == "SELECT CAST('a' AS Enum('a' = 1, 'b' = 2)) = 'a' FROM system.one AS f0"
+
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("CAST('a' AS Enum('a' = 1, 'b' = 2))") == ^1
+             ) == "SELECT CAST('a' AS Enum('a' = 1, 'b' = 2)) = 1 FROM system.one AS f0"
+    end
 
     test "with booleans" do
       assert one(from fragment("system.one"), select: true == ^true) ==
@@ -254,12 +277,38 @@ defmodule Ecto.Integration.InlineSQLTest do
                "SELECT 0 = false FROM system.one AS f0"
     end
 
-    @tag :skip
-    test "with uuid"
-    @tag :skip
-    test "with ipv4"
-    @tag :skip
-    test "with ipv6"
+    test "with uuid" do
+      uuid = "601d74e4-a8d3-4b6e-8365-eddb4c893327"
+
+      assert one(from fragment("system.one"), select: type(^uuid, Ecto.UUID) == ^uuid) ==
+               "SELECT CAST('601d74e4-a8d3-4b6e-8365-eddb4c893327' AS UUID) = '601d74e4-a8d3-4b6e-8365-eddb4c893327' FROM system.one AS f0"
+
+      assert <<uuid_raw::16-bytes>> = Ecto.UUID.dump!(uuid)
+
+      assert one(from fragment("system.one"), select: type(^uuid_raw, Ecto.UUID) == ^uuid) ==
+               "SELECT CAST('601d74e4-a8d3-4b6e-8365-eddb4c893327' AS UUID) = '601d74e4-a8d3-4b6e-8365-eddb4c893327' FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: type(^uuid, Ecto.UUID) == ^uuid_raw) ==
+               "SELECT CAST('601d74e4-a8d3-4b6e-8365-eddb4c893327' AS UUID) = '601d74e4-a8d3-4b6e-8365-eddb4c893327' FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: ^uuid_raw == ^uuid_raw) ==
+               "SELECT '`\x1Dt\xE4\xA8\xD3Kn\x83e\xED\xDBL\x893''' = '`\x1Dt\xE4\xA8\xD3Kn\x83e\xED\xDBL\x893''' FROM system.one AS f0"
+    end
+
+    test "with ipv4" do
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("'116.253.40.133'::IPv4") == ^"116.253.40.133"
+             ) == "SELECT '116.253.40.133'::IPv4 = '116.253.40.133' FROM system.one AS f0"
+    end
+
+    test "with ipv6" do
+      assert one(
+               from fragment("system.one"),
+                 select: fragment("'2a02:aa08:e000:3100::2'::IPv6") == ^"2a02:aa08:e000:3100::2"
+             ) ==
+               "SELECT '2a02:aa08:e000:3100::2'::IPv6 = '2a02:aa08:e000:3100::2' FROM system.one AS f0"
+    end
 
     test "with array" do
       assert one(from fragment("system.one"), select: [] == ^[]) ==
@@ -284,8 +333,13 @@ defmodule Ecto.Integration.InlineSQLTest do
                "SELECT [toDate('2023-01-01'),NULL] = ['2023-01-01'::date,NULL] FROM system.one AS f0"
     end
 
-    @tag :skip
-    test "with tuple"
+    test "with tuple" do
+      assert one(from fragment("system.one"), select: fragment("tuple(1, 'a')") == ^{1, "a"}) ==
+               "SELECT tuple(1, 'a') = (1,'a') FROM system.one AS f0"
+
+      assert one(from fragment("system.one"), select: 1 == fragment("?.1", ^{1, nil})) ==
+               "SELECT 1 = (1,NULL).1 FROM system.one AS f0"
+    end
 
     test "with map" do
       assert one(from fragment("system.one"), select: 1 == fragment("?[1]", ^%{1 => 1})) ==

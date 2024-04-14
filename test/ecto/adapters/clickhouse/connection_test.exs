@@ -2922,7 +2922,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              Connection.build_params(
                _ix = 0,
                _len = 6,
-               Enum.map(params, &Connection.mark_interpolate/1)
+               Enum.map(params, &Connection.mark_inline/1)
              )
            ) ==
              "1,'a',true,'2024-04-12'::date,'2024-04-12 09:55:54.329788'::DateTime64(6,'Etc/UTC'),'2024-04-12 09:55:54'::DateTime('Etc/UTC')"
