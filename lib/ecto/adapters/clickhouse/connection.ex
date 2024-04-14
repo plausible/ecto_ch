@@ -806,15 +806,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   def intersperse_map([], _separator, _mapper), do: []
 
-  @interpolate_tag :__ecto_ch_interpolate__
+  @inline_tag :__ecto_ch_inline__
 
   @doc false
-  def mark_interpolate(param), do: {@interpolate_tag, param}
+  def mark_inline(param), do: {@inline_tag, param}
 
   @compile inline: [build_param: 2]
   defp build_param(ix, param) do
     case param do
-      {@interpolate_tag, param} -> interpolate_param(param)
+      {@inline_tag, param} -> inline_param(param)
       param -> ["{$", Integer.to_string(ix), ?:, param_type(param), ?}]
     end
   end
@@ -922,16 +922,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       message: "unknown or ambiguous (for ClickHouse) Ecto type #{inspect(type)}"
   end
 
-  defp interpolate_param(nil), do: "NULL"
-  defp interpolate_param(true), do: "true"
-  defp interpolate_param(false), do: "false"
-  defp interpolate_param(s) when is_binary(s), do: [?', escape_string(s), ?']
-  defp interpolate_param(i) when is_integer(i), do: Integer.to_string(i)
+  defp inline_param(nil), do: "NULL"
+  defp inline_param(true), do: "true"
+  defp inline_param(false), do: "false"
+  defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
+  defp inline_param(i) when is_integer(i), do: Integer.to_string(i)
 
   # ClickHouse understands scientific notation
-  defp interpolate_param(f) when is_float(f), do: Float.to_string(f)
+  defp inline_param(f) when is_float(f), do: Float.to_string(f)
 
-  defp interpolate_param(%NaiveDateTime{microsecond: microsecond} = naive) do
+  defp inline_param(%NaiveDateTime{microsecond: microsecond} = naive) do
     naive = NaiveDateTime.to_string(naive)
 
     case microsecond do
@@ -940,7 +940,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  defp interpolate_param(%DateTime{microsecond: microsecond, time_zone: time_zone} = dt) do
+  defp inline_param(%DateTime{microsecond: microsecond, time_zone: time_zone} = dt) do
     time_zone = escape_string(time_zone)
     dt = NaiveDateTime.to_string(DateTime.to_naive(dt))
 
@@ -953,7 +953,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  defp interpolate_param(%Date{year: year} = date) do
+  defp inline_param(%Date{year: year} = date) do
     suffix =
       if year < 1970 or year > 2148 do
         "'::date32"
@@ -964,21 +964,21 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?', Date.to_string(date), suffix]
   end
 
-  defp interpolate_param(%Decimal{} = dec), do: Decimal.to_string(dec, :normal)
+  defp inline_param(%Decimal{} = dec), do: Decimal.to_string(dec, :normal)
 
-  defp interpolate_param(a) when is_list(a) do
-    [?[, Enum.map_intersperse(a, ?,, &interpolate_param/1), ?]]
+  defp inline_param(a) when is_list(a) do
+    [?[, Enum.map_intersperse(a, ?,, &inline_param/1), ?]]
   end
 
-  defp interpolate_param(%s{}) do
+  defp inline_param(%s{}) do
     raise ArgumentError, "struct #{inspect(s)} is not supported in params"
   end
 
-  defp interpolate_param(m) when is_map(m) do
+  defp inline_param(m) when is_map(m) do
     [
       "map(",
       Enum.map_intersperse(m, ?,, fn {k, v} ->
-        [interpolate_param(k), ?,, interpolate_param(v)]
+        [inline_param(k), ?,, inline_param(v)]
       end),
       ?)
     ]

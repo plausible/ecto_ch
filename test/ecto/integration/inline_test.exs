@@ -1,10 +1,10 @@
-defmodule Ecto.Integration.InterpolateTest do
+defmodule Ecto.Integration.InlineSQLTest do
   use Ecto.Integration.Case, async: true
   import Ecto.Query
   alias Ecto.Integration.TestRepo
 
   def all(query) do
-    {sql, _params} = TestRepo.to_sql(:all, query, interpolate: true)
+    sql = TestRepo.to_inline_sql(:all, query)
     %{sql: sql, rows: TestRepo.query!(sql, _no_params = []).rows}
   end
 

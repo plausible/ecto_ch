@@ -58,16 +58,19 @@ defmodule Ecto.Adapters.ClickHouse do
       A convenience function for SQL-based repositories that translates the given query to SQL.
 
       See `Ecto.Adapters.SQL.to_sql/3` for more information.
-
-      Additional adapter-specific options include:
-
-          - `:interpolate` -- boolean for weather to interpolate params into SQL
-
       """
-      @spec to_sql(:all | :update_all | :delete_all, Ecto.Queryable.t(), [{:interpolate, boolean}]) ::
-              {String.t(), [term]}
-      def to_sql(operation, queryable, opts \\ []) do
-        Ecto.Adapters.ClickHouse.to_sql(operation, queryable, opts)
+      def to_sql(operation, queryable) do
+        Ecto.Adapters.ClickHouse.to_sql(operation, queryable)
+      end
+
+      @doc """
+      Similar to `to_sql/2` but inlines the parameters into the SQL query.
+
+      See `Ecto.Adapters.ClickHouse.to_inline_sql/2` for more information.
+      """
+      @spec to_inline_sql(:all | :delete_all | :update_all, Ecto.Queryable.t()) :: String.t()
+      def to_inline_sql(operation, queryable) do
+        Ecto.Adapters.ClickHouse.to_inline_sql(operation, queryable)
       end
 
       @doc """
@@ -327,7 +330,7 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @doc false
-  def to_sql(operation, queryable, opts \\ []) do
+  def to_sql(operation, queryable) do
     queryable =
       queryable
       |> Ecto.Queryable.to_query()
@@ -336,15 +339,26 @@ defmodule Ecto.Adapters.ClickHouse do
     {query, _cast_params, dump_params} =
       Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
 
-    params =
-      if opts[:interpolate] do
-        Enum.map(dump_params, &@conn.mark_interpolate/1)
-      else
-        dump_params
-      end
-
-    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, params)
+    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
     {IO.iodata_to_binary(sql), dump_params}
+  end
+
+  @doc """
+  TODO
+  """
+  @spec to_inline_sql(:all | :delete_all | :update_all, Ecto.Queryable.t()) :: String.t()
+  def to_inline_sql(operation, queryable) do
+    queryable =
+      queryable
+      |> Ecto.Queryable.to_query()
+      |> Ecto.Query.Planner.ensure_select(operation == :all)
+
+    {query, _cast_params, dump_params} =
+      Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
+
+    inline_params = Enum.map(dump_params, &@conn.mark_inline/1)
+    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, inline_params)
+    IO.iodata_to_binary(sql)
   end
 
   defp put_setting(opts, key, value) do
