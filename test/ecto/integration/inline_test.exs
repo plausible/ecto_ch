@@ -222,9 +222,9 @@ defmodule Ecto.Integration.InlineSQLTest do
       assert one(
                from fragment("system.one"),
                  select:
-                   fragment("toDateTime('1970-01-01 00:00:00')") == ^~N[1970-01-01 00:00:00.000]
+                   fragment("toDateTime('1970-01-01 10:00:00')") == ^~N[1970-01-01 10:00:00.000]
              ) ==
-               "SELECT toDateTime('1970-01-01 00:00:00') = '1970-01-01 00:00:00.000'::DateTime64(3) FROM system.one AS f0"
+               "SELECT toDateTime('1970-01-01 10:00:00') = '1970-01-01 10:00:00.000'::DateTime64(3) FROM system.one AS f0"
 
       # can apply toDateTime64
       assert one(
