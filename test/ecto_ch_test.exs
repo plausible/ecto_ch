@@ -1,9 +1,11 @@
 defmodule EctoCh.Test do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   import Ecto.Query
   alias Ecto.Adapters.ClickHouse.Connection, as: SQL
   alias EctoClickHouse.Integration.Product
+
+  doctest Ecto.Adapters.ClickHouse
 
   describe "all" do
     test "select one column" do

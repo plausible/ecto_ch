@@ -64,6 +64,16 @@ defmodule Ecto.Adapters.ClickHouse do
       end
 
       @doc """
+      Similar to `to_sql/2` but inlines the parameters into the SQL query.
+
+      See `Ecto.Adapters.ClickHouse.to_inline_sql/2` for more information.
+      """
+      @spec to_inline_sql(:all | :delete_all | :update_all, Ecto.Queryable.t()) :: String.t()
+      def to_inline_sql(operation, queryable) do
+        Ecto.Adapters.ClickHouse.to_inline_sql(operation, queryable)
+      end
+
+      @doc """
       A convenience function for SQL-based repositories that forces all connections in the
       pool to disconnect within the given interval.
 
@@ -331,6 +341,37 @@ defmodule Ecto.Adapters.ClickHouse do
 
     sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
     {IO.iodata_to_binary(sql), dump_params}
+  end
+
+  @doc """
+  Converts the given query to SQL according to its kind and inlines all parameters. Useful for debugging.
+
+  Example:
+
+      iex> query = from n in fragment("numbers(10)"), where: n.number == ^-1, select: n.number
+      iex> Ecto.Adapters.ClickHouse.to_inline_sql(:all, query)
+      ~s{SELECT f0."number" FROM numbers(10) AS f0 WHERE (f0."number" = -1)}
+
+  Compare it with the output of `to_sql/2`
+
+      iex> query = from n in fragment("numbers(10)"), where: n.number == ^-1, select: n.number
+      iex> Ecto.Adapters.ClickHouse.to_sql(:all, query)
+      {~s[SELECT f0."number" FROM numbers(10) AS f0 WHERE (f0."number" = {$0:Int64})], [-1]}
+
+  """
+  @spec to_inline_sql(:all | :delete_all | :update_all, Ecto.Queryable.t()) :: String.t()
+  def to_inline_sql(operation, queryable) do
+    queryable =
+      queryable
+      |> Ecto.Queryable.to_query()
+      |> Ecto.Query.Planner.ensure_select(operation == :all)
+
+    {query, _cast_params, dump_params} =
+      Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
+
+    inline_params = Enum.map(dump_params, &@conn.mark_inline/1)
+    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, inline_params)
+    IO.iodata_to_binary(sql)
   end
 
   defp put_setting(opts, key, value) do

@@ -1,5 +1,5 @@
 defmodule Ecto.Integration.AggregateFunctionTypeTest do
-  use Ecto.Integration.Case
+  use Ecto.Integration.Case, async: true
   import Ecto.Query
   import Ecto.Adapters.ClickHouse.API, only: [input: 1]
   alias Ecto.Integration.TestRepo

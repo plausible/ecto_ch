@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- add `to_inline_sql/2` which is similar to `to_sql/2` but inlines the parameters into SQL https://github.com/plausible/ecto_ch/pull/157
+
 ## 0.3.4 (2024-04-07)
 
 - support join strictness (ASOF, ANY, ANTI, SEMI) https://github.com/plausible/ecto_ch/pull/156

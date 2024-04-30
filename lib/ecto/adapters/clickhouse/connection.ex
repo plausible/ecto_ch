@@ -183,7 +183,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
           [quote_name(field), " IS NULL"]
 
         {{field, value}, idx} ->
-          [quote_name(field), ?=, build_param(idx, param_type(value))]
+          [quote_name(field), ?=, build_param(idx, value)]
       end)
 
     ["DELETE FROM ", quote_table(prefix, table), " WHERE ", filters]
@@ -541,7 +541,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:^, [], [ix]}, _sources, params, _query) do
-    build_param(ix, param_type_at(params, ix))
+    build_param(ix, Enum.at(params, ix))
   end
 
   defp expr({:^, [], [ix, len]}, _sources, params, _query) when len > 0 do
@@ -806,17 +806,25 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   def intersperse_map([], _separator, _mapper), do: []
 
+  @inline_tag :__ecto_ch_inline__
+
+  @doc false
+  def mark_inline(param), do: {@inline_tag, param}
+
   @compile inline: [build_param: 2]
-  defp build_param(ix, type) do
-    ["{$", Integer.to_string(ix), ?:, type, ?}]
+  defp build_param(ix, param) do
+    case param do
+      {@inline_tag, param} -> inline_param(param)
+      param -> ["{$", Integer.to_string(ix), ?:, param_type(param), ?}]
+    end
   end
 
   @doc false
   def build_params(ix, len, params) when len > 1 do
-    [build_param(ix, param_type_at(params, ix)), ?, | build_params(ix + 1, len - 1, params)]
+    [build_param(ix, Enum.at(params, ix)), ?, | build_params(ix + 1, len - 1, params)]
   end
 
-  def build_params(ix, _len = 1, params), do: build_param(ix, param_type_at(params, ix))
+  def build_params(ix, _len = 1, params), do: build_param(ix, Enum.at(params, ix))
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
@@ -914,9 +922,70 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       message: "unknown or ambiguous (for ClickHouse) Ecto type #{inspect(type)}"
   end
 
-  defp param_type_at(params, ix) do
-    value = Enum.at(params, ix)
-    param_type(value)
+  defp inline_param(nil), do: "NULL"
+  defp inline_param(true), do: "true"
+  defp inline_param(false), do: "false"
+  defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
+  defp inline_param(i) when is_integer(i), do: Integer.to_string(i)
+
+  # ClickHouse understands scientific notation
+  defp inline_param(f) when is_float(f), do: Float.to_string(f)
+
+  defp inline_param(%NaiveDateTime{microsecond: microsecond} = naive) do
+    naive = NaiveDateTime.to_string(naive)
+
+    case microsecond do
+      {0, 0} -> [?', naive, "'::datetime"]
+      {_, precision} -> [?', naive, "'::DateTime64(", Integer.to_string(precision), ?)]
+    end
+  end
+
+  defp inline_param(%DateTime{microsecond: microsecond, time_zone: time_zone} = dt) do
+    time_zone = escape_string(time_zone)
+    dt = NaiveDateTime.to_string(DateTime.to_naive(dt))
+
+    case microsecond do
+      {0, 0} ->
+        [?', dt, "'::DateTime('", time_zone, "')"]
+
+      {_, precision} ->
+        [?', dt, "'::DateTime64(", Integer.to_string(precision), ",'", time_zone, "')"]
+    end
+  end
+
+  defp inline_param(%Date{year: year} = date) do
+    suffix =
+      if year < 1970 or year > 2148 do
+        "'::date32"
+      else
+        "'::date"
+      end
+
+    [?', Date.to_string(date), suffix]
+  end
+
+  defp inline_param(%Decimal{} = dec), do: Decimal.to_string(dec, :normal)
+
+  defp inline_param(a) when is_list(a) do
+    [?[, Enum.map_intersperse(a, ?,, &inline_param/1), ?]]
+  end
+
+  defp inline_param(t) when is_tuple(t) do
+    [?(, t |> Tuple.to_list() |> Enum.map_intersperse(?,, &inline_param/1), ?)]
+  end
+
+  defp inline_param(%s{}) do
+    raise ArgumentError, "struct #{inspect(s)} is not supported in params"
+  end
+
+  defp inline_param(m) when is_map(m) do
+    [
+      "map(",
+      Enum.map_intersperse(m, ?,, fn {k, v} ->
+        [inline_param(k), ?,, inline_param(v)]
+      end),
+      ?)
+    ]
   end
 
   defp param_type(s) when is_binary(s), do: "String"
