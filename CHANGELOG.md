@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- deprecate `:array_join` and support ARRAY join hint
+
 ## 0.3.5 (2024-05-01)
 
 - add `to_inline_sql/2` which is similar to `to_sql/2` but inlines the parameters into SQL https://github.com/plausible/ecto_ch/pull/157

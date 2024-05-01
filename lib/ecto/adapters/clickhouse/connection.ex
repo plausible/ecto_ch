@@ -4,6 +4,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @behaviour Ecto.Adapters.SQL.Connection
   @dialyzer :no_improper_lists
 
+  require Logger
   alias Ecto.SubQuery
   alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
 
@@ -313,23 +314,34 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join(%{joins: joins} = query, sources, params) do
     Enum.map(joins, fn
       %JoinExpr{qual: qual, ix: ix, source: source, on: %QueryExpr{expr: on_exrp}, hints: hints} ->
+        if qual in [:inner_lateral, :array, :left_lateral, :left_array] do
+          Logger.warning("""
+          #{inspect(qual)} join type is being deprecated. Please use `hints: "ARRAY"` to express ARRAY JOIN instead:
+
+              from t in "tables", join: a in "arr", hints: "ARRAY"
+              from t in "tables", left_join: a in "arr", hints: "ARRAY"
+
+          """)
+        end
+
         {join, name} = get_source(query, sources, params, ix, source)
 
         [
           join_hints(hints, query),
-          join_qual(qual),
+          join_qual(qual, hints),
           join,
           " AS ",
           name
-          | join_on(qual, on_exrp, sources, params, query)
+          | join_on(qual, on_exrp, hints, sources, params, query)
         ]
     end)
   end
 
-  # TODO mybe add GLOBAL and PASTE
-  valid_join_hints = ["ASOF", "ANY", "ANTI", "SEMI"]
+  # TODO maybe add GLOBAL and PASTE
+  valid_join_strictness_hints = ["ASOF", "ANY", "ANTI", "SEMI"]
+  valid_join_hints = valid_join_strictness_hints ++ ["ARRAY"]
 
-  for hint <- valid_join_hints do
+  for hint <- valid_join_strictness_hints do
     hints = List.wrap(hint)
 
     defp join_hints(unquote(hints), _query) do
@@ -337,6 +349,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  defp join_hints(["ARRAY"], _query), do: []
   defp join_hints([], _query), do: []
 
   defp join_hints(hints, query) do
@@ -345,29 +358,42 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     raise Ecto.QueryError,
       query: query,
       message: """
-      unsupported JOIN strictness passed in hints: #{inspect(hints)}
+      unsupported JOIN strictness or type passed in hints: #{inspect(hints)}
       supported: #{supported}
       """
   end
 
-  defp join_on(:cross, true, _sources, _params, _query), do: []
+  defp join_on(:cross, true, _hints, _sources, _params, _query), do: []
 
-  defp join_on(array, true, _sources, _params, _query)
+  # TODO remove
+  defp join_on(array, true, _hints, _sources, _params, _query)
        when array in [:array, :left_array, :inner_lateral, :left_lateral] do
     []
   end
 
-  defp join_on(_qual, expr, sources, params, query) do
+  defp join_on(_qual, true, ["ARRAY"], _sources, _params, _query) do
+    []
+  end
+
+  defp join_on(_qual, expr, _hints, sources, params, query) do
     [" ON " | expr(expr, sources, params, query)]
   end
 
-  defp join_qual(:inner), do: " INNER JOIN "
-  defp join_qual(t) when t in [:inner_lateral, :array], do: " ARRAY JOIN "
-  defp join_qual(t) when t in [:left_lateral, :left_array], do: " LEFT ARRAY JOIN "
-  defp join_qual(:left), do: " LEFT JOIN "
-  defp join_qual(:right), do: " RIGHT JOIN "
-  defp join_qual(:full), do: " FULL JOIN "
-  defp join_qual(:cross), do: " CROSS JOIN "
+  defp join_qual(:inner, ["ARRAY"]), do: " ARRAY JOIN "
+  defp join_qual(:inner, _hints), do: " INNER JOIN "
+  # TODO remove
+  defp join_qual(t, _hints) when t in [:inner_lateral, :array], do: " ARRAY JOIN "
+  # TODO remove
+  defp join_qual(t, _hints) when t in [:left_lateral, :left_array], do: " LEFT ARRAY JOIN "
+  defp join_qual(:left, ["ARRAY"]), do: " LEFT ARRAY JOIN "
+  defp join_qual(:left, _hints), do: " LEFT JOIN "
+  defp join_qual(:right, _hints), do: " RIGHT JOIN "
+  defp join_qual(:full, _hints), do: " FULL JOIN "
+  defp join_qual(:cross, _hints), do: " CROSS JOIN "
+
+  defp join_qual(qual, _hints) do
+    raise ArgumentError, "join type #{inspect(qual)} is not supported"
+  end
 
   defp where(%{wheres: wheres} = query, sources, params) do
     boolean(" WHERE ", wheres, sources, params, query)
