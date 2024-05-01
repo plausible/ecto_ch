@@ -1315,6 +1315,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
   end
 
+  @tag :capture_log
   test "lateral (but really array) join" do
     query =
       "arrays_test"
@@ -1326,6 +1327,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
   end
 
+  @tag :capture_log
   test "left lateral (but really left array) join" do
     query =
       "arrays_test"
@@ -1337,6 +1339,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
   end
 
+  @tag :capture_log
   test "array join" do
     query =
       from at in "arrays_test",
@@ -1346,8 +1349,20 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == """
            SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
            """
+
+    assert all(
+             from at in "arrays_test",
+               join: a in "arr",
+               on: true,
+               hints: "ARRAY",
+               select: [at.s, a]
+           ) ==
+             """
+             SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
+             """
   end
 
+  @tag :capture_log
   test "left array join" do
     query =
       from at in "arrays_test",
@@ -1357,6 +1372,17 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == """
            SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
            """
+
+    assert all(
+             from at in "arrays_test",
+               left_join: a in "arr",
+               on: true,
+               hints: "ARRAY",
+               select: [at.s, a]
+           ) ==
+             """
+             SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
+             """
   end
 
   test "join with nothing bound" do
@@ -1845,7 +1871,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     test "invalid type" do
       expected_message =
-        ~r/unsupported JOIN strictness passed in hints: \["INVALID"\]\nsupported: "ASOF", "ANY", "ANTI", "SEMI"/
+        ~r/unsupported JOIN strictness or type passed in hints: \["INVALID"\]\nsupported: "ASOF", "ANY", "ANTI", "SEMI", "ARRAY"/
 
       assert_raise Ecto.QueryError, expected_message, fn ->
         all(

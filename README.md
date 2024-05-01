@@ -125,25 +125,7 @@ CREATE TABLE `posts` ON CLUSTER `my-cluster` (
 
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)
 
-Since [`v3.10.2`](https://github.com/elixir-ecto/ecto/blob/40133ace8c71f1f81432858e71d3d73527f85107/CHANGELOG.md?plain=1#L10) Ecto supports `:array` and `:left_array` join types:
-
-```elixir
-from a in "arrays_test", array_join: r in "arr", select: {a.s, fragment("?", r)}
-```
-
-For an earlier Ecto version `:inner_lateral` and `:left_lateral` join types can be used instead:
-
-```elixir
-from a in "arrays_test", inner_lateral_join: r in "arr", select: {a.s, fragment("?", r)}
-```
-
-Both of these queries are equivalent to:
-
-```sql
-SELECT a0."s", a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1
-```
-
-For more `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [clickhouse_joins_test.exs.](./test/ecto/integration/clickhouse_joins_test.exs)
+For `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [clickhouse_joins_test.exs.](./test/ecto/integration/clickhouse_joins_test.exs)
 
 #### NULL
 
