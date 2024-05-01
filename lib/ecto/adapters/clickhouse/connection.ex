@@ -249,6 +249,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp select_fields(fields, sources, params, query) do
     intersperse_map(fields, ?,, fn
+      # TODO raise
       # this is useful in array joins lie
       #
       #     "arrays_test"
