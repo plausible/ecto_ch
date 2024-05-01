@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- deprecate `:array_join` and support ARRAY join hint
+- deprecate `:array_join` and support ARRAY join hint https://github.com/plausible/ecto_ch/pull/160
 
 ## 0.3.5 (2024-05-01)
 
