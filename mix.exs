@@ -39,7 +39,8 @@ defmodule EctoCh.MixProject do
   defp deps do
     [
       {:ch, "~> 0.2.0"},
-      {:ecto_sql, "~> 3.9"},
+      {:ecto_sql, github: "ruslandoga/ecto_sql", branch: "make-with_log-public"},
+      {:ecto, github: "elixir-ecto/ecto", override: true},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :docs},

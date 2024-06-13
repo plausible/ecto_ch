@@ -39,19 +39,19 @@ defmodule Ecto.Adapters.ClickHouse do
       @doc """
       A convenience function for SQL-based repositories that executes the given query.
 
-      See `Ecto.Adapters.SQL.query/4` for more information.
+      See `Ecto.Adapters.ClickHouse.query/4` for more information.
       """
       def query(sql, params \\ [], opts \\ []) do
-        Ecto.Adapters.SQL.query(get_dynamic_repo(), sql, params, opts)
+        Ecto.Adapters.ClickHouse.query(get_dynamic_repo(), sql, params, opts)
       end
 
       @doc """
       A convenience function for SQL-based repositories that executes the given query.
 
-      See `Ecto.Adapters.SQL.query!/4` for more information.
+      See `Ecto.Adapters.ClickHouse.query!/4` for more information.
       """
       def query!(sql, params \\ [], opts \\ []) do
-        Ecto.Adapters.SQL.query!(get_dynamic_repo(), sql, params, opts)
+        Ecto.Adapters.ClickHouse.query!(get_dynamic_repo(), sql, params, opts)
       end
 
       @doc """
@@ -392,4 +392,60 @@ defmodule Ecto.Adapters.ClickHouse do
   defp put_source(opts, _) do
     opts
   end
+
+  @type query_params :: [term] | %{(atom | String.t()) => term}
+
+  @doc """
+  Same as `Ecto.Adapters.SQL.query/4` but allows named params expressed as maps
+  as well as positional params expressed as lists.
+
+      MyRepo.query("select {$0:String}", ["b"])
+      MyRepo.query("select {a:String}", %{"a" => "b"})
+
+  """
+  @spec query(
+          pid() | Ecto.Repo.t() | Ecto.Adapter.adapter_meta(),
+          iodata,
+          query_params,
+          Keyword.t()
+        ) :: {:ok, Ecto.Adapters.SQL.query_result()} | {:error, Exception.t()}
+  def query(repo, sql, params \\ [], opts \\ [])
+
+  def query(repo, sql, params, opts) when is_atom(repo) or is_pid(repo) do
+    query(Ecto.Adapter.lookup_meta(repo), sql, params, opts)
+  end
+
+  def query(adapter_meta, sql, params, opts) do
+    sql_call(adapter_meta, :query, [sql], params, opts)
+  end
+
+  @doc """
+  Same as `query/4` but raises on invalid queries.
+  """
+  @spec query!(
+          pid() | Ecto.Repo.t() | Ecto.Adapter.adapter_meta(),
+          iodata,
+          query_params,
+          Keyword.t()
+        ) :: Ecto.Adapters.SQL.query_result()
+  def query!(repo, sql, params \\ [], opts \\ []) do
+    case query(repo, sql, params, opts) do
+      {:ok, result} -> result
+      {:error, error} -> raise error
+    end
+  end
+
+  defp sql_call(adapter_meta, callback, args, params, opts) do
+    %{pid: pool, telemetry: telemetry, sql: sql, opts: default_opts} = adapter_meta
+    conn = get_conn_or_pool(pool)
+    opts = Ecto.Adapters.SQL.with_log(telemetry, params, opts ++ default_opts)
+    args = args ++ [params, opts]
+    apply(sql, callback, [conn | args])
+  end
+
+  defp get_conn_or_pool(pool) do
+    Process.get(key(pool), pool)
+  end
+
+  defp key(pool), do: {__MODULE__, pool}
 end
