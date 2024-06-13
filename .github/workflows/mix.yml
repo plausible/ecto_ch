@@ -11,13 +11,17 @@ jobs:
 
     strategy:
       matrix:
-        elixir: [1.14, 1.15, 1.16]
+        elixir: [1.14, 1.15, 1.16, 1.17]
         otp: [25, 26]
         clickhouse: [latest]
         timezone: [UTC]
         include:
-          - elixir: 1.16
-            otp: 26
+          - elixir: 1.17
+            otp: 27
+            clickhouse: latest
+            timezone: UTC
+          - elixir: 1.17
+            otp: 27
             clickhouse: latest
             timezone: Europe/Berlin
           # Plausible
@@ -72,14 +76,14 @@ jobs:
     strategy:
       matrix:
         elixir: [1]
-        otp: [26]
+        otp: [27]
 
     steps:
-      - uses: actions/checkout@v4 
+      - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
-          elixir-version:  ${{ matrix.elixir }}
-          otp-version:  ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
       - run: elixir -v
       - uses: actions/cache@v4
         with:
