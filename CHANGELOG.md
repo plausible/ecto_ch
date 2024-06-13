@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- add `alter_update_all/2` https://github.com/plausible/ecto_ch/pull/172
+
 ## 0.3.6 (2024-05-10)
 
 - deprecate `:array_join` and support ARRAY join hint https://github.com/plausible/ecto_ch/pull/160

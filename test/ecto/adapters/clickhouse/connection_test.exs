@@ -91,6 +91,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query |> Connection.delete_all(params) |> IO.iodata_to_binary()
   end
 
+  defp alter_update_all(query) do
+    {query, params} = plan(query, :update_all)
+    query |> Connection.alter_update_all(params) |> IO.iodata_to_binary()
+  end
+
   defp insert(prefix, table, header, rows, on_conflict, returning, placeholders \\ []) do
     Connection.insert(prefix, table, header, rows, on_conflict, returning, placeholders)
     |> IO.iodata_to_binary()
@@ -999,7 +1004,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "update_all" do
-    error_message = ~r/ClickHouse does not support UPDATE statements -- use ALTER TABLE instead/
+    error_message =
+      ~r/ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead/
 
     query =
       (m in Schema)
@@ -1107,6 +1113,106 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
   end
 
+  test "alter_update_all" do
+    assert alter_update_all(from m in Schema, update: [set: [x: 0]]) ==
+             """
+             ALTER TABLE "schema" UPDATE "x"=0 WHERE 1\
+             """
+
+    assert alter_update_all(from m in Schema, update: [set: [x: 0], inc: [y: 1, z: -3]]) == """
+           ALTER TABLE "schema" UPDATE "x"=0,"y"="y"+1,"z"="z"+-3 WHERE 1\
+           """
+
+    assert alter_update_all(from e in Schema, where: e.x == 123, update: [set: [x: 0]]) == """
+           ALTER TABLE "schema" UPDATE "x"=0 WHERE ("x" = 123)\
+           """
+
+    assert alter_update_all(from m in Schema, update: [set: [x: ^0]]) == """
+           ALTER TABLE "schema" UPDATE "x"={$0:Int64} WHERE 1\
+           """
+
+    assert alter_update_all(from e in "events", update: [push: [tags: "cool"]]) == """
+           ALTER TABLE "events" UPDATE "tags"=arrayPushBack("tags",'cool') WHERE 1\
+           """
+
+    assert alter_update_all(from e in "events", update: [push: [tags: ^"cool"]]) == """
+           ALTER TABLE "events" UPDATE "tags"=arrayPushBack("tags",{$0:String}) WHERE 1\
+           """
+
+    assert alter_update_all(from e in "events", update: [pull: [tags: "not cool"]]) == """
+           ALTER TABLE "events" UPDATE "tags"=arrayFilter(x->x!='not cool',"tags") WHERE 1\
+           """
+
+    assert alter_update_all(from e in "events", update: [pull: [tags: ^"not cool"]]) == """
+           ALTER TABLE "events" UPDATE "tags"=arrayFilter(x->x!={$0:String},"tags") WHERE 1\
+           """
+
+    assert_raise Ecto.QueryError,
+                 ~r/ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements/,
+                 fn ->
+                   Schema
+                   |> join(:inner, [p], q in Schema2, on: p.x == q.z)
+                   |> update([_], set: [x: 0])
+                   |> alter_update_all()
+                 end
+
+    assert_raise Ecto.QueryError,
+                 ~r/ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements/,
+                 fn ->
+                   alter_update_all(
+                     from e in Schema,
+                       where: e.x == 123,
+                       update: [set: [x: 0]],
+                       join: q in Schema2,
+                       on: e.x == q.z
+                   )
+                 end
+
+    assert_raise Ecto.QueryError,
+                 ~r/ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements/,
+                 fn ->
+                   alter_update_all(
+                     from p in Post,
+                       where: p.title == ^"foo",
+                       select: p.content,
+                       update: [set: [title: "bar"]]
+                   )
+                 end
+  end
+
+  test "alter_update_all with prefix" do
+    assert alter_update_all(
+             (m in Schema)
+             |> from(update: [set: [x: 0]])
+             |> Map.put(:prefix, "prefix")
+           ) == """
+           ALTER TABLE "prefix"."schema" UPDATE "x"=0 WHERE 1\
+           """
+
+    assert alter_update_all(
+             (m in Schema)
+             |> from(prefix: "first", update: [set: [x: 0]])
+             |> Map.put(:prefix, "prefix")
+           ) == """
+           ALTER TABLE "first"."schema" UPDATE "x"=0 WHERE 1\
+           """
+  end
+
+  test "alter_update_all with returning" do
+    assert_raise Ecto.QueryError, fn ->
+      from(p in Post, update: [set: [title: "foo"]])
+      |> select([p], p)
+      |> alter_update_all()
+    end
+
+    assert_raise Ecto.QueryError, fn ->
+      from(m in Schema, update: [set: [x: ^1]])
+      |> where([m], m.x == ^2)
+      |> select([m], m.x == ^3)
+      |> alter_update_all()
+    end
+  end
+
   test "delete_all" do
     assert delete_all(Schema) == ~s{DELETE FROM "schema" WHERE 1}
 
@@ -1147,7 +1253,48 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert delete_all(query) == ~s{DELETE FROM "first"."schema" WHERE 1}
   end
 
-  # TODO alter_update_all, alter_delete_all
+  test "CTE alter_update_all" do
+    cte_query =
+      from(x in Schema,
+        order_by: [asc: :id],
+        limit: 10,
+        lock: "FOR UPDATE SKIP LOCKED",
+        select: %{id: x.id}
+      )
+
+    query =
+      Schema
+      |> with_cte("target_rows", as: ^cte_query)
+      |> update(set: [x: 123])
+
+    assert_raise Ecto.QueryError,
+                 ~r/ClickHouse does not support CTEs in ALTER TABLE ... UPDATE statements/,
+                 fn -> alter_update_all(query) end
+  end
+
+  test "returning alter_update_all" do
+    query =
+      Schema
+      |> select([r, t], r)
+      |> update(set: [x: 123])
+
+    assert_raise Ecto.QueryError,
+                 ~r/ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements/,
+                 fn -> alter_update_all(query) end
+  end
+
+  test "join alter_update_all" do
+    query =
+      Schema
+      |> join(:inner, [s], e in "events", on: s.id == e.event_id)
+      |> update(set: [x: 123])
+
+    assert_raise Ecto.QueryError,
+                 ~r/ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements/,
+                 fn -> alter_update_all(query) end
+  end
+
+  # TODO alter_delete_all
 
   describe "windows" do
     test "one window" do
@@ -1979,15 +2126,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     error_message = ~r/ClickHouse does not support UPDATE statements/
 
     assert_raise ArgumentError, error_message, fn ->
-      update(nil, "schema", [:x, :y], [:id], [])
+      update(nil, "schema", [:x, :y], [id: 1], [])
     end
 
     assert_raise ArgumentError, error_message, fn ->
-      update(nil, "schema", [:x, :y], [:id], [])
+      update(nil, "schema", [:x, :y], [id: 1], [])
     end
 
     assert_raise ArgumentError, error_message, fn ->
-      update("prefix", "schema", [:x, :y], [:id], [])
+      update("prefix", "schema", [:x, :y], [id: 1], [])
     end
   end
 

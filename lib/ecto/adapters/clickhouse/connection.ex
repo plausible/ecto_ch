@@ -89,7 +89,85 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def update_all(query, _prefix \\ nil) do
     raise Ecto.QueryError,
       query: query,
-      message: "ClickHouse does not support UPDATE statements -- use ALTER TABLE instead"
+      message:
+        "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/statements/alter/update
+  # https://clickhouse.com/docs/en/guides/developer/mutations#updating-data
+  def alter_update_all(query, params \\ []) do
+    # TODO link to https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse#updating-and-deleting-using-joins
+    unless query.joins == [] do
+      raise Ecto.QueryError,
+        query: query,
+        message:
+          "Ecto.Adapters.ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements"
+    end
+
+    if query.select do
+      raise Ecto.QueryError,
+        query: query,
+        message:
+          "Ecto.Adapters.ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements"
+    end
+
+    if query.with_ctes do
+      raise Ecto.QueryError,
+        query: query,
+        message:
+          "Ecto.Adapters.ClickHouse does not support CTEs in ALTER TABLE ... UPDATE statements"
+    end
+
+    %{sources: sources} = query
+    {table, _schema, prefix} = elem(sources, 0)
+    fields = update_fields(query, sources, params)
+
+    where =
+      case query.wheres do
+        [] -> " WHERE 1"
+        _ -> where(query, {{nil, nil, nil}}, params)
+      end
+
+    ["ALTER TABLE ", quote_table(prefix, table), " UPDATE ", fields, where]
+  end
+
+  defp update_fields(%{updates: updates} = query, sources, params) do
+    fields =
+      for %{expr: expression} <- updates, {op, kw} <- expression, {key, value} <- kw do
+        update_op(op, quote_name(key), value, sources, params, query)
+      end
+
+    Enum.intersperse(fields, ?,)
+  end
+
+  defp update_op(:set, quoted_key, value, sources, params, query) do
+    [quoted_key, ?= | expr(value, sources, params, query)]
+  end
+
+  defp update_op(:inc, quoted_key, value, sources, params, query) do
+    [quoted_key, ?=, quoted_key, ?+ | expr(value, sources, params, query)]
+  end
+
+  defp update_op(:push, quoted_key, value, sources, params, query) do
+    [quoted_key, ?=, "arrayPushBack(", quoted_key, ?,, expr(value, sources, params, query), ?)]
+  end
+
+  defp update_op(:pull, quoted_key, value, sources, params, query) do
+    [
+      quoted_key,
+      ?=,
+      "arrayFilter(x->x!=",
+      expr(value, sources, params, query),
+      ?,,
+      quoted_key,
+      ?)
+    ]
+  end
+
+  defp update_op(command, _quoted_key, _value, _sources, _params, query) do
+    raise Ecto.QueryError,
+      query: query,
+      message: "Ecto.Adapters.ClickHouse does not support update operation #{inspect(command)}"
   end
 
   @impl true
@@ -166,7 +244,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @impl true
   def update(_prefix, _table, _fields, _filters, _returning) do
     raise ArgumentError,
-          "ClickHouse does not support UPDATE statements -- use ALTER TABLE instead"
+          "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
   end
 
   @impl true
