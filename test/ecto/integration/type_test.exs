@@ -362,13 +362,7 @@ defmodule Ecto.Integration.TypeTest do
                select: t.uuids
            ) == [uuids]
 
-    # TODO add support for alter_update_all
-    # {1, _} = TestRepo.update_all(Tag, set: [uuids: nil])
-
-    TestRepo.query!("alter table tags update uuids = [] where 1", [],
-      settings: [mutations_sync: 1]
-    )
-
+    {0, _} = TestRepo.alter_update_all(Tag, [set: [uuids: []]], settings: [mutations_sync: 1])
     assert TestRepo.all(from t in Tag, select: t.uuids) == [[]]
   end
 

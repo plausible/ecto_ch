@@ -123,6 +123,14 @@ CREATE TABLE `posts` ON CLUSTER `my-cluster` (
 
 ## Caveats
 
+#### [ALTER TABLE ... UPDATE](https://clickhouse.com/docs/en/sql-reference/statements/alter/update)
+
+ClickHouse doesn't support `UPDATE` statements as of now, so `Repo.update/2` and `Repo.update_all/3` raise when called. But `Repo.alter_update_all/3` -- which executes `ALTER TABLE ... UPDATE` -- can be used instead.
+
+Note that `ALTER TABLE ... UPDATE` is considered an admin operation and comes with a performance cost. Please read https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse for more information.
+
+For examples, please see [clickhouse_alter_update_test.exs.](./test/ecto/integration/clickhouse_alter_update_test.exs)
+
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)
 
 For `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [clickhouse_joins_test.exs.](./test/ecto/integration/clickhouse_joins_test.exs)

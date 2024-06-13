@@ -117,6 +117,26 @@ defmodule Ecto.Adapters.ClickHouse do
         # opts = Ecto.Repo.Supervisor.tuplet(repo, prepare_opts(:insert_all, opts))
         Ecto.Adapters.ClickHouse.Schema.insert_stream(repo, source_or_schema, rows, opts)
       end
+
+      @doc """
+      Similar to `Ecto.Repo.update_all/3` but uses [`ALTER TABLE ... UPDATE`](https://clickhouse.com/docs/en/sql-reference/statements/alter/update) instead.
+
+      For more information and performance implications please see:
+
+        - https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse
+        - https://clickhouse.com/docs/en/guides/developer/mutations
+
+      """
+      def alter_update_all(queryable, updates, opts \\ []) do
+        repo = get_dynamic_repo()
+
+        Ecto.Adapters.ClickHouse.Queryable.alter_update_all(
+          repo,
+          queryable,
+          updates,
+          Ecto.Repo.Supervisor.tuplet(repo, prepare_opts(:update_all, opts))
+        )
+      end
     end
   end
 
@@ -314,6 +334,9 @@ defmodule Ecto.Adapters.ClickHouse do
 
         :delete_all ->
           [{:command, :delete} | opts]
+
+        :alter_update_all ->
+          [{:command, :alter} | opts]
       end
 
     result = Ecto.Adapters.SQL.query!(adapter_meta, sql, params, put_source(opts, query_meta))
@@ -326,19 +349,16 @@ defmodule Ecto.Adapters.ClickHouse do
       :delete_all ->
         # clickhouse doesn't give us any info on how many rows have been deleted
         {0, nil}
+
+      :alter_update_all ->
+        # clickhouse doesn't give us any info on how many rows have been / will be altered
+        {0, nil}
     end
   end
 
   @doc false
   def to_sql(operation, queryable) do
-    queryable =
-      queryable
-      |> Ecto.Queryable.to_query()
-      |> Ecto.Query.Planner.ensure_select(operation == :all)
-
-    {query, _cast_params, dump_params} =
-      Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
-
+    {query, _cast_params, dump_params} = plan_query(operation, queryable)
     sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, dump_params)
     {IO.iodata_to_binary(sql), dump_params}
   end
@@ -361,17 +381,26 @@ defmodule Ecto.Adapters.ClickHouse do
   """
   @spec to_inline_sql(:all | :delete_all | :update_all, Ecto.Queryable.t()) :: String.t()
   def to_inline_sql(operation, queryable) do
+    {query, _cast_params, dump_params} = plan_query(operation, queryable)
+    inline_params = Enum.map(dump_params, &@conn.mark_inline/1)
+    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, inline_params)
+    IO.iodata_to_binary(sql)
+  end
+
+  defp plan_query(operation, queryable) do
     queryable =
       queryable
       |> Ecto.Queryable.to_query()
       |> Ecto.Query.Planner.ensure_select(operation == :all)
 
-    {query, _cast_params, dump_params} =
-      Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
+    operation =
+      case operation do
+        :alter_update_all -> :update_all
+        :alter_delete_all -> :delete_all
+        _other -> operation
+      end
 
-    inline_params = Enum.map(dump_params, &@conn.mark_inline/1)
-    sql = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, inline_params)
-    IO.iodata_to_binary(sql)
+    Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
   end
 
   defp put_setting(opts, key, value) do
@@ -383,6 +412,9 @@ defmodule Ecto.Adapters.ClickHouse do
   def prepare_sql(:all, query, params), do: @conn.all(query, params)
   def prepare_sql(:update_all, query, params), do: @conn.update_all(query, params)
   def prepare_sql(:delete_all, query, params), do: @conn.delete_all(query, params)
+  def prepare_sql(:alter_update_all, query, params), do: @conn.alter_update_all(query, params)
+  # TODO
+  # def prepare_sql(:alter_delete_all, query, params), do: @conn.alter_delete_all(query, params)
 
   defp put_source(opts, %{sources: sources}) when is_binary(elem(elem(sources, 0), 0)) do
     {source, _, _} = elem(sources, 0)
