@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.7 (2024-06-15)
 
 - add `alter_update_all/2` https://github.com/plausible/ecto_ch/pull/172
 
