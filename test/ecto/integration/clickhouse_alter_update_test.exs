@@ -3,6 +3,13 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
   import Ecto.Query
   alias Ecto.Integration.TestRepo
 
+  # TODO please open an issue if you need this functionality!
+  @tag :skip
+  test "ON CLUSTER"
+
+  @tag :skip
+  test "IN PARTITION"
+
   defp to_sql(query) do
     TestRepo.to_sql(:alter_update_all, query)
   end
@@ -154,10 +161,6 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
   end
 
   describe "alter_update_all/2" do
-    # TODO please open an issue if you need this functionality!
-    @tag :skip
-    test "on cluster"
-
     test "updates all rows if no where is provided" do
       TestRepo.query!(
         "CREATE TABLE update_no_where_test(s String, i UInt8) ENGINE = MergeTree ORDER BY tuple()"
