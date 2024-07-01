@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.8 (2024-07-01)
 
 - add DateTime64 precision https://github.com/plausible/ecto_ch/pull/179
 
