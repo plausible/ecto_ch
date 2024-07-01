@@ -3046,6 +3046,57 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
+  # https://github.com/plausible/ecto_ch/issues/178
+  test "DateTime64 params" do
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~U[2024-06-28 20:02:17.3Z],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(1)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~U[2024-06-28 20:02:17.38Z],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(2)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~U[2024-06-28 20:02:17.382Z],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(3)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~U[2024-06-28 20:02:17.3827Z],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(4)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~U[2024-06-28 20:02:17.38278Z],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(5)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~U[2024-06-28 20:02:17.382780Z],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(6)})\
+           """
+  end
+
   test "build_params/3" do
     params =
       [
@@ -3080,16 +3131,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              "{$2:Bool},{$3:Date}"
 
     assert to_string(Connection.build_params(_ix = 2, _len = 3, params)) ==
-             "{$2:Bool},{$3:Date},{$4:DateTime64}"
+             "{$2:Bool},{$3:Date},{$4:DateTime64(6)}"
 
     assert to_string(Connection.build_params(_ix = 1, _len = 4, params)) ==
-             "{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64}"
+             "{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64(6)}"
 
     assert to_string(Connection.build_params(_ix = 0, _len = 5, params)) ==
-             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64}"
+             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64(6)}"
 
     assert to_string(Connection.build_params(_ix = 0, _len = 6, params)) ==
-             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64},{$5:DateTime}"
+             "{$0:Int64},{$1:String},{$2:Bool},{$3:Date},{$4:DateTime64(6)},{$5:DateTime}"
 
     assert to_string(
              Connection.build_params(
