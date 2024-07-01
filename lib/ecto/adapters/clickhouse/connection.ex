@@ -1105,7 +1105,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp param_type(%DateTime{microsecond: microsecond}) do
     case microsecond do
       {_val, precision} when precision > 0 ->
-        "DateTime64"
+        ["DateTime64(", Integer.to_string(precision), ?)]
 
       _ ->
         "DateTime"

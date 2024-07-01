@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- add DateTime64 precision https://github.com/plausible/ecto_ch/pull/179
+
 ## 0.3.7 (2024-06-15)
 
 - add `alter_update_all/2` https://github.com/plausible/ecto_ch/pull/172
