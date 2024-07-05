@@ -327,16 +327,22 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp select_fields(fields, sources, params, query) do
     intersperse_map(fields, ?,, fn
-      # TODO raise
-      # this is useful in array joins lie
-      #
-      #     "arrays_test"
-      #     |> join(:array, [a], r in "arr")
-      #     |> select([a, r], {a.s, fragment("?", r)})
-      #
       {:&, _, [idx]} ->
-        {_, source, _} = elem(sources, idx)
-        source
+        {_source, name, schema} = elem(sources, idx)
+
+        if is_nil(schema) do
+          name = IO.iodata_to_binary(name)
+
+          raise Ecto.QueryError,
+            query: query,
+            message:
+              "Ecto.Adapters.ClickHouse requires a schema module when using selector " <>
+                "#{inspect(name)} but none was given. " <>
+                "Please specify a schema or specify exactly which fields from " <>
+                "#{inspect(name)} you desire"
+        end
+
+        name
 
       {k, v} ->
         [expr(v, sources, params, query), " AS " | quote_name(k)]
@@ -679,7 +685,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       raise Ecto.QueryError,
         query: query,
         message:
-          "ClickHouse requires a schema module when using selector " <>
+          "Ecto.Adapters.ClickHouse requires a schema module when using selector " <>
             "#{inspect(name)} but none was given. " <>
             "Please specify a schema or specify exactly which fields from " <>
             "#{inspect(name)} you desire"
@@ -727,7 +733,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
        when is_list(kw) or tuple_size(kw) == 3 do
     raise Ecto.QueryError,
       query: query,
-      message: "ClickHouse adapter does not support keyword or interpolated fragments"
+      message: "Ecto.Adapters.ClickHouse does not support keyword or interpolated fragments"
   end
 
   defp expr({:fragment, _, parts}, sources, params, query) do
