@@ -3151,4 +3151,19 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ) ==
              "1,'a',true,'2024-04-12'::date,'2024-04-12 09:55:54.329788'::DateTime64(6,'Etc/UTC'),'2024-04-12 09:55:54'::DateTime('Etc/UTC')"
   end
+
+  test "integer boundaries" do
+    params =
+    [
+      9223372036854775807, #Int64 Boundary
+      18446744073709551615, #UInt64 Boundary
+      170141183460469231731687303715884105727, #Int128 Boundary
+      340282366920938463463374607431768211455, #UInt128 Boundary
+      57896044618658097711785492504343953926634992332820282019728792003956564819967, #Int256 Boundary
+      115792089237316195423570985008687907853269984665640564039457584007913129639935, #UInt256 Boundary
+    ]
+
+    assert to_string(Connection.build_params(_ix = 0, _len = 6, params)) ==
+             "{$0:Int64},{$1:UInt64},{$2:Int128},{$3:UInt128},{$4:Int256},{$5:UInt256}"
+  end
 end
