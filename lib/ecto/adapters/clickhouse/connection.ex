@@ -1094,6 +1094,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp param_type(s) when is_binary(s), do: "String"
+  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "UInt256"
+  defp param_type(i) when is_integer(i) and i > 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "Int256"
+  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "UInt128"
+  defp param_type(i) when is_integer(i) and i > 0xFFFFFFFFFFFFFFFF, do: "Int128"
+  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFF, do: "UInt64"
+  defp param_type(i) when is_integer(i), do: "Int64"
   defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFF, do: "UInt64"
   defp param_type(i) when is_integer(i), do: "Int64"
   defp param_type(f) when is_float(f), do: "Float64"
