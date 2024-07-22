@@ -27,7 +27,7 @@ defmodule Ch.TypeTest do
     end
   end
 
-  # TODO what if overlow
+  # TODO what if overflow
   describe "Int / UInt" do
     setup do
       query!("""
@@ -174,7 +174,7 @@ defmodule Ch.TypeTest do
     end
   end
 
-  # TODO what if overlow
+  # TODO what if overflow
   describe "Float" do
     setup do
       query!("create table ch_floats(f32 Float32, f64 Float64) engine Memory")
@@ -214,7 +214,7 @@ defmodule Ch.TypeTest do
     end
   end
 
-  # TODO what if overlow
+  # TODO what if overflow
   describe "Decimal" do
     setup do
       query!("""
