@@ -1,0 +1,3 @@
+[default.extend-words]
+"wheres" = "wheres" # %Ecto.Query{wheres: wheres}
+"nd" = "nd"         # ./test/support/ecto_schemas.exs:266:24

@@ -2087,7 +2087,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert query == ~s{INSERT INTO "schema"("x","y")}
   end
 
-  # TODO what is that suppoed to evaluate to?
+  # TODO what is that supposed to evaluate to?
   test "insert with query" do
     select_query = from("schema", select: [:id])
 
