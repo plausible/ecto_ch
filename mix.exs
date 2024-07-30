@@ -44,7 +44,7 @@ defmodule EctoCh.MixProject do
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :docs},
       {:rexbug, "~> 1.0", only: [:dev, :test]},
-      {:tz, "~> 0.26.1", only: [:dev, :test]}
+      {:tz, "~> 0.27.1", only: [:dev, :test]}
     ]
   end
 
