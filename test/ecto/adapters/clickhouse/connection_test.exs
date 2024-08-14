@@ -3055,6 +3055,57 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
   end
 
+  # https://github.com/plausible/ecto_ch/pull/189
+  test "naive DateTime64 params" do
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~N[2024-06-28 20:02:17.3],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(1)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~N[2024-06-28 20:02:17.38],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(2)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~N[2024-06-28 20:02:17.382],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(3)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~N[2024-06-28 20:02:17.3827],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(4)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~N[2024-06-28 20:02:17.38278],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(5)})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.timestamp > ^~N[2024-06-28 20:02:17.382780],
+               select: e.timestamp
+           ) == """
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(6)})\
+           """
+  end
+
   test "build_params/3" do
     params =
       [
