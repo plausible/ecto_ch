@@ -22,6 +22,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     schema "posts" do
       field(:title, :string)
       field(:content, :string)
+      field(:timestamp, Ch, type: "DateTime64(3)")
       has_many(:comments, Comment)
     end
   end
@@ -3023,7 +3024,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "preloading" do
     query = from(p in Post, preload: [:comments], select: p)
 
-    assert all(query) == ~s{SELECT p0."id",p0."title",p0."content" FROM "posts" AS p0}
+    assert all(query) ==
+             ~s{SELECT p0."id",p0."title",p0."content",p0."timestamp" FROM "posts" AS p0}
   end
 
   test "autoincrement support" do
@@ -3094,6 +3096,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                select: e.timestamp
            ) == """
            SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(6)})\
+           """
+
+    assert all(
+             from p in Post,
+               where: p.timestamp > ^~U[2024-06-28 20:02:17.382Z],
+               select: p.timestamp
+           ) == """
+           SELECT p0."timestamp" FROM "posts" AS p0 WHERE (p0."timestamp" > {$0:DateTime64(3)})\
            """
   end
 

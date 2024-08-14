@@ -1109,7 +1109,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp param_type(b) when is_boolean(b), do: "Bool"
 
   # TODO Date32
-  defp param_type(%NaiveDateTime{}), do: "DateTime"
+  defp param_type(%NaiveDateTime{microsecond: microsecond} = datetime) do
+    case microsecond do
+      {_val, precision} when precision > 0 ->
+        ["DateTime64(", Integer.to_string(precision), ?)]
+
+      _ ->
+        "DateTime"
+    end
+  end
 
   defp param_type(%DateTime{microsecond: microsecond}) do
     case microsecond do
