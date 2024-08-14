@@ -683,7 +683,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT lcase(s0."x", {$0:Int64}) FROM "schema" AS s0]
 
     assert_raise Ecto.QueryError,
-                 ~r/ClickHouse adapter does not support keyword or interpolated fragments/,
+                 ~r/Ecto.Adapters.ClickHouse does not support keyword or interpolated fragments/,
                  fn ->
                    Schema
                    |> select([], fragment(title: 2))
@@ -1464,68 +1464,123 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   @tag :capture_log
   test "lateral (but really array) join" do
-    query =
-      "arrays_test"
-      |> join(:inner_lateral, [a], r in "arr", on: true)
-      |> select([a, r], {a.s, r})
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given./,
+                 fn ->
+                   all(
+                     "arrays_test"
+                     |> join(:inner_lateral, [a], r in "arr", on: true)
+                     |> select([a, r], {a.s, r})
+                   )
+                 end
 
-    assert all(query) == """
+    assert all(
+             "arrays_test"
+             |> join(:inner_lateral, [a], r in "arr", on: true)
+             |> select([a, r], {a.s, fragment("?", r)})
+           ) == """
            SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
            """
   end
 
   @tag :capture_log
   test "left lateral (but really left array) join" do
-    query =
-      "arrays_test"
-      |> join(:left_lateral, [a], r in "arr", on: true)
-      |> select([a, r], {a.s, r})
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given./,
+                 fn ->
+                   all(
+                     "arrays_test"
+                     |> join(:left_lateral, [a], r in "arr", on: true)
+                     |> select([a, r], {a.s, r})
+                   )
+                 end
 
-    assert all(query) == """
+    assert all(
+             "arrays_test"
+             |> join(:left_lateral, [a], r in "arr", on: true)
+             |> select([a, r], {a.s, fragment("?", r)})
+           ) == """
            SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
            """
   end
 
   @tag :capture_log
   test "array join" do
-    query =
-      from at in "arrays_test",
-        array_join: a in "arr",
-        select: [at.s, a]
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given./,
+                 fn ->
+                   all(
+                     from at in "arrays_test",
+                       array_join: a in "arr",
+                       select: [at.s, a]
+                   )
+                 end
 
-    assert all(query) == """
-           SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
-           """
+    assert all(
+             from at in "arrays_test",
+               array_join: a in "arr",
+               select: [at.s, fragment("?", a)]
+           ) == ~s{SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1}
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given./,
+                 fn ->
+                   all(
+                     from at in "arrays_test",
+                       join: a in "arr",
+                       on: true,
+                       hints: "ARRAY",
+                       select: [at.s, a]
+                   )
+                 end
 
     assert all(
              from at in "arrays_test",
                join: a in "arr",
                on: true,
                hints: "ARRAY",
-               select: [at.s, a]
-           ) ==
-             """
-             SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
-             """
+               select: [at.s, fragment("?", a)]
+           ) == ~s{SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1}
   end
 
   @tag :capture_log
   test "left array join" do
-    query =
-      from at in "arrays_test",
-        left_array_join: a in "arr",
-        select: [at.s, a]
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given./,
+                 fn ->
+                   all(
+                     from at in "arrays_test",
+                       left_array_join: a in "arr",
+                       select: [at.s, a]
+                   )
+                 end
 
-    assert all(query) == """
+    assert all(
+             from at in "arrays_test",
+               left_array_join: a in "arr",
+               select: [at.s, fragment("?", a)]
+           ) == """
            SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
            """
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given./,
+                 fn ->
+                   all(
+                     from at in "arrays_test",
+                       left_join: a in "arr",
+                       on: true,
+                       hints: "ARRAY",
+                       select: [at.s, a]
+                   )
+                 end
 
     assert all(
              from at in "arrays_test",
                left_join: a in "arr",
                on: true,
                hints: "ARRAY",
-               select: [at.s, a]
+               select: [at.s, fragment("?", a)]
            ) ==
              """
              SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
