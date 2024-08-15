@@ -261,7 +261,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     remap_type(Ecto.Type.type(type), type, schema, field)
   end
 
-  defp remap_type({:parameterized, Ch, t}, _original, _schema, _field), do: t
+  defp remap_type({:parameterized, {Ch, t}}, _original, _schema, _field), do: t
 
   defp remap_type(t, _original, _schema, _field)
        when t in [:string, :date, :uuid, :boolean],

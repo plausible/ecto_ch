@@ -164,8 +164,8 @@ defmodule Ecto.Adapters.ClickHouse do
   def dumpers(:uuid, Ecto.UUID), do: [&__MODULE__.hex_uuid/1]
   def dumpers(:uuid, type), do: [type, &__MODULE__.hex_uuid/1]
   def dumpers(:binary_id, type), do: [type, &__MODULE__.hex_uuid/1]
-  def dumpers(_primitive, {:parameterized, Ch, params}), do: [dumper(params)]
-  def dumpers({:parameterized, Ch, params}, type), do: [type, dumper(params)]
+  def dumpers(_primitive, {:parameterized, {Ch, params}}), do: [dumper(params)]
+  def dumpers({:parameterized, {Ch, params}}, type), do: [type, dumper(params)]
   def dumpers(_primitive, type), do: [type]
 
   defp dumper(:uuid), do: &__MODULE__.hex_uuid/1
@@ -199,8 +199,8 @@ defmodule Ecto.Adapters.ClickHouse do
   def loaders(:uuid, Ecto.UUID = uuid), do: [uuid]
   def loaders(:uuid, type), do: [Ecto.UUID, type]
   def loaders(:binary_id, type), do: [Ecto.UUID, type]
-  def loaders(_primitive, {:parameterized, Ch, params}), do: [loader(params)]
-  def loaders({:parameterized, Ch, params}, type), do: [loader(params), type]
+  def loaders(_primitive, {:parameterized, {Ch, params}}), do: [loader(params)]
+  def loaders({:parameterized, {Ch, params}}, type), do: [loader(params), type]
   def loaders(_primitive, type), do: [type]
 
   defp loader(:uuid), do: Ecto.UUID

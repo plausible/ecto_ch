@@ -3,6 +3,8 @@
 ## Unreleased
 
 - add support for 128 and 256 bit integers https://github.com/plausible/ecto_ch/pull/181
+- drop `:array_join` support (please use ARRAY join hint instead) https://github.com/plausible/ecto_ch/pull/190
+- adapt to Ecto v3.12 https://github.com/plausible/ecto_ch/pull/190
 
 ## 0.3.8 (2024-07-01)
 

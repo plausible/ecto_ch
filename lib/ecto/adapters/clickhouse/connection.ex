@@ -6,7 +6,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   require Logger
   alias Ecto.SubQuery
-  alias Ecto.Query.{QueryExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
+  alias Ecto.Query.{QueryExpr, ByExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
 
   @parent_as __MODULE__
 
@@ -393,16 +393,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp join(%{joins: joins} = query, sources, params) do
     Enum.map(joins, fn
       %JoinExpr{qual: qual, ix: ix, source: source, on: %QueryExpr{expr: on_exrp}, hints: hints} ->
-        if qual in [:inner_lateral, :array, :left_lateral, :left_array] do
-          Logger.warning("""
-          #{inspect(qual)} join type is being deprecated. Please use `hints: "ARRAY"` to express ARRAY JOIN instead:
-
-              from t in "tables", join: a in "arr", hints: "ARRAY"
-              from t in "tables", left_join: a in "arr", hints: "ARRAY"
-
-          """)
-        end
-
         {join, name} = get_source(query, sources, params, ix, source)
 
         [
@@ -444,12 +434,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp join_on(:cross, true, _hints, _sources, _params, _query), do: []
 
-  # TODO remove
-  defp join_on(array, true, _hints, _sources, _params, _query)
-       when array in [:array, :left_array, :inner_lateral, :left_lateral] do
-    []
-  end
-
   defp join_on(_qual, true, ["ARRAY"], _sources, _params, _query) do
     []
   end
@@ -460,10 +444,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp join_qual(:inner, ["ARRAY"]), do: " ARRAY JOIN "
   defp join_qual(:inner, _hints), do: " INNER JOIN "
-  # TODO remove
-  defp join_qual(t, _hints) when t in [:inner_lateral, :array], do: " ARRAY JOIN "
-  # TODO remove
-  defp join_qual(t, _hints) when t in [:left_lateral, :left_array], do: " LEFT ARRAY JOIN "
   defp join_qual(:left, ["ARRAY"]), do: " LEFT ARRAY JOIN "
   defp join_qual(:left, _hints), do: " LEFT JOIN "
   defp join_qual(:right, _hints), do: " RIGHT JOIN "
@@ -487,7 +467,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp group_by(%{group_bys: group_bys} = query, sources, params) do
     [
       " GROUP BY "
-      | intersperse_map(group_bys, ?,, fn %QueryExpr{expr: expr} ->
+      | intersperse_map(group_bys, ?,, fn %ByExpr{expr: expr} ->
           intersperse_map(expr, ?,, &expr(&1, sources, params, query))
         end)
     ]
@@ -1014,7 +994,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # this is why :integer is Int64 and not Int32
   defp ecto_to_db(:integer, _query), do: "Int64"
   defp ecto_to_db(:binary, _query), do: "String"
-  defp ecto_to_db({:parameterized, Ch, type}, _query), do: Ch.Types.encode(type)
+  defp ecto_to_db({:parameterized, {Ch, type}}, _query), do: Ch.Types.encode(type)
   defp ecto_to_db({:array, type}, query), do: ["Array(", ecto_to_db(type, query), ?)]
 
   defp ecto_to_db(type, _query) when type in [:uuid, :string, :date, :boolean] do
