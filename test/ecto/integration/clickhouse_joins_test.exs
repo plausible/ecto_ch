@@ -19,16 +19,6 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
 
     # SELECT s, arr FROM arrays_test ARRAY JOIN arr
     assert TestRepo.all(
-             from t in "arrays_test", array_join: a in "arr", select: [t.s, fragment("?", a)]
-           ) == [
-             ["Hello", 1],
-             ["Hello", 2],
-             ["World", 3],
-             ["World", 4],
-             ["World", 5]
-           ]
-
-    assert TestRepo.all(
              from t in "arrays_test",
                join: a in "arr",
                on: true,
@@ -43,17 +33,6 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
            ]
 
     # SELECT s, arr FROM arrays_test LEFT ARRAY JOIN arr;
-    assert TestRepo.all(
-             from t in "arrays_test", left_array_join: a in "arr", select: [t.s, fragment("?", a)]
-           ) == [
-             ["Hello", 1],
-             ["Hello", 2],
-             ["World", 3],
-             ["World", 4],
-             ["World", 5],
-             ["Goodbye", 0]
-           ]
-
     assert TestRepo.all(
              from t in "arrays_test",
                left_join: a in "arr",
@@ -72,18 +51,6 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
     # SELECT s, arr, a FROM arrays_test ARRAY JOIN arr AS a;
     assert TestRepo.all(
              from t in "arrays_test",
-               array_join: a in "arr",
-               select: [t.s, fragment("arr"), fragment("?", a)]
-           ) == [
-             ["Hello", [1, 2], 1],
-             ["Hello", [1, 2], 2],
-             ["World", [3, 4, 5], 3],
-             ["World", [3, 4, 5], 4],
-             ["World", [3, 4, 5], 5]
-           ]
-
-    assert TestRepo.all(
-             from t in "arrays_test",
                join: a in "arr",
                hints: "ARRAY",
                on: true,
@@ -97,22 +64,6 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
            ]
 
     # SELECT s, arr_external FROM arrays_test ARRAY JOIN [1, 2, 3] AS arr_external;
-    assert TestRepo.all(
-             from t in "arrays_test",
-               array_join: a in fragment("?", [1, 2, 3]),
-               select: [t.s, fragment("?", a)]
-           ) == [
-             ["Hello", 1],
-             ["Hello", 2],
-             ["Hello", 3],
-             ["World", 1],
-             ["World", 2],
-             ["World", 3],
-             ["Goodbye", 1],
-             ["Goodbye", 2],
-             ["Goodbye", 3]
-           ]
-
     assert TestRepo.all(
              from t in "arrays_test",
                join: a in fragment("?", [1, 2, 3]),
@@ -142,15 +93,6 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
     )
 
     # SELECT s, `nest.x`, `nest.y` FROM nested_test ARRAY JOIN nest;
-    assert TestRepo.all(from t in "nested_test", array_join: n in "nest", select: [t.s, n.x, n.y]) ==
-             [
-               ["Hello", 1, 10],
-               ["Hello", 2, 20],
-               ["World", 3, 30],
-               ["World", 4, 40],
-               ["World", 5, 50]
-             ]
-
     assert TestRepo.all(
              from t in "nested_test",
                join: n in "nest",
