@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.9 (2024-08-15)
 
 - add support for 128 and 256 bit integers https://github.com/plausible/ecto_ch/pull/181
 - drop `:array_join` support (please use ARRAY join hint instead) https://github.com/plausible/ecto_ch/pull/190
