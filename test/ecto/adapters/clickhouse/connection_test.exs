@@ -3161,24 +3161,71 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              "1,'a',true,'2024-04-12'::date,'2024-04-12 09:55:54.329788'::DateTime64(6,'Etc/UTC'),'2024-04-12 09:55:54'::DateTime('Etc/UTC')"
   end
 
+  # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
   test "integer boundaries" do
-    params =
-      [
-        # Int64 Boundary
-        9_223_372_036_854_775_807,
-        # UInt64 Boundary
-        18_446_744_073_709_551_615,
-        # Int128 Boundary
-        170_141_183_460_469_231_731_687_303_715_884_105_727,
-        # UInt128 Boundary
-        340_282_366_920_938_463_463_374_607_431_768_211_455,
-        # Int256 Boundary
-        57_896_044_618_658_097_711_785_492_504_343_953_926_634_992_332_820_282_019_728_792_003_956_564_819_967,
-        # UInt256 Boundary
-        115_792_089_237_316_195_423_570_985_008_687_907_853_269_984_665_640_564_039_457_584_007_913_129_639_935
-      ]
+    import Bitwise
 
-    assert to_string(Connection.build_params(_ix = 0, _len = 6, params)) ==
-             "{$0:Int64},{$1:UInt64},{$2:Int128},{$3:UInt128},{$4:Int256},{$5:UInt256}"
+    param = fn value ->
+      to_string(Connection.build_params(_ix = 0, _len = 1, [value]))
+    end
+
+    inline_param = fn value ->
+      to_string(Connection.build_params(_ix = 0, _len = 1, [Connection.mark_inline(value)]))
+    end
+
+    # Int256 (from below)
+    assert param.(-(1 <<< 255)) == "{$0:Int256}"
+    assert param.(-(1 <<< 255) + 1) == "{$0:Int256}"
+    assert param.(-(1 <<< 127) - 1) == "{$0:Int256}"
+
+    assert inline_param.(-(1 <<< 255)) ==
+             "-57896044618658097711785492504343953926634992332820282019728792003956564819968::Int256"
+
+    assert inline_param.(-(1 <<< 255) + 1) ==
+             "-57896044618658097711785492504343953926634992332820282019728792003956564819967::Int256"
+
+    assert inline_param.(-(1 <<< 127) - 1) == "-170141183460469231731687303715884105729::Int256"
+
+    # Int128 (from below)
+    assert param.(-(1 <<< 127)) == "{$0:Int128}"
+    assert param.(-(1 <<< 127) + 1) == "{$0:Int128}"
+    assert param.(-(1 <<< 63) - 1) == "{$0:Int128}"
+
+    assert inline_param.(-(1 <<< 127)) == "-170141183460469231731687303715884105728::Int128"
+    assert inline_param.(-(1 <<< 127) + 1) == "-170141183460469231731687303715884105727::Int128"
+    assert inline_param.(-(1 <<< 63) - 1) == "-9223372036854775809::Int128"
+
+    # Int64
+    assert param.(-(1 <<< 63)) == "{$0:Int64}"
+    assert param.(-(1 <<< 63) + 1) == "{$0:Int64}"
+    assert param.(-(1 <<< 31) - 1) == "{$0:Int64}"
+    assert param.(0) == "{$0:Int64}"
+    assert param.((1 <<< 63) - 1) == "{$0:Int64}"
+
+    assert inline_param.(-(1 <<< 63)) == "-9223372036854775808"
+    assert inline_param.(-(1 <<< 63) + 1) == "-9223372036854775807"
+    assert inline_param.(-(1 <<< 31) - 1) == "-2147483649"
+    assert inline_param.(0) == "0"
+    assert inline_param.((1 <<< 63) - 1) == "9223372036854775807"
+
+    # UInt64
+    assert param.(1 <<< 63) == "{$0:UInt64}"
+    assert param.((1 <<< 64) - 1) == "{$0:UInt64}"
+    assert inline_param.(1 <<< 63) == "9223372036854775808"
+    assert inline_param.((1 <<< 64) - 1) == "18446744073709551615"
+
+    # UInt128
+    assert param.(1 <<< 64) == "{$0:UInt128}"
+    assert param.((1 <<< 128) - 1) == "{$0:UInt128}"
+    assert inline_param.(1 <<< 64) == "18446744073709551616::UInt128"
+    assert inline_param.((1 <<< 128) - 1) == "340282366920938463463374607431768211455::UInt128"
+
+    # UInt256
+    assert param.(1 <<< 128) == "{$0:UInt256}"
+    assert param.((1 <<< 256) - 1) == "{$0:UInt256}"
+    assert inline_param.(1 <<< 128) == "340282366920938463463374607431768211456::UInt256"
+
+    assert inline_param.((1 <<< 256) - 1) ==
+             "115792089237316195423570985008687907853269984665640564039457584007913129639935::UInt256"
   end
 end

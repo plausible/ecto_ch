@@ -821,7 +821,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr(literal, _sources, _params, _query) when is_integer(literal) do
-    Integer.to_string(literal)
+    inline_param(literal)
   end
 
   defp expr(literal, _sources, _params, _query) when is_float(literal) do
@@ -1012,10 +1012,20 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp inline_param(false), do: "false"
   defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
 
+  @max_uint128 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  @max_uint64 0xFFFFFFFFFFFFFFFF
+  @max_int64 0x7FFFFFFFFFFFFFFF
+  @min_int128 -0x80000000000000000000000000000000
+  @min_int64 -0x8000000000000000
+
   defp inline_param(i) when is_integer(i) do
-    # we add explicit casting to integers to avoid scientific notation
+    # we add explicit casting to large integers to avoid scientific notation
     # see https://github.com/plausible/ecto_ch/issues/187
-    Integer.to_string(i) <> "::" <> param_type(i)
+    if i > @max_uint64 or i < @min_int64 do
+      Integer.to_string(i) <> "::" <> param_type(i)
+    else
+      Integer.to_string(i)
+    end
   end
 
   # ClickHouse understands scientific notation
@@ -1080,18 +1090,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type(s) when is_binary(s), do: "String"
 
-  @max_int256 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-  @max_int128 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-  @max_int64 0x7FFFFFFFFFFFFFFF
-
   # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
   defp param_type(i) when is_integer(i) do
     cond do
-      i > @max_int256 -> "UInt256"
-      i < -@max_int128 - 1 -> "Int256"
-      i > @max_int128 -> "UInt128"
-      i < -@max_int64 - 1 -> "Int128"
+      i > @max_uint128 -> "UInt256"
+      i > @max_uint64 -> "UInt128"
       i > @max_int64 -> "UInt64"
+      i < @min_int128 -> "Int256"
+      i < @min_int64 -> "Int128"
       true -> "Int64"
     end
   end
