@@ -821,7 +821,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr(literal, _sources, _params, _query) when is_integer(literal) do
-    Integer.to_string(literal)
+    inline_param(literal)
   end
 
   defp expr(literal, _sources, _params, _query) when is_float(literal) do
@@ -1011,7 +1011,22 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp inline_param(true), do: "true"
   defp inline_param(false), do: "false"
   defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
-  defp inline_param(i) when is_integer(i), do: Integer.to_string(i)
+
+  @max_uint128 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  @max_uint64 0xFFFFFFFFFFFFFFFF
+  @max_int64 0x7FFFFFFFFFFFFFFF
+  @min_int128 -0x80000000000000000000000000000000
+  @min_int64 -0x8000000000000000
+
+  defp inline_param(i) when is_integer(i) do
+    # we add explicit casting to large integers to avoid scientific notation
+    # see https://github.com/plausible/ecto_ch/issues/187
+    if i > @max_uint64 or i < @min_int64 do
+      Integer.to_string(i) <> "::" <> param_type(i)
+    else
+      Integer.to_string(i)
+    end
+  end
 
   # ClickHouse understands scientific notation
   defp inline_param(f) when is_float(f), do: Float.to_string(f)
@@ -1075,16 +1090,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type(s) when is_binary(s), do: "String"
 
-  defp param_type(i)
-       when is_integer(i) and
-              i > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-       do: "UInt256"
+  # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
+  defp param_type(i) when is_integer(i) do
+    cond do
+      i > @max_uint128 -> "UInt256"
+      i > @max_uint64 -> "UInt128"
+      i > @max_int64 -> "UInt64"
+      i < @min_int128 -> "Int256"
+      i < @min_int64 -> "Int128"
+      true -> "Int64"
+    end
+  end
 
-  defp param_type(i) when is_integer(i) and i > 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "Int256"
-  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "UInt128"
-  defp param_type(i) when is_integer(i) and i > 0xFFFFFFFFFFFFFFFF, do: "Int128"
-  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFF, do: "UInt64"
-  defp param_type(i) when is_integer(i), do: "Int64"
   defp param_type(f) when is_float(f), do: "Float64"
   defp param_type(b) when is_boolean(b), do: "Bool"
 
