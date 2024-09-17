@@ -1013,11 +1013,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
 
   defp inline_param(i) when is_integer(i) do
-    if i > 0xFFFFFFFFFFFFFFFF do
-      Integer.to_string(i) <> "::" <> param_type(i)
-    else
-      Integer.to_string(i)
-    end
+    # we add explicit casting to integers to avoid scientific notation
+    # see https://github.com/plausible/ecto_ch/issues/187
+    Integer.to_string(i) <> "::" <> param_type(i)
   end
 
   # ClickHouse understands scientific notation
@@ -1082,16 +1080,22 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type(s) when is_binary(s), do: "String"
 
-  defp param_type(i)
-       when is_integer(i) and
-              i > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
-       do: "UInt256"
+  @max_int256 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  @max_int128 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  @max_int64 0x7FFFFFFFFFFFFFFF
 
-  defp param_type(i) when is_integer(i) and i > 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "Int256"
-  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, do: "UInt128"
-  defp param_type(i) when is_integer(i) and i > 0xFFFFFFFFFFFFFFFF, do: "Int128"
-  defp param_type(i) when is_integer(i) and i > 0x7FFFFFFFFFFFFFFF, do: "UInt64"
-  defp param_type(i) when is_integer(i), do: "Int64"
+  # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
+  defp param_type(i) when is_integer(i) do
+    cond do
+      i > @max_int256 -> "UInt256"
+      i < -@max_int128 - 1 -> "Int256"
+      i > @max_int128 -> "UInt128"
+      i < -@max_int64 - 1 -> "Int128"
+      i > @max_int64 -> "UInt64"
+      true -> "Int64"
+    end
+  end
+
   defp param_type(f) when is_float(f), do: "Float64"
   defp param_type(b) when is_boolean(b), do: "Bool"
 
