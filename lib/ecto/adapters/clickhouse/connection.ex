@@ -1011,7 +1011,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp inline_param(true), do: "true"
   defp inline_param(false), do: "false"
   defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
-  defp inline_param(i) when is_integer(i), do: Integer.to_string(i)
+
+  defp inline_param(i) when is_integer(i) do
+    if i > 0xFFFFFFFFFFFFFFFF do
+      Integer.to_string(i) <> "::" <> param_type(i)
+    else
+      Integer.to_string(i)
+    end
+  end
 
   # ClickHouse understands scientific notation
   defp inline_param(f) when is_float(f), do: Float.to_string(f)
