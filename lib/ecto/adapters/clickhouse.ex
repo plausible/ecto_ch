@@ -329,14 +329,9 @@ defmodule Ecto.Adapters.ClickHouse do
 
     opts =
       case operation do
-        :all ->
-          [{:command, :select} | put_setting(opts, :readonly, 1)]
-
-        :delete_all ->
-          [{:command, :delete} | opts]
-
-        :alter_update_all ->
-          [{:command, :alter} | opts]
+        :all -> [{:command, :select} | opts]
+        :delete_all -> [{:command, :delete} | opts]
+        :alter_update_all -> [{:command, :alter} | opts]
       end
 
     result = Ecto.Adapters.SQL.query!(adapter_meta, sql, params, put_source(opts, query_meta))
@@ -401,11 +396,6 @@ defmodule Ecto.Adapters.ClickHouse do
       end
 
     Ecto.Adapter.Queryable.plan_query(operation, Ecto.Adapters.ClickHouse, queryable)
-  end
-
-  defp put_setting(opts, key, value) do
-    setting = {key, value}
-    Keyword.update(opts, :settings, [setting], fn settings -> [setting | settings] end)
   end
 
   @doc false
