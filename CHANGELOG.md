@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.10 (2024-09-27)
+
+- improve support for 128 and 256 bit integers https://github.com/plausible/ecto_ch/pull/192
+- remove implicit `readonly=1` setting from `Repo.all` https://github.com/plausible/ecto_ch/pull/199
+
 ## 0.3.9 (2024-08-15)
 
 - add support for 128 and 256 bit integers https://github.com/plausible/ecto_ch/pull/181
