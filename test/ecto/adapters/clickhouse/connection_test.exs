@@ -7,6 +7,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   import Ecto.Query
   import Ecto.Migration, only: [table: 1, table: 2, index: 3, constraint: 3]
+  import Ecto.Adapters.ClickHouse.API, only: [union_distinct: 2]
 
   defmodule Comment do
     use Ecto.Schema
@@ -437,7 +438,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ~s[SELECT s0."x" FROM "schema" AS s0 ORDER BY s0."x" ASC NULLS LAST,s0."y" DESC NULLS LAST]
   end
 
-  test "union and union all" do
+  test "union, union all, and union distinct" do
     base_query =
       Schema
       |> select([r], r.x)
@@ -481,6 +482,18 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
              UNION ALL (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
              UNION ALL (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
+             """
+
+    query =
+      base_query
+      |> union_distinct(^union_query1)
+      |> union_distinct(^union_query2)
+
+    assert all(query) ==
+             """
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             UNION DISTINCT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
+             UNION DISTINCT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
   end
 

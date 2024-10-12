@@ -562,6 +562,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp combination({:union, query}, params), do: [" UNION (", all(query, params), ?)]
   defp combination({:union_all, query}, params), do: [" UNION ALL (", all(query, params), ?)]
+
+  defp combination({:union_distinct, query}, params),
+    do: [" UNION DISTINCT (", all(query, params), ?)]
+
   defp combination({:except, query}, params), do: [" EXCEPT (", all(query, params), ?)]
   defp combination({:intersect, query}, params), do: [" INTERSECT (", all(query, params), ?)]
 
