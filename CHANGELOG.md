@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 (2024-10-15)
+
+- use `UNION DISTINCT` instead of `UNION` for `Ecto.Query.union/2` https://github.com/plausible/ecto_ch/pull/204
+
 ## 0.3.10 (2024-09-27)
 
 - improve support for 128 and 256 bit integers https://github.com/plausible/ecto_ch/pull/192
