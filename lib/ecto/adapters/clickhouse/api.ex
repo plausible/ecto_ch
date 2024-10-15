@@ -48,11 +48,4 @@ defmodule Ecto.Adapters.ClickHouse.API do
     # %{query | sources: {nil, schema}}
     query
   end
-
-  @doc """
-  Builds a `UNION DISTINCT` query.
-  """
-  defmacro union_distinct(query, other_query) do
-    Ecto.Query.Builder.Combination.build(:union_distinct, query, other_query, __CALLER__)
-  end
 end

@@ -68,7 +68,7 @@ defmodule Ecto.Integration.InlineSQLTest do
                ORDER BY 7 \
                LIMIT 8 \
                OFFSET 9 \
-               UNION \
+               UNION DISTINCT \
                (SELECT s0."id",true FROM "schema1" AS s0 \
                WHERE (5)) \
                UNION ALL \

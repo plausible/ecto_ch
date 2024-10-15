@@ -7,7 +7,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   import Ecto.Query
   import Ecto.Migration, only: [table: 1, table: 2, index: 3, constraint: 3]
-  import Ecto.Adapters.ClickHouse.API, only: [union_distinct: 2]
 
   defmodule Comment do
     use Ecto.Schema
@@ -468,8 +467,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) ==
              """
              SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
-             UNION (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
-             UNION (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
+             UNION DISTINCT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
+             UNION DISTINCT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
 
     query =
@@ -482,18 +481,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
              UNION ALL (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
              UNION ALL (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
-             """
-
-    query =
-      base_query
-      |> union_distinct(^union_query1)
-      |> union_distinct(^union_query2)
-
-    assert all(query) ==
-             """
-             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
-             UNION DISTINCT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
-             UNION DISTINCT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
   end
 
@@ -996,7 +983,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ORDER BY {$16:Int64} \
              LIMIT {$17:Int64} \
              OFFSET {$18:Int64} \
-             UNION \
+             UNION DISTINCT \
              (SELECT s0."id",{$12:Bool} FROM "schema1" AS s0 \
              WHERE ({$13:Int64})) \
              UNION ALL \
