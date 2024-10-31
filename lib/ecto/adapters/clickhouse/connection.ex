@@ -307,8 +307,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     is_nil: " WHERE "
   ]
 
-  @binary_ops Keyword.keys(binary_ops)
-
   for {op, str} <- binary_ops do
     defp handle_call(unquote(op), 2), do: {:binary_op, unquote(str)}
   end
@@ -594,21 +592,20 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp boolean(_name, [], _sources, _params, _query), do: []
 
-  defp boolean(name, [%{expr: expr, op: op} | exprs], sources, params, query) do
-    result =
-      Enum.reduce(exprs, {op, paren_expr(expr, sources, params, query)}, fn
-        %BooleanExpr{expr: expr, op: op}, {op, acc} ->
-          {op, [acc, operator_to_boolean(op) | paren_expr(expr, sources, params, query)]}
+  defp boolean(name, exprs, sources, params, query) do
+    [%BooleanExpr{expr: first_expr} | other_exprs] = exprs
 
-        %BooleanExpr{expr: expr, op: op}, {_, acc} ->
-          {op, [?(, acc, ?), operator_to_boolean(op) | paren_expr(expr, sources, params, query)]}
+    result =
+      Enum.reduce(other_exprs, expr(first_expr, sources, params, query), fn
+        %BooleanExpr{op: :or, expr: expr}, acc ->
+          ["((", acc, ?), " OR ", ?(, expr(expr, sources, params, query), "))"]
+
+        %BooleanExpr{op: :and, expr: expr}, acc ->
+          [acc, " AND ", expr(expr, sources, params, query)]
       end)
 
-    [name | elem(result, 1)]
+    [name | result]
   end
-
-  defp operator_to_boolean(:and), do: " AND "
-  defp operator_to_boolean(:or), do: " OR "
 
   defp parens_for_select([first_expr | _] = expression) do
     if is_binary(first_expr) and String.match?(first_expr, ~r/^\s*select/i) do
@@ -616,10 +613,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     else
       expression
     end
-  end
-
-  defp paren_expr(expr, sources, params, query) do
-    [?(, expr(expr, sources, params, query), ?)]
   end
 
   defp expr({_type, [literal]}, sources, params, query) do
@@ -782,16 +775,31 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         _ -> {[], args}
       end
 
-    case handle_call(fun, length(args)) do
-      {:binary_op, op} ->
+    # TODO don't length(args)
+    case {fun, handle_call(fun, length(args))} do
+      {:or, {:binary_op, op}} ->
+        [left, right] = args
+
+        [
+          "((",
+          op_to_binary(left, sources, params, query),
+          ?),
+          op,
+          ?(,
+          op_to_binary(right, sources, params, query),
+          "))"
+        ]
+
+      {_, {:binary_op, op}} ->
         [left, right] = args
 
         [
           op_to_binary(left, sources, params, query),
-          op | op_to_binary(right, sources, params, query)
+          op,
+          op_to_binary(right, sources, params, query)
         ]
 
-      {:fun, fun} ->
+      {_, {:fun, fun}} ->
         [fun, ?(, modifier, intersperse_map(args, ?,, &expr(&1, sources, params, query)), ?)]
     end
   end
@@ -835,12 +843,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       message: "unsupported expression #{inspect(expr)}"
   end
 
-  defp op_to_binary({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
-    paren_expr(expr, sources, params, query)
-  end
-
   defp op_to_binary({:is_nil, _, [_]} = expr, sources, params, query) do
-    paren_expr(expr, sources, params, query)
+    [?(, expr(expr, sources, params, query), ?)]
   end
 
   defp op_to_binary(expr, sources, params, query) do

@@ -410,6 +410,63 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x" = 42) OR (s0."y" != 43)) AND (s0."z" = 44)]
   end
 
+  defmacrop has_key(table, meta_column, key) do
+    quote do
+      fragment(
+        "has(?, ?)",
+        field(unquote(table), unquote(meta_column)),
+        unquote(key)
+      )
+    end
+  end
+
+  defmacrop get_by_key(table, meta_column, key) do
+    quote do
+      fragment(
+        "?[indexOf(?, ?)]",
+        field(unquote(table), unquote(meta_column)),
+        field(unquote(table), unquote(meta_column)),
+        unquote(key)
+      )
+    end
+  end
+
+  test "dynamic with many conditions" do
+    filters = [
+      dynamic(
+        [t],
+        (has_key(t, :"meta.key", ^"content-platform") and
+           get_by_key(t, :"meta.key", ^"content-platform") in ^["(none)", "web", "app"]) or
+          (^true and not has_key(t, :"meta.key", ^"content-platform"))
+      )
+    ]
+
+    base_condition =
+      dynamic(
+        [e],
+        e.site_id == ^1 and e.timestamp >= ^~D[2024-01-01] and e.timestamp <= ^~D[2025-01-01]
+      )
+
+    dynamic =
+      Enum.reduce(filters, base_condition, fn condition, acc ->
+        dynamic([], ^acc and ^condition)
+      end)
+
+    assert all(from e in "events", where: ^dynamic, select: e.name) ==
+             """
+             SELECT e0."name" FROM "events" AS e0 WHERE \
+             e0."site_id" = {$0:Int64} \
+             AND e0."timestamp" >= {$1:Date} \
+             AND e0."timestamp" <= {$2:Date} \
+             AND \
+             (\
+             (has(e0."meta.key", {$3:String}) AND e0."meta.key"[indexOf(e0."meta.key", {$4:String})] IN ({$5:String},{$6:String},{$7:String})) \
+             OR \
+             ({$8:Bool} AND NOT (has(e0."meta.key", {$9:String})))\
+             )\
+             """
+  end
+
   test "order_by" do
     query = Schema |> order_by([r], r.x) |> select([r], r.x)
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 ORDER BY s0."x"]
