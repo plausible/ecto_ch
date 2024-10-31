@@ -20,14 +20,14 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                "events"
                |> where(name: "hello")
                |> update(set: [i: 1])
-             ) == {~s[ALTER TABLE "events" UPDATE "i"=1 WHERE ("name" = 'hello')], []}
+             ) == {~s[ALTER TABLE "events" UPDATE "i"=1 WHERE "name" = 'hello'], []}
 
       assert to_sql(
                "events"
                |> where(name: "hello")
                |> update(set: [i: ^1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"={$0:Int64} WHERE ("name" = 'hello')],
+               ~s[ALTER TABLE "events" UPDATE "i"={$0:Int64} WHERE "name" = 'hello'],
                [1]
              }
 
@@ -36,7 +36,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(set: [i: ^1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"={$0:Int64} WHERE ("name" = {$1:String})],
+               ~s[ALTER TABLE "events" UPDATE "i"={$0:Int64} WHERE "name" = {$1:String}],
                [1, "hello"]
              }
 
@@ -45,7 +45,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(set: [i: 1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=1 WHERE ("name" = {$0:String})],
+               ~s[ALTER TABLE "events" UPDATE "i"=1 WHERE "name" = {$0:String}],
                ["hello"]
              }
     end
@@ -56,7 +56,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: "hello")
                |> update(inc: [i: 1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"="i"+1 WHERE ("name" = 'hello')],
+               ~s[ALTER TABLE "events" UPDATE "i"="i"+1 WHERE "name" = 'hello'],
                []
              }
 
@@ -65,21 +65,21 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(inc: [i: ^1])
              ) ==
-               {~s[ALTER TABLE "events" UPDATE "i"="i"+{$0:Int64} WHERE ("name" = {$1:String})],
+               {~s[ALTER TABLE "events" UPDATE "i"="i"+{$0:Int64} WHERE "name" = {$1:String}],
                 [1, "hello"]}
 
       assert to_sql(
                "events"
                |> where(name: "hello")
                |> update(inc: [i: -1])
-             ) == {~s[ALTER TABLE "events" UPDATE "i"="i"+-1 WHERE ("name" = 'hello')], []}
+             ) == {~s[ALTER TABLE "events" UPDATE "i"="i"+-1 WHERE "name" = 'hello'], []}
 
       assert to_sql(
                "events"
                |> where(name: ^"hello")
                |> update(inc: [i: ^(-1)])
              ) ==
-               {~s[ALTER TABLE "events" UPDATE "i"="i"+{$0:Int64} WHERE ("name" = {$1:String})],
+               {~s[ALTER TABLE "events" UPDATE "i"="i"+{$0:Int64} WHERE "name" = {$1:String}],
                 [-1, "hello"]}
     end
 
@@ -89,7 +89,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: "hello")
                |> update(push: [i: 1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",1) WHERE ("name" = 'hello')],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",1) WHERE "name" = 'hello'],
                []
              }
 
@@ -98,7 +98,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: "hello")
                |> update(push: [i: ^1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",{$0:Int64}) WHERE ("name" = 'hello')],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",{$0:Int64}) WHERE "name" = 'hello'],
                [1]
              }
 
@@ -107,7 +107,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(push: [i: ^1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",{$0:Int64}) WHERE ("name" = {$1:String})],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",{$0:Int64}) WHERE "name" = {$1:String}],
                [1, "hello"]
              }
 
@@ -116,7 +116,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(push: [i: 1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",1) WHERE ("name" = {$0:String})],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayPushBack("i",1) WHERE "name" = {$0:String}],
                ["hello"]
              }
     end
@@ -127,7 +127,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: "hello")
                |> update(pull: [i: 1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!=1,"i") WHERE ("name" = 'hello')],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!=1,"i") WHERE "name" = 'hello'],
                []
              }
 
@@ -136,7 +136,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: "hello")
                |> update(pull: [i: ^1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE ("name" = 'hello')],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE "name" = 'hello'],
                [1]
              }
 
@@ -145,7 +145,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(pull: [i: ^1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE ("name" = {$1:String})],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE "name" = {$1:String}],
                [1, "hello"]
              }
 
@@ -154,7 +154,7 @@ defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
                |> where(name: ^"hello")
                |> update(pull: [i: 1])
              ) == {
-               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!=1,"i") WHERE ("name" = {$0:String})],
+               ~s[ALTER TABLE "events" UPDATE "i"=arrayFilter(x->x!=1,"i") WHERE "name" = {$0:String}],
                ["hello"]
              }
     end

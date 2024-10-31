@@ -301,10 +301,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     and: " AND ",
     or: " OR ",
     ilike: " ILIKE ",
-    like: " LIKE ",
-    # TODO these two are not in binary_ops in sqlite3 adapter
-    in: " IN ",
-    is_nil: " WHERE "
+    like: " LIKE "
   ]
 
   for {op, str} <- binary_ops do
@@ -676,7 +673,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:is_nil, _, [arg]}, sources, params, query) do
-    [expr(arg, sources, params, query) | " IS NULL"]
+    [?(, expr(arg, sources, params, query) | " IS NULL)"]
   end
 
   defp expr({:not, _, [expr]}, sources, params, query) do
@@ -782,11 +779,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
         [
           "((",
-          op_to_binary(left, sources, params, query),
+          expr(left, sources, params, query),
           ?),
           op,
           ?(,
-          op_to_binary(right, sources, params, query),
+          expr(right, sources, params, query),
           "))"
         ]
 
@@ -794,9 +791,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         [left, right] = args
 
         [
-          op_to_binary(left, sources, params, query),
+          expr(left, sources, params, query),
           op,
-          op_to_binary(right, sources, params, query)
+          expr(right, sources, params, query)
         ]
 
       {_, {:fun, fun}} ->
@@ -841,14 +838,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     raise Ecto.QueryError,
       query: query,
       message: "unsupported expression #{inspect(expr)}"
-  end
-
-  defp op_to_binary({:is_nil, _, [_]} = expr, sources, params, query) do
-    [?(, expr(expr, sources, params, query), ?)]
-  end
-
-  defp op_to_binary(expr, sources, params, query) do
-    expr(expr, sources, params, query)
   end
 
   defp create_names(%{sources: sources}, as_prefix) do

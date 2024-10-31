@@ -347,7 +347,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = Schema |> select([r], count(r.x) |> filter(r.x > 10 and r.x < 50))
 
     assert all(query) ==
-             ~s[SELECT count(s0."x") FILTER (WHERE (s0."x" > 10) AND (s0."x" < 50)) FROM "schema" AS s0]
+             ~s[SELECT count(s0."x") FILTER (WHERE s0."x" > 10 AND s0."x" < 50) FROM "schema" AS s0]
 
     query = Schema |> select([r], count() |> filter(r.x > 10))
     assert all(query) == ~s[SELECT count(*) FILTER (WHERE s0."x" > 10) FROM "schema" AS s0]
@@ -383,10 +383,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> select([r], r.x)
 
     assert all(query) ==
-             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE (s0."x" = 42) AND (s0."y" != 43)]
+             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE s0."x" = 42 AND s0."y" != 43]
 
     query = Schema |> where([r], {r.x, r.y} > {1, 2}) |> select([r], r.x)
-    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x",s0."y") > (1,2))]
+    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE (s0."x",s0."y") > (1,2)]
   end
 
   test "or_where" do
@@ -396,8 +396,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> or_where([r], r.y != 43)
       |> select([r], r.x)
 
+    # TODO
     assert all(query) ==
-             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE (s0."x" = 42) OR (s0."y" != 43)]
+             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x" = 42) OR (s0."y" != 43))]
 
     query =
       Schema
@@ -407,7 +408,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> select([r], r.x)
 
     assert all(query) ==
-             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x" = 42) OR (s0."y" != 43)) AND (s0."z" = 44)]
+             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x" = 42) OR (s0."y" != 43)) AND s0."z" = 44]
   end
 
   defmacrop has_key(table, meta_column, key) do
@@ -658,10 +659,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "string escape" do
     query = "schema" |> where(foo: "'\\  ") |> select([], true)
-    assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE (s0."foo" = '''\\\\  ')]
+    assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE s0."foo" = '''\\\\  ']
 
     query = "schema" |> where(foo: "'") |> select([], true)
-    assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE (s0."foo" = '''')]
+    assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE s0."foo" = '''']
   end
 
   test "binary ops" do
@@ -698,10 +699,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "is_nil" do
     query = Schema |> select([r], is_nil(r.x))
-    assert all(query) == ~s[SELECT s0."x" IS NULL FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT (s0."x" IS NULL) FROM "schema" AS s0]
 
     query = Schema |> select([r], not is_nil(r.x))
-    assert all(query) == ~s[SELECT NOT (s0."x" IS NULL) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT NOT ((s0."x" IS NULL)) FROM "schema" AS s0]
 
     query = "schema" |> select([r], r.x == is_nil(r.y))
     assert all(query) == ~s[SELECT s0."x" = (s0."y" IS NULL) FROM "schema" AS s0]
@@ -733,7 +734,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> select([r], r.x)
       |> where([], fragment(~s|? = "query\\?"|, ^10))
 
-    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ({$0:Int64} = "query?")]
+    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE {$0:Int64} = "query?"]
 
     value = 13
     query = Schema |> select([r], fragment("lcase(?, ?)", r.x, ^value))
@@ -751,21 +752,19 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "literals" do
     query = "schema" |> where(foo: true) |> select([], true)
     # TODO is true?
-    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 1)}
+    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE s0."foo" = 1}
 
     query = "schema" |> where(foo: false) |> select([], true)
-    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 0)}
+    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE s0."foo" = 0}
 
     query = "schema" |> where(foo: "abc") |> select([], true)
-    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 'abc')}
+    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE s0."foo" = 'abc'}
 
     query = "schema" |> where(foo: 123) |> select([], true)
-    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 123)}
+    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE s0."foo" = 123}
 
     query = "schema" |> where(foo: 123.0) |> select([], true)
-
-    assert all(query) ==
-             ~s{SELECT true FROM "schema" AS s0 WHERE (s0."foo" = 123.0)}
+    assert all(query) == ~s{SELECT true FROM "schema" AS s0 WHERE s0."foo" = 123.0}
 
     name = "y"
 
@@ -774,7 +773,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> where(fragment("? = ?", literal(^name), "Main"))
       |> select([], true)
 
-    assert all(query) == ~s|SELECT true FROM "schema" AS s0 WHERE ("y" = 'Main')|
+    assert all(query) == ~s|SELECT true FROM "schema" AS s0 WHERE "y" = 'Main'|
   end
 
   test "selected_as" do
@@ -846,7 +845,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> select([r], (r.x > 0 and r.y > ^(-z)) or true)
 
     assert all(query) ==
-             ~s[SELECT ((s0."x" > 0) AND (s0."y" > {$0:Int64})) OR 1 FROM "schema" AS s0]
+             ~s[SELECT ((s0."x" > 0 AND s0."y" > {$0:Int64}) OR (1)) FROM "schema" AS s0]
   end
 
   test "in expression" do
@@ -865,7 +864,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = Schema |> select([e], e.x == ^0 or e.x in ^[1, 2, 3] or e.x == ^4)
 
     assert all(query) ==
-             ~s[SELECT ((s0."x" = {$0:Int64}) OR (s0."x" IN ({$1:Int64},{$2:Int64},{$3:Int64}))) OR (s0."x" = {$4:Int64}) FROM "schema" AS s0]
+             ~s[SELECT ((((s0."x" = {$0:Int64}) OR (s0."x" IN ({$1:Int64},{$2:Int64},{$3:Int64})))) OR (s0."x" = {$4:Int64})) FROM "schema" AS s0]
 
     query = Schema |> select([e], e in [1, 2, 3])
 
@@ -888,7 +887,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) ==
              """
              SELECT c0."x" FROM "comments" AS c0 \
-             WHERE (c0."post_id" IN (SELECT sp0."id" FROM "posts" AS sp0 WHERE (sp0."title" = {$0:String})))\
+             WHERE c0."post_id" IN (\
+             SELECT sp0."id" FROM "posts" AS sp0 WHERE sp0."title" = {$0:String}\
+             )\
              """
 
     posts =
@@ -906,7 +907,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) ==
              """
              SELECT c0."x" FROM "comments" AS c0 \
-             WHERE (c0."post_id" IN (SELECT sp0."id" FROM "posts" AS sp0 WHERE (sp0."title" = c0."subtitle")))\
+             WHERE c0."post_id" IN (\
+             SELECT sp0."id" FROM "posts" AS sp0 WHERE sp0."title" = c0."subtitle"\
+             )\
              """
   end
 
@@ -916,7 +919,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> having([p], p.x == p.x)
       |> select([p], p.x)
 
-    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 HAVING (s0."x" = s0."x")}
+    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 HAVING s0."x" = s0."x"}
 
     query =
       Schema
@@ -928,8 +931,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
              SELECT s0."y",s0."x" \
              FROM "schema" AS s0 \
-             HAVING (s0."x" = s0."x") \
-             AND (s0."y" = s0."y")\
+             HAVING s0."x" = s0."x" AND s0."y" = s0."y"\
              """
   end
 
@@ -939,7 +941,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> or_having([p], p.x == p.x)
       |> select([p], p.x)
 
-    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 HAVING (s0."x" = s0."x")}
+    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 HAVING s0."x" = s0."x"}
 
     query =
       Schema
@@ -951,8 +953,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
              SELECT s0."y",s0."x" \
              FROM "schema" AS s0 \
-             HAVING (s0."x" = s0."x") \
-             OR (s0."y" = s0."y")\
+             HAVING ((s0."x" = s0."x") OR (s0."y" = s0."y"))\
              """
   end
 
@@ -1026,7 +1027,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              WITH \
              "cte1" AS (\
              SELECT ss0."id" AS "id",{$0:Bool} AS "smth" FROM "schema1" AS ss0 \
-             WHERE ({$1:Int64})\
+             WHERE {$1:Int64}\
              ),\
              "cte2" AS (\
              SELECT * FROM schema WHERE {$2:Int64}\
@@ -1034,18 +1035,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              SELECT s0."id",{$3:Int64} FROM "schema" AS s0 \
              INNER JOIN "schema2" AS s1 ON {$4:Bool} \
              INNER JOIN "schema2" AS s2 ON {$5:Bool} \
-             WHERE ({$6:Bool}) AND ({$7:Bool}) \
+             WHERE {$6:Bool} AND {$7:Bool} \
              GROUP BY {$8:Int64},{$9:Int64} \
-             HAVING ({$10:Bool}) AND ({$11:Bool}) \
+             HAVING {$10:Bool} AND {$11:Bool} \
              ORDER BY {$16:Int64} \
              LIMIT {$17:Int64} \
              OFFSET {$18:Int64} \
              UNION DISTINCT \
-             (SELECT s0."id",{$12:Bool} FROM "schema1" AS s0 \
-             WHERE ({$13:Int64})) \
+             (SELECT s0."id",{$12:Bool} FROM "schema1" AS s0 WHERE {$13:Int64}) \
              UNION ALL \
-             (SELECT s0."id",{$14:Bool} FROM "schema2" AS s0 \
-             WHERE ({$15:Int64}))\
+             (SELECT s0."id",{$14:Bool} FROM "schema2" AS s0 WHERE {$15:Int64})\
              """
   end
 
@@ -1057,7 +1056,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         select: true
       )
 
-    assert all(query) == ~s|SELECT true FROM "schema" AS s0 WHERE (s0."start_time" = "query?")|
+    assert all(query) == ~s|SELECT true FROM "schema" AS s0 WHERE s0."start_time" = "query?"|
   end
 
   test "update_all" do
@@ -1181,7 +1180,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
 
     assert alter_update_all(from e in Schema, where: e.x == 123, update: [set: [x: 0]]) == """
-           ALTER TABLE "schema" UPDATE "x"=0 WHERE ("x" = 123)\
+           ALTER TABLE "schema" UPDATE "x"=0 WHERE "x" = 123\
            """
 
     assert alter_update_all(from m in Schema, update: [set: [x: ^0]]) == """
@@ -1274,10 +1273,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert delete_all(Schema) == ~s{DELETE FROM "schema" WHERE 1}
 
     query = from(e in Schema, where: e.x == 123)
-    assert delete_all(query) == ~s{DELETE FROM "schema" WHERE ("x" = 123)}
+    assert delete_all(query) == ~s{DELETE FROM "schema" WHERE "x" = 123}
 
     query = from(e in Schema, where: e.x == ^123)
-    assert delete_all(query) == ~s[DELETE FROM "schema" WHERE ("x" = {$0:Int64})]
+    assert delete_all(query) == ~s[DELETE FROM "schema" WHERE "x" = {$0:Int64}]
 
     query = from(e in Schema, where: e.x == 123, select: e.x)
 
@@ -1593,7 +1592,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              INNER JOIN (\
              SELECT sp0."x" AS "x",sp0."y" AS "y" \
              FROM "posts" AS sp0 \
-             WHERE (sp0."title" = {$0:String})\
+             WHERE sp0."title" = {$0:String}\
              ) AS s1 ON 1\
              """
 
@@ -1614,7 +1613,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              INNER JOIN (\
              SELECT sp0."x" AS "x",sp0."y" AS "z" \
              FROM "posts" AS sp0 \
-             WHERE (sp0."title" = {$0:String})\
+             WHERE sp0."title" = {$0:String}\
              ) AS s1 ON 1\
              """
 
@@ -1637,7 +1636,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              INNER JOIN (\
              SELECT sp0."title" AS "title" \
              FROM "posts" AS sp0 \
-             WHERE (sp0."title" = c0."subtitle")\
+             WHERE sp0."title" = c0."subtitle"\
              ) AS s1 ON 1\
              """
   end
@@ -1699,7 +1698,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              FROM schema2 AS s2 \
              WHERE s2.id = s0."x" AND s2.field = {$1:Int64}\
              ) AS f1 ON 1 \
-             WHERE ((s0."id" > 0) AND (s0."id" < {$2:Int64}))\
+             WHERE s0."id" > 0 AND s0."id" < {$2:Int64}\
              """
   end
 
@@ -1806,7 +1805,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                SELECT {$0:Int64} \
                FROM "schema" AS s0 \
                INNER JOIN (SELECT {$1:Int64} AS "x",{$2:Int64} AS "w" FROM "schema" AS ss0) AS s1 ON 1 \
-               WHERE (s0."x" = {$3:Int64})\
+               WHERE s0."x" = {$3:Int64}\
                """
     end
   end
@@ -1886,7 +1885,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              SELECT m0."name" \
              FROM "movies" AS m0 \
              LEFT JOIN "genres" AS g1 ON m0."id" = g1."movie_id" \
-             WHERE (g1."movie_id" = 0) \
+             WHERE g1."movie_id" = 0 \
              ORDER BY m0."year" DESC,m0."name" \
              LIMIT 10\
              """
@@ -1922,7 +1921,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              SELECT a0."first_name",a0."last_name" \
              FROM "actors" AS a0 \
              SEMI LEFT JOIN "roles" AS r1 ON a0."id" = r1."actor_id" \
-             WHERE (toYear(created_at) = '2023') \
+             WHERE toYear(created_at) = '2023' \
              ORDER BY a0."id" \
              LIMIT 10\
              """
@@ -2027,7 +2026,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              q1."price" AS "quote_price",\
              t0."volume" * q1."price" AS "final_price" \
              FROM "trades" AS t0 \
-             ASOF LEFT JOIN "quotes" AS q1 ON (t0."symbol" = q1."symbol") AND (t0."time" >= q1."time")\
+             ASOF LEFT JOIN "quotes" AS q1 ON t0."symbol" = q1."symbol" AND t0."time" >= q1."time"\
              """
     end
 
@@ -2126,7 +2125,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     insert = insert(nil, "schema", [:foo, :bar], select, {:raise, [], []}, [])
 
     assert insert ==
-             ~s{INSERT INTO "schema"("foo","bar") SELECT 3,s0."bar" FROM "schema" AS s0 WHERE (1)}
+             ~s{INSERT INTO "schema"("foo","bar") SELECT 3,s0."bar" FROM "schema" AS s0 WHERE 1}
 
     select =
       (s in "schema")
@@ -3068,7 +3067,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~U[2024-06-28 20:02:17.3Z],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(1)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(1)}\
            """
 
     assert all(
@@ -3076,7 +3075,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~U[2024-06-28 20:02:17.38Z],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(2)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(2)}\
            """
 
     assert all(
@@ -3084,7 +3083,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~U[2024-06-28 20:02:17.382Z],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(3)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(3)}\
            """
 
     assert all(
@@ -3092,7 +3091,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~U[2024-06-28 20:02:17.3827Z],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(4)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(4)}\
            """
 
     assert all(
@@ -3100,7 +3099,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~U[2024-06-28 20:02:17.38278Z],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(5)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(5)}\
            """
 
     assert all(
@@ -3108,7 +3107,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~U[2024-06-28 20:02:17.382780Z],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(6)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(6)}\
            """
   end
 
@@ -3119,7 +3118,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~N[2024-06-28 20:02:17.3],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(1)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(1)}\
            """
 
     assert all(
@@ -3127,7 +3126,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~N[2024-06-28 20:02:17.38],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(2)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(2)}\
            """
 
     assert all(
@@ -3135,7 +3134,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~N[2024-06-28 20:02:17.382],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(3)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(3)}\
            """
 
     assert all(
@@ -3143,7 +3142,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~N[2024-06-28 20:02:17.3827],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(4)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(4)}\
            """
 
     assert all(
@@ -3151,7 +3150,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~N[2024-06-28 20:02:17.38278],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(5)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(5)}\
            """
 
     assert all(
@@ -3159,7 +3158,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                where: e.timestamp > ^~N[2024-06-28 20:02:17.382780],
                select: e.timestamp
            ) == """
-           SELECT e0."timestamp" FROM "events" AS e0 WHERE (e0."timestamp" > {$0:DateTime64(6)})\
+           SELECT e0."timestamp" FROM "events" AS e0 WHERE e0."timestamp" > {$0:DateTime64(6)}\
            """
   end
 

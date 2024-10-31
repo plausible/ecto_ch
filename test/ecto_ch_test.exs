@@ -35,7 +35,7 @@ defmodule EctoCh.Test do
         |> select([e], e.user_id)
 
       assert all(query) ==
-               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."name" = {$0:String}) AND (e0."user_id" > {$1:Int64})],
+               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE e0."name" = {$0:String} AND e0."user_id" > {$1:Int64}],
                 ["John", 10]}
     end
 
@@ -48,7 +48,7 @@ defmodule EctoCh.Test do
         |> select([e], e.user_id)
 
       assert all(query) ==
-               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (name = {$0:String})], ["John"]}
+               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE name = {$0:String}], ["John"]}
     end
 
     test "where in" do
@@ -74,12 +74,11 @@ defmodule EctoCh.Test do
                  countIf(e0."type" = 'pageview'),\
                  countIf(e0."type" != 'pageview') \
                  FROM "events" AS e0 \
-                 WHERE (\
-                 e0."domain" IN ({$0:String},{$1:String})) AND \
-                 (e0."tags" = {$2:Array(String)}) AND \
-                 (toDate(e0."inserted_at") >= {$3:Date}) AND \
-                 (toDate(e0."inserted_at") <= {$4:Date}\
-                 )\
+                 WHERE \
+                 e0."domain" IN ({$0:String},{$1:String}) AND \
+                 e0."tags" = {$2:Array(String)} AND \
+                 toDate(e0."inserted_at") >= {$3:Date} AND \
+                 toDate(e0."inserted_at") <= {$4:Date}\
                  """,
                  [
                    "dummy.site",
@@ -96,7 +95,7 @@ defmodule EctoCh.Test do
       query = "events" |> where(domains: ^domains) |> select([e], e.user_id)
 
       assert all(query) ==
-               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE (e0."domains" = {$0:Array(String)})],
+               {~s[SELECT e0."user_id" FROM "events" AS e0 WHERE e0."domains" = {$0:Array(String)}],
                 [["dummy.site", "dummy2.site"]]}
     end
 
@@ -105,7 +104,7 @@ defmodule EctoCh.Test do
       query = Product |> where(tags: ^tags) |> select([p], p.name)
 
       assert all(query) ==
-               {~s[SELECT p0."name" FROM "products" AS p0 WHERE (p0."tags" = {$0:Array(String)})],
+               {~s[SELECT p0."name" FROM "products" AS p0 WHERE p0."tags" = {$0:Array(String)}],
                 [["a", "b"]]}
     end
   end
@@ -129,7 +128,7 @@ defmodule EctoCh.Test do
     user_id = 1
     query = "example" |> where([e], e.user_id == ^user_id) |> select([e], e.name)
     assert {sql, params} = Ecto.Integration.TestRepo.to_sql(:all, query)
-    assert sql == ~s[SELECT e0."name" FROM "example" AS e0 WHERE (e0."user_id" = {$0:Int64})]
+    assert sql == ~s[SELECT e0."name" FROM "example" AS e0 WHERE e0."user_id" = {$0:Int64}]
     assert params == [1]
   end
 end

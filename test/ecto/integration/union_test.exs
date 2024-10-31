@@ -80,27 +80,27 @@ defmodule Ecto.Integration.UnionTest do
 
     assert sql == """
            SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$0:Bool}) \
+           WHERE p0."public" = {$0:Bool} \
            ORDER BY p0."counter" \
            LIMIT {$8:Int64} \
            UNION ALL \
            (\
            SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$1:Bool}) \
+           WHERE p0."public" = {$1:Bool} \
            ORDER BY p0."counter" DESC \
            LIMIT {$2:Int64}\
            ) \
            UNION ALL \
            (\
            SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$3:Bool}) \
+           WHERE p0."public" = {$3:Bool} \
            ORDER BY p0."counter" \
            LIMIT {$4:Int64}\
            ) \
            UNION ALL \
            (\
            SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$5:Bool}) \
+           WHERE p0."public" = {$5:Bool} \
            ORDER BY p0."counter" \
            LIMIT {$6:Int64} \
            OFFSET {$7:Int64}\
