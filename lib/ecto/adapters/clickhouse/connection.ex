@@ -740,6 +740,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:count, _, []}, _sources, _params, _query), do: "count(*)"
 
+  defp expr({:count, _, [expr]}, sources, params, query) do
+    ["count(", expr(expr, sources, params, query), ?)]
+  end
+
+  defp expr({:count, _, [expr, :distinct]}, sources, params, query) do
+    ["countDistinct(", expr(expr, sources, params, query), ?)]
+  end
+
   defp expr({:datetime_add, _, [datetime, count, interval]}, sources, params, query) do
     [
       expr(datetime, sources, params, query),
@@ -771,10 +779,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # TODO parens?
   defp expr({:exists, _, [subquery]}, sources, params, query) do
     ["exists" | expr(subquery, sources, params, query)]
-  end
-
-  defp expr({:count, _, [expr, :distinct]}, sources, params, query) do
-    ["count(DISTINCT ", expr(expr, sources, params, query), ?)]
   end
 
   defp expr({fun, _, args}, sources, params, query) when is_atom(fun) and is_list(args) do

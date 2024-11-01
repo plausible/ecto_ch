@@ -343,7 +343,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~S[SELECT count(s0."x") FROM "schema" AS s0]
 
     query = Schema |> select([s], count(s.x, :distinct))
-    assert all(query) == ~S[SELECT count(DISTINCT s0."x") FROM "schema" AS s0]
+    assert all(query) == ~S[SELECT countDistinct(s0."x") FROM "schema" AS s0]
   end
 
   test "aggregate filters" do
