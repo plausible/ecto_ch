@@ -304,6 +304,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ilike: " ILIKE ",
     # TODO like()
     like: " LIKE ",
+    # TODO in()
     in: " IN "
   ]
 
@@ -696,6 +697,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
       {:ilike, _, [l, r]} ->
         ["notILike(", expr(l, sources, params, query), ", ", expr(r, sources, params, query), ?)]
+
+      # TODO notIn()
 
       _other ->
         ["not(", expr(expr, sources, params, query), ?)]
