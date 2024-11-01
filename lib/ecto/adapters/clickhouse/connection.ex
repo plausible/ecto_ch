@@ -773,13 +773,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["exists" | expr(subquery, sources, params, query)]
   end
 
-  defp expr({fun, _, args}, sources, params, query) when is_atom(fun) and is_list(args) do
-    {modifier, args} =
-      case args do
-        [rest, :distinct] -> {"DISTINCT ", [rest]}
-        _ -> {[], args}
-      end
+  defp expr({:count, _, [expr, :distinct]}, sources, params, query) do
+    ["count(DISTINCT ", expr(expr, sources, params, query), ?)]
+  end
 
+  defp expr({fun, _, args}, sources, params, query) when is_atom(fun) and is_list(args) do
     case handle_call(fun, length(args)) do
       {:binary_op, op} ->
         [left, right] = args
@@ -790,7 +788,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         ]
 
       {:fun, fun} ->
-        [fun, ?(, modifier, intersperse_map(args, ?,, &expr(&1, sources, params, query)), ?)]
+        [fun, ?(, intersperse_map(args, ?,, &expr(&1, sources, params, query)), ?)]
     end
   end
 
