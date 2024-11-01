@@ -389,6 +389,27 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x",s0."y") > (1,2))]
   end
 
+  test "where with big AND chain gets many parens" do
+    assert all(from e in "events", where: true and true and true and true and true, select: true) ==
+             """
+             SELECT true FROM "events" AS e0 WHERE ((((1 AND 1) AND 1) AND 1) AND 1)\
+             """
+  end
+
+  test "many where clauses get flat AND chain" do
+    assert all(
+             from e in "events",
+               where: true,
+               where: true,
+               where: true,
+               where: true,
+               where: true,
+               select: true
+           ) == """
+           SELECT true FROM "events" AS e0 WHERE (1) AND (1) AND (1) AND (1) AND (1)\
+           """
+  end
+
   test "or_where" do
     query =
       Schema
@@ -408,6 +429,39 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x" = 42) OR (s0."y" != 43)) AND (s0."z" = 44)]
+  end
+
+  test "nested dynamic" do
+    dynamic = dynamic([e], e.site_id == ^1)
+
+    assert all(from e in "events", where: ^dynamic, select: count()) ==
+             """
+             SELECT count(*) FROM "events" AS e0 WHERE (e0."site_id" = {$0:Int64})\
+             """
+
+    dynamic = dynamic([e], ^dynamic and e.timestamp < ^~D[2025-01-01])
+
+    assert all(from e in "events", where: ^dynamic, select: count()) ==
+             """
+             SELECT count(*) FROM "events" AS e0 WHERE ((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date}))\
+             """
+
+    dynamic = dynamic([e], ^dynamic and e.timestamp >= ^~D[2024-01-01])
+
+    assert all(from e in "events", where: ^dynamic, select: count()) ==
+             """
+             SELECT count(*) FROM "events" AS e0 WHERE (((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date})) AND (e0."timestamp" >= {$2:Date}))\
+             """
+
+    # (has_key(t, :"meta.key", ^"content-platform") and
+    #    get_by_key(t, :"meta.key", ^"content-platform") in ^["(none)", "web", "app"]) or
+    #   (^true and not has_key(t, :"meta.key", ^"content-platform"))
+    dynamic = dynamic([e], ^dynamic and ((true and false) or (true and not true)))
+
+    assert all(from e in "events", where: ^dynamic, select: count()) ==
+             """
+             SELECT count(*) FROM "events" AS e0 WHERE ((((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date})) AND (e0."timestamp" >= {$2:Date})) AND ((1 AND 0) OR (1 AND NOT (1))))\
+             """
   end
 
   test "order_by" do
