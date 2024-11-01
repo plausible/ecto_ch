@@ -710,6 +710,20 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" = isNull(s0."y") FROM "schema" AS s0]
   end
 
+  test "not" do
+    assert all(from e in "events", select: not e.is_bounce) ==
+             ~s[SELECT not(e0."is_bounce") FROM "events" AS e0]
+
+    assert all(from e in "events", select: not is_nil(e.name)) ==
+             ~s[SELECT isNotNull(e0."name") FROM "events" AS e0]
+
+    assert all(from e in "events", select: not like(e.name, "page%")) ==
+             ~s[SELECT notLike(e0."name", 'page%') FROM "events" AS e0]
+
+    assert all(from e in "events", select: not ilike(e.name, "page%")) ==
+             ~s[SELECT notILike(e0."name", 'page%') FROM "events" AS e0]
+  end
+
   @decimal64_2 Ecto.ParameterizedType.init(Ch, type: "Decimal64(2)")
   test "order_by and types" do
     query =
