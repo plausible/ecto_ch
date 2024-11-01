@@ -302,9 +302,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     or: " OR ",
     ilike: " ILIKE ",
     like: " LIKE ",
-    # TODO these two are not in binary_ops in sqlite3 adapter
-    in: " IN ",
-    is_nil: " WHERE "
+    in: " IN "
   ]
 
   @binary_ops Keyword.keys(binary_ops)
