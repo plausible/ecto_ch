@@ -787,8 +787,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         [left, right] = args
 
         [
-          op_to_binary(left, sources, params, query),
-          op | op_to_binary(right, sources, params, query)
+          maybe_paren_expr(left, sources, params, query),
+          op | maybe_paren_expr(right, sources, params, query)
         ]
 
       {:fun, fun} ->
@@ -835,11 +835,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       message: "unsupported expression #{inspect(expr)}"
   end
 
-  defp op_to_binary({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
+  defp maybe_paren_expr({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
     paren_expr(expr, sources, params, query)
   end
 
-  defp op_to_binary(expr, sources, params, query) do
+  defp maybe_paren_expr(expr, sources, params, query) do
     expr(expr, sources, params, query)
   end
 
