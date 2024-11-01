@@ -258,8 +258,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       filters
       |> Enum.with_index()
       |> intersperse_map(" AND ", fn
-        {{field, nil}, _} ->
-          [quote_name(field), " IS NULL"]
+        {{field, nil}, _idx} ->
+          ["isNull(", quote_name(field), ?)]
 
         {{field, value}, idx} ->
           [quote_name(field), ?=, build_param(idx, value)]

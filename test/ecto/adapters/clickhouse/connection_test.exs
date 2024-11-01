@@ -2164,7 +2164,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert query == ~s[DELETE FROM "prefix"."schema" WHERE "x"={$0:Int64} AND "y"={$1:Int64}]
 
     query = delete(nil, "schema", [x: nil, y: 1], [])
-    assert query == ~s[DELETE FROM "schema" WHERE "x" IS NULL AND "y"={$1:Int64}]
+    assert query == ~s[DELETE FROM "schema" WHERE isNull("x") AND "y"={$1:Int64}]
   end
 
   test "executing a string during migration" do
