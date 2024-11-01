@@ -681,11 +681,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:is_nil, _, [arg]}, sources, params, query) do
-    [expr(arg, sources, params, query) | " IS NULL"]
+    ["isNull(", expr(arg, sources, params, query), ?)]
   end
 
   defp expr({:not, _, [expr]}, sources, params, query) do
-    ["NOT (", expr(expr, sources, params, query), ?)]
+    ["not(", expr(expr, sources, params, query), ?)]
   end
 
   defp expr({:filter, _, [agg, filter]}, sources, params, query) do
@@ -836,10 +836,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp op_to_binary({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
-    paren_expr(expr, sources, params, query)
-  end
-
-  defp op_to_binary({:is_nil, _, [_]} = expr, sources, params, query) do
     paren_expr(expr, sources, params, query)
   end
 

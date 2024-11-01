@@ -223,7 +223,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) ==
              """
              WITH RECURSIVE "tree" AS \
-             (SELECT sc0."id" AS "id",1 AS "depth" FROM "categories" AS sc0 WHERE (sc0."parent_id" IS NULL) \
+             (SELECT sc0."id" AS "id",1 AS "depth" FROM "categories" AS sc0 WHERE (isNull(sc0."parent_id")) \
              UNION ALL \
              (SELECT c0."id",t1."depth" + 1 FROM "categories" AS c0 \
              INNER JOIN "tree" AS t1 ON t1."id" = c0."parent_id")) \
@@ -258,7 +258,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
              WITH "comments_scope" AS (\
              SELECT sc0."entity_id" AS "entity_id",sc0."text" AS "text" \
-             FROM "comments" AS sc0 WHERE (sc0."deleted_at" IS NULL)) \
+             FROM "comments" AS sc0 WHERE (isNull(sc0."deleted_at"))) \
              SELECT p0."title",c1."text" \
              FROM "posts" AS p0 \
              INNER JOIN "comments_scope" AS c1 ON c1."entity_id" = p0."guid" \
@@ -466,7 +466,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(from e in "events", where: ^dynamic, select: count()) ==
              """
-             SELECT count(*) FROM "events" AS e0 WHERE ((((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date})) AND (e0."timestamp" >= {$2:Date})) AND ((1 AND 0) OR (1 AND NOT (1))))\
+             SELECT count(*) FROM "events" AS e0 WHERE ((((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date})) AND (e0."timestamp" >= {$2:Date})) AND ((1 AND 0) OR (1 AND not(1))))\
              """
   end
 
@@ -701,13 +701,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "is_nil" do
     query = Schema |> select([r], is_nil(r.x))
-    assert all(query) == ~s[SELECT s0."x" IS NULL FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT isNull(s0."x") FROM "schema" AS s0]
 
     query = Schema |> select([r], not is_nil(r.x))
-    assert all(query) == ~s[SELECT NOT (s0."x" IS NULL) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT not(isNull(s0."x")) FROM "schema" AS s0]
 
     query = "schema" |> select([r], r.x == is_nil(r.y))
-    assert all(query) == ~s[SELECT s0."x" = (s0."y" IS NULL) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT s0."x" = isNull(s0."y") FROM "schema" AS s0]
   end
 
   @decimal64_2 Ecto.ParameterizedType.init(Ch, type: "Decimal64(2)")
