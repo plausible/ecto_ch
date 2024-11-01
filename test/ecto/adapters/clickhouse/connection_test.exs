@@ -704,7 +704,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT isNull(s0."x") FROM "schema" AS s0]
 
     query = Schema |> select([r], not is_nil(r.x))
-    assert all(query) == ~s[SELECT not(isNull(s0."x")) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT isNotNull(s0."x") FROM "schema" AS s0]
 
     query = "schema" |> select([r], r.x == is_nil(r.y))
     assert all(query) == ~s[SELECT s0."x" = isNull(s0."y") FROM "schema" AS s0]

@@ -287,11 +287,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  # TODO fuse not() for these:
-  # notLike()
-  # notILike()
-  # notIsNull()
-
   binary_ops = [
     ==: " = ",
     !=: " != ",
@@ -692,7 +687,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:not, _, [expr]}, sources, params, query) do
-    ["not(", expr(expr, sources, params, query), ?)]
+    case expr do
+      {:is_nil, _, [arg]} ->
+        ["isNotNull(", expr(arg, sources, params, query), ?)]
+
+      {:like, _, [l, r]} ->
+        ["notLike(", expr(l, sources, params, query), ", ", expr(r, sources, params, query), ?)]
+
+      {:ilike, _, [l, r]} ->
+        ["notILike(", expr(l, sources, params, query), ", ", expr(r, sources, params, query), ?)]
+
+      _other ->
+        ["not(", expr(expr, sources, params, query), ?)]
+    end
   end
 
   defp expr({:filter, _, [agg, filter]}, sources, params, query) do
