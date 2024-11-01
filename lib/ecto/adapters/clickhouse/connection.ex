@@ -287,6 +287,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  # TODO fuse not() for these:
+  # notLike()
+  # notILike()
+  # notIsNull()
+
   binary_ops = [
     ==: " = ",
     !=: " != ",
@@ -300,7 +305,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     /: " / ",
     and: " AND ",
     or: " OR ",
+    # TODO ilike()
     ilike: " ILIKE ",
+    # TODO like()
     like: " LIKE ",
     in: " IN "
   ]
