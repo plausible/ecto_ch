@@ -13,6 +13,7 @@ jobs:
       - uses: codespell-project/actions-codespell@v2
         with:
           check_filenames: true
+          ignore_words_list: "notIn"
 
   typos:
     runs-on: ubuntu-latest
