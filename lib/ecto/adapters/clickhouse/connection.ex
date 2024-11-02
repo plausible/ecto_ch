@@ -298,8 +298,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     -: " - ",
     *: " * ",
     /: " / ",
-    and: " AND ",
-    or: " OR ",
     # TODO ilike()
     ilike: " ILIKE ",
     # TODO like()
@@ -798,6 +796,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["exists" | expr(subquery, sources, params, query)]
   end
 
+  defp expr({op, _, [l, r]}, sources, params, query) when op in [:and, :or] do
+    [
+      logical_expr(op, l, sources, params, query),
+      operator_to_boolean(op),
+      logical_expr(op, r, sources, params, query)
+    ]
+  end
+
   defp expr({fun, _, args}, sources, params, query) when is_atom(fun) and is_list(args) do
     case handle_call(fun, length(args)) do
       {:binary_op, op} ->
@@ -850,6 +856,29 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     raise Ecto.QueryError,
       query: query,
       message: "unsupported expression #{inspect(expr)}"
+  end
+
+  defp logical_expr(parent_op, expr, sources, params, query) do
+    case expr do
+      {^parent_op, _, [l, r]} ->
+        [
+          logical_expr(parent_op, l, sources, params, query),
+          operator_to_boolean(parent_op),
+          logical_expr(parent_op, r, sources, params, query)
+        ]
+
+      {op, _, [l, r]} when op in [:and, :or] ->
+        [
+          ?(,
+          logical_expr(op, l, sources, params, query),
+          operator_to_boolean(op),
+          logical_expr(op, r, sources, params, query),
+          ?)
+        ]
+
+      _ ->
+        maybe_paren_expr(expr, sources, params, query)
+    end
   end
 
   defp maybe_paren_expr({op, _, [_, _]} = expr, sources, params, query) when op in @binary_ops do
