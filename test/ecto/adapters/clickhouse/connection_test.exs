@@ -395,13 +395,15 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ((s0."x",s0."y") > (1,2))]
   end
 
-  test "where with big AND chain gets many parens" do
+  # TODO remove (kept for smaller diffs)
+  test "where with big AND chain (NOT) gets many parens" do
     assert all(from e in "events", where: true and true and true and true and true, select: true) ==
              """
-             SELECT true FROM "events" AS e0 WHERE ((((1 AND 1) AND 1) AND 1) AND 1)\
+             SELECT true FROM "events" AS e0 WHERE (1 AND 1 AND 1 AND 1 AND 1)\
              """
   end
 
+  # TODO remove (kept for smaller diffs)
   test "many where clauses get flat AND chain" do
     assert all(
              from e in "events",
@@ -413,6 +415,112 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                select: true
            ) == """
            SELECT true FROM "events" AS e0 WHERE (1) AND (1) AND (1) AND (1) AND (1)\
+           """
+  end
+
+  test "single where with AND/OR chains" do
+    assert all(
+             from e in "events",
+               where: true and true and true and true and true,
+               select: true
+           ) ==
+             """
+             SELECT true FROM "events" AS e0 WHERE (1 AND 1 AND 1 AND 1 AND 1)\
+             """
+
+    assert all(
+             from e in "events",
+               where: true or true or true or true or true,
+               select: true
+           ) ==
+             """
+             SELECT true FROM "events" AS e0 WHERE (1 OR 1 OR 1 OR 1 OR 1)\
+             """
+
+    # :) explain syntax select 1 AND 1 AND 1 OR 1 OR 1 OR 1 AND 1 OR 1;
+    # SELECT (1 AND 1 AND 1) OR 1 OR 1 OR (1 AND 1) OR 1
+    assert all(
+             from e in "events",
+               where: (true and true and true) or true or true or (true and true) or true,
+               select: true
+           ) ==
+             """
+             SELECT true FROM "events" AS e0 WHERE (\
+             (1 AND 1 AND 1) OR 1 OR 1 OR (1 AND 1) OR 1\
+             )\
+             """
+
+    assert all(
+             from e in "events",
+               where: (true and true and true) or true or true or (true and (true or true)),
+               select: true
+           ) ==
+             """
+             SELECT true FROM "events" AS e0 WHERE (\
+             (1 AND 1 AND 1) OR 1 OR 1 OR (1 AND (1 OR 1))\
+             )\
+             """
+  end
+
+  test "many where with AND/OR chains" do
+    assert all(
+             from e in "events",
+               where: fragment("1"),
+               where: fragment("2"),
+               where: fragment("3"),
+               where: fragment("4"),
+               where: fragment("5"),
+               select: true
+           ) == """
+           SELECT true FROM "events" AS e0 WHERE (1) AND (2) AND (3) AND (4) AND (5)\
+           """
+
+    assert all(
+             from e in "events",
+               or_where: fragment("1"),
+               or_where: fragment("2"),
+               or_where: fragment("3"),
+               or_where: fragment("4"),
+               or_where: fragment("5"),
+               select: true
+           ) == """
+           SELECT true FROM "events" AS e0 WHERE (1) OR (2) OR (3) OR (4) OR (5)\
+           """
+
+    # NOTE: when multiple :where/:or_where are used, the order is preserved using parens with left-to-right precedence
+    assert all(
+             from e in "events",
+               where: fragment("1"),
+               where: fragment("2"),
+               where: fragment("3"),
+               or_where: fragment("4"),
+               or_where: fragment("5"),
+               where: fragment("6"),
+               where: fragment("7"),
+               or_where: fragment("8"),
+               select: true
+           ) == """
+           SELECT true FROM "events" AS e0 WHERE ((((1) AND (2) AND (3)) OR (4) OR (5)) AND (6) AND (7)) OR (8)\
+           """
+  end
+
+  test "many where with AND/OR chains inside" do
+    assert all(
+             from e in "events",
+               where: true and true and true,
+               where: true and true,
+               select: true
+           ) == """
+           SELECT true FROM "events" AS e0 WHERE (1 AND 1 AND 1) AND (1 AND 1)\
+           """
+
+    assert all(
+             from e in "events",
+               where: true and true and true,
+               or_where: true and true,
+               select: true
+           ) == """
+           SELECT true FROM "events" AS e0 WHERE ((1 AND 1 AND 1)) OR (1 AND 1)\
            """
   end
 
@@ -456,9 +564,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(from e in "events", where: ^dynamic, select: count()) ==
              """
-             SELECT count(*) FROM "events" AS e0 WHERE (((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date})) AND (e0."timestamp" >= {$2:Date}))\
+             SELECT count(*) FROM "events" AS e0 WHERE ((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date}) AND (e0."timestamp" >= {$2:Date}))\
              """
 
+    # imagine:
     # (has_key(t, :"meta.key", ^"content-platform") and
     #    get_by_key(t, :"meta.key", ^"content-platform") in ^["(none)", "web", "app"]) or
     #   (^true and not has_key(t, :"meta.key", ^"content-platform"))
@@ -466,7 +575,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(from e in "events", where: ^dynamic, select: count()) ==
              """
-             SELECT count(*) FROM "events" AS e0 WHERE ((((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date})) AND (e0."timestamp" >= {$2:Date})) AND ((1 AND 0) OR (1 AND not(1))))\
+             SELECT count(*) FROM "events" AS e0 WHERE ((e0."site_id" = {$0:Int64}) AND (e0."timestamp" < {$1:Date}) AND (e0."timestamp" >= {$2:Date}) AND ((1 AND 0) OR (1 AND not(1))))\
              """
   end
 
@@ -882,7 +991,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = Schema |> select([e], e.x == ^0 or e.x in ^[1, 2, 3] or e.x == ^4)
 
     assert all(query) ==
-             ~s[SELECT ((s0."x" = {$0:Int64}) OR (s0."x" IN ({$1:Int64},{$2:Int64},{$3:Int64}))) OR (s0."x" = {$4:Int64}) FROM "schema" AS s0]
+             ~s[SELECT (s0."x" = {$0:Int64}) OR (s0."x" IN ({$1:Int64},{$2:Int64},{$3:Int64})) OR (s0."x" = {$4:Int64}) FROM "schema" AS s0]
 
     query = Schema |> select([e], e in [1, 2, 3])
 
