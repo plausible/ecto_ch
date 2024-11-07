@@ -25,8 +25,12 @@ defmodule Ecto.Adapters.ClickHouse.ExtractStatementsTest do
     assert extract_statements("select '`a; b`'; select 2;") == ["select '`a; b`'", "select 2"]
     assert extract_statements("select '`a`; `b`'; select 2;") == ["select '`a`; `b`'", "select 2"]
 
-    assert extract_statements("select 'DO NOT RUN THIS: \\'; drop table events\\''") == [
+    # sanity check
+    assert ~S[select 'DO NOT RUN THIS: \'; drop table events\''] ==
              "select 'DO NOT RUN THIS: \\'; drop table events\\''"
+
+    assert extract_statements(~S[select 'DO NOT RUN THIS: \'; drop table events\'']) == [
+             ~S[select 'DO NOT RUN THIS: \'; drop table events\'']
            ]
 
     assert extract_statements("select `funny_columns;`; select 2;") == [
