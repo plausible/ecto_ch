@@ -1203,7 +1203,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   extract_statements_quotes = %{
+    # https://clickhouse.com/docs/en/sql-reference/syntax#string
     "single_quote" => ?',
+    # https://clickhouse.com/docs/en/sql-reference/syntax#keywords
     "double_quote" => ?",
     "backtick" => ?`
   }
@@ -1233,23 +1235,24 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  # https://clickhouse.com/docs/en/sql-reference/syntax#comments
   extract_statements_line_comments = [
-    {_starts_with = "--", _ends_with = ?\n}
+    "--",
+    ?#
   ]
 
   # ... and we ignore semicolons in line comments ...
-  for {started, ended} <- extract_statements_line_comments do
-    start_length = IO.iodata_length([started])
-    end_length = IO.iodata_length([ended])
+  for pattern <- extract_statements_line_comments do
+    pattern_len = IO.iodata_length([pattern])
 
     # line comment begins
-    defp extract_statements(<<unquote(started), rest::bytes>>, from, len, og, acc) do
-      extract_statements_exit_line_comment(rest, from, len + unquote(start_length), og, acc)
+    defp extract_statements(<<unquote(pattern), rest::bytes>>, from, len, og, acc) do
+      extract_statements_exit_line_comment(rest, from, len + unquote(pattern_len), og, acc)
     end
 
     # line comment is over
-    defp extract_statements_exit_line_comment(<<unquote(ended), rest::bytes>>, from, len, og, acc) do
-      extract_statements(rest, from, len + unquote(end_length), og, acc)
+    defp extract_statements_exit_line_comment(<<?\n, rest::bytes>>, from, len, og, acc) do
+      extract_statements(rest, from, len + 1, og, acc)
     end
 
     # line comment continues
@@ -1264,6 +1267,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
+  # https://clickhouse.com/docs/en/sql-reference/syntax#comments
   extract_statements_block_comments = [
     {_starts_with = "/*", _ends_with = "*/"}
   ]
