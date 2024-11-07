@@ -1204,19 +1204,28 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   extract_statements_quotes = %{
     # https://clickhouse.com/docs/en/sql-reference/syntax#string
-    "single_quote" => ?',
+    "single_quote" => {?', _escaped_with = ["''", ~S[\']]},
     # https://clickhouse.com/docs/en/sql-reference/syntax#keywords
-    "double_quote" => ?",
-    "backtick" => ?`
+    "double_quote" => {?", _todo = []},
+    "backtick" => {?`, _todo = []}
   }
 
   # ... we ignore semicolons in quotes ...
-  for {name, codepoint} <- extract_statements_quotes do
+  for {name, {codepoint, escape_patterns}} <- extract_statements_quotes do
     fun = String.to_atom("extract_statements_exit_#{name}")
 
     # quoted content begins
     defp extract_statements(<<unquote(codepoint), rest::bytes>>, from, len, original, acc) do
       unquote(fun)(rest, from, len + 1, original, acc)
+    end
+
+    # quoted content is escaped
+    for escape_pattern <- escape_patterns do
+      escape_pattern_size = IO.iodata_length([escape_pattern])
+
+      defp unquote(fun)(<<unquote(escape_pattern), rest::bytes>>, from, len, original, acc) do
+        unquote(fun)(rest, from, len + unquote(escape_pattern_size), original, acc)
+      end
     end
 
     # quoted content is over
