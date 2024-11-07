@@ -1189,4 +1189,140 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         "Map(Nothing,Nothing)"
     end
   end
+
+  @doc false
+  def extract_statements(statements) when is_binary(statements) do
+    extracted = extract_statements(statements, _from = 0, _len = 0, statements, _acc = [])
+    :lists.reverse(extracted)
+  end
+
+  # we split statements on semicolons, but ...
+  defp extract_statements(<<?;, rest::bytes>>, from, len, original, acc) do
+    acc = extarct_statements_add(binary_part(original, from, len), acc)
+    extract_statements(rest, from + len + 1, 0, original, acc)
+  end
+
+  extract_statements_quotes = %{
+    "single_quote" => ?',
+    "double_quote" => ?",
+    "backtick" => ?`
+  }
+
+  # ... we ignore semicolons in quotes ...
+  for {name, codepoint} <- extract_statements_quotes do
+    fun = String.to_atom("extract_statements_exit_#{name}")
+
+    # quoted content begins
+    defp extract_statements(<<unquote(codepoint), rest::bytes>>, from, len, original, acc) do
+      unquote(fun)(rest, from, len + 1, original, acc)
+    end
+
+    # quoted content is over
+    defp unquote(fun)(<<unquote(codepoint), rest::bytes>>, from, len, original, acc) do
+      extract_statements(rest, from, len + 1, original, acc)
+    end
+
+    # quoted content continues
+    defp unquote(fun)(<<_, rest::bytes>>, from, len, original, acc) do
+      unquote(fun)(rest, from, len + 1, original, acc)
+    end
+
+    defp unquote(fun)(<<>>, from, len, original, _acc) do
+      problem_statement = binary_part(original, from, len)
+      raise ArgumentError, "unterminated quote in #{inspect(problem_statement)}"
+    end
+  end
+
+  extract_statements_line_comments = [
+    {_starts_with = "--", _ends_with = ?\n}
+  ]
+
+  # ... and we ignore semicolons in line comments ...
+  for {started, ended} <- extract_statements_line_comments do
+    start_length = IO.iodata_length([started])
+    end_length = IO.iodata_length([ended])
+
+    # line comment begins
+    defp extract_statements(<<unquote(started), rest::bytes>>, from, len, og, acc) do
+      extract_statements_exit_line_comment(rest, from, len + unquote(start_length), og, acc)
+    end
+
+    # line comment is over
+    defp extract_statements_exit_line_comment(<<unquote(ended), rest::bytes>>, from, len, og, acc) do
+      extract_statements(rest, from, len + unquote(end_length), og, acc)
+    end
+
+    # line comment continues
+    defp extract_statements_exit_line_comment(<<_, rest::bytes>>, from, len, original, acc) do
+      extract_statements_exit_line_comment(rest, from, len + 1, original, acc)
+    end
+
+    # unlike quoted strings or block comments, line comments can be unterminated
+    # e.g. select 1; -- comment
+    defp extract_statements_exit_line_comment(<<>>, from, len, original, acc) do
+      extarct_statements_add(binary_part(original, from, len), acc)
+    end
+  end
+
+  extract_statements_block_comments = [
+    {_starts_with = "/*", _ends_with = "*/"}
+  ]
+
+  # ... and we ignore semicolons in block comments
+  for {started, ended} <- extract_statements_block_comments do
+    start_length = IO.iodata_length([started])
+    end_length = IO.iodata_length([ended])
+
+    # block comment begins
+    defp extract_statements(<<unquote(started), rest::bytes>>, from, len, og, acc) do
+      # NOTE: block comments can be nested so we track the nesting level
+      extract_statements_exit_block_comment(rest, 0, from, len + unquote(start_length), og, acc)
+    end
+
+    # block comment is over
+    defp extract_statements_exit_block_comment(<<unquote(ended), r::bytes>>, 0, from, l, og, acc) do
+      extract_statements(r, from, l + unquote(end_length), og, acc)
+    end
+
+    # block comment was nested -> not over yet
+    defp extract_statements_exit_block_comment(<<unquote(ended), r::bytes>>, n, from, l, og, acc) do
+      nesting = n - 1
+      len = l + unquote(end_length)
+      extract_statements_exit_block_comment(r, nesting, from, len, og, acc)
+    end
+
+    # block comment within a block comment -> increase nesting
+    defp extract_statements_exit_block_comment(<<unquote(started), r::bytes>>, n, from, l, og, a) do
+      nesting = n + 1
+      len = l + unquote(start_length)
+      extract_statements_exit_block_comment(r, nesting, from, len, og, a)
+    end
+
+    # block comment continues
+    defp extract_statements_exit_block_comment(<<_, rest::bytes>>, n, from, len, og, acc) do
+      extract_statements_exit_block_comment(rest, n, from, len + 1, og, acc)
+    end
+
+    defp extract_statements_exit_block_comment(<<>>, _nesting, from, len, original, _acc) do
+      problem_statement = binary_part(original, from, len)
+      raise ArgumentError, "unterminated block comment in #{inspect(problem_statement)}"
+    end
+  end
+
+  defp extract_statements(<<_, rest::bytes>>, from, len, original, acc) do
+    extract_statements(rest, from, len + 1, original, acc)
+  end
+
+  defp extract_statements(<<>>, from, len, original, acc) do
+    extarct_statements_add(binary_part(original, from, len), acc)
+  end
+
+  # TODO: we don't really need to trim, ClickHouse is fine with whitespace
+  #       and empty statement -- like in select 1; /* empty */ ; select 2; -- is a programmer's mistake
+  defp extarct_statements_add(statement, acc) do
+    case String.trim(statement) do
+      "" -> acc
+      statement -> [statement | acc]
+    end
+  end
 end
