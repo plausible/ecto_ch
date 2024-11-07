@@ -1204,14 +1204,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   extract_statements_quotes = %{
     # https://clickhouse.com/docs/en/sql-reference/syntax#string
-    "single_quote" => {?', _escaped_with = ["''", ~S[\']]},
+    "single_quote" => ?',
     # https://clickhouse.com/docs/en/sql-reference/syntax#keywords
-    "double_quote" => {?", _todo = []},
-    "backtick" => {?`, _todo = []}
+    "double_quote" => ?",
+    "backtick" => ?`
   }
 
   # ... we ignore semicolons in quotes ...
-  for {name, {codepoint, escape_patterns}} <- extract_statements_quotes do
+  for {name, codepoint} <- extract_statements_quotes do
     fun = String.to_atom("extract_statements_exit_#{name}")
 
     # quoted content begins
@@ -1219,12 +1219,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       unquote(fun)(rest, from, len + 1, original, acc)
     end
 
-    # quoted content is escaped
-    for escape_pattern <- escape_patterns do
-      escape_pattern_size = IO.iodata_length([escape_pattern])
-
-      defp unquote(fun)(<<unquote(escape_pattern), rest::bytes>>, from, len, original, acc) do
-        unquote(fun)(rest, from, len + unquote(escape_pattern_size), original, acc)
+    # "unquote" is escaped
+    for escape <- [[codepoint, codepoint], [?\\, codepoint]] do
+      defp unquote(fun)(<<unquote_splicing(escape), rest::bytes>>, from, len, original, acc) do
+        unquote(fun)(rest, from, len + 2, original, acc)
       end
     end
 
@@ -1246,17 +1244,20 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   # https://clickhouse.com/docs/en/sql-reference/syntax#comments
   extract_statements_line_comments = [
-    "--",
-    ?#
+    [?-, ?-],
+    [?#]
   ]
 
   # ... and we ignore semicolons in line comments ...
   for pattern <- extract_statements_line_comments do
-    pattern_len = IO.iodata_length([pattern])
-
     # line comment begins
-    defp extract_statements(<<unquote(pattern), rest::bytes>>, from, len, og, acc) do
-      extract_statements_exit_line_comment(rest, from, len + unquote(pattern_len), og, acc)
+    defp extract_statements(<<unquote_splicing(pattern), rest::bytes>>, from, len, og, acc) do
+      extract_statements_exit_line_comment(rest, from, len + unquote(length(pattern)), og, acc)
+    end
+
+    # new line is escaped
+    defp extract_statements_exit_line_comment(<<?\\, ?\n, rest::bytes>>, from, len, original, acc) do
+      extract_statements_exit_line_comment(rest, from, len + 2, original, acc)
     end
 
     # line comment is over
@@ -1283,31 +1284,39 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   # ... and we ignore semicolons in block comments
   for {started, ended} <- extract_statements_block_comments do
-    start_length = IO.iodata_length([started])
-    end_length = IO.iodata_length([ended])
+    start_len = byte_size(started)
+    end_len = byte_size(ended)
 
     # block comment begins
     defp extract_statements(<<unquote(started), rest::bytes>>, from, len, og, acc) do
       # NOTE: block comments can be nested so we track the nesting level
-      extract_statements_exit_block_comment(rest, 0, from, len + unquote(start_length), og, acc)
+      extract_statements_exit_block_comment(rest, 0, from, len + unquote(start_len), og, acc)
+    end
+
+    escaped = "\\" <> ended
+
+    # end block is escaped
+    defp extract_statements_exit_block_comment(<<unquote(escaped), r::bytes>>, n, from, l, og, a) do
+      len = l + 1 + unquote(end_len)
+      extract_statements_exit_block_comment(r, n, from, len, og, a)
     end
 
     # block comment is over
     defp extract_statements_exit_block_comment(<<unquote(ended), r::bytes>>, 0, from, l, og, acc) do
-      extract_statements(r, from, l + unquote(end_length), og, acc)
+      extract_statements(r, from, l + unquote(end_len), og, acc)
     end
 
     # block comment was nested -> not over yet
     defp extract_statements_exit_block_comment(<<unquote(ended), r::bytes>>, n, from, l, og, acc) do
       nesting = n - 1
-      len = l + unquote(end_length)
+      len = l + unquote(end_len)
       extract_statements_exit_block_comment(r, nesting, from, len, og, acc)
     end
 
     # block comment within a block comment -> increase nesting
     defp extract_statements_exit_block_comment(<<unquote(started), r::bytes>>, n, from, l, og, a) do
       nesting = n + 1
-      len = l + unquote(start_length)
+      len = l + unquote(start_len)
       extract_statements_exit_block_comment(r, nesting, from, len, og, a)
     end
 
