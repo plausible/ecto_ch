@@ -1,7 +1,7 @@
 # Ecto ClickHouse Adapter
 
-[![Hex Package](https://img.shields.io/hexpm/v/ecto_ch.svg)](https://hex.pm/packages/ecto_ch)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-blue.svg)](https://hexdocs.pm/ecto_ch)
+[![Documentation badge](https://img.shields.io/badge/Documentation-ff69b4)](https://hexdocs.pm/ecto_ch)
+[![Hex.pm badge](https://img.shields.io/badge/Package%20on%20hex.pm-informational)](https://hex.pm/packages/ecto_ch)
 
 Uses [Ch](https://github.com/plausible/ch) as driver.
 
