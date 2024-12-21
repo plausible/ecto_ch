@@ -283,23 +283,9 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @dialyzer {:no_return, update: 6}
   @impl Ecto.Adapter.Schema
-  def update(adapter_meta, %{source: source, prefix: prefix}, fields, params, returning, opts) do
-    {fields, field_values} = :lists.unzip(fields)
-    filter_values = Keyword.values(params)
-    sql = @conn.update(prefix, source, fields, params, returning)
-
-    Ecto.Adapters.SQL.struct(
-      adapter_meta,
-      @conn,
-      sql,
-      :update,
-      source,
-      params,
-      field_values ++ filter_values,
-      :raise,
-      returning,
-      opts
-    )
+  def update(_adapter_meta, _schema_meta, _fields, _params, _returning, _opts) do
+    raise ArgumentError,
+          "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
   end
 
   # TODO
