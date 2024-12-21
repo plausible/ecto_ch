@@ -136,7 +136,8 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
                left_join: n2 in subquery(sq),
                on: n1.number == n2.number,
                hints: "ANY",
-               select: [n1.number, n2.joined]
+               select: [n1.number, n2.joined],
+               order_by: fragment("ALL")
            ) == [
              [0, 1],
              [1, 0],
@@ -225,7 +226,8 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
                inner_join: b in subquery(sq2),
                on: a.k == b.k,
                hints: "ANY",
-               select: [a.k, b.k, b.joined]
+               select: [a.k, b.k, b.joined],
+               order_by: fragment("ALL")
            ) == [
              [0, 0, 0],
              [2, 2, 1],
