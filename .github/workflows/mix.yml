@@ -22,7 +22,11 @@ jobs:
             otp: 27
             clickhouse: latest
             timezone: UTC
-          - elixir: 1.17
+          - elixir: 1.18
+            otp: 27
+            clickhouse: latest
+            timezone: UTC
+          - elixir: 1.18
             otp: 27
             clickhouse: latest
             timezone: Europe/Berlin
