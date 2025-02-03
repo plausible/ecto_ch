@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to [v0.3.0](https://github.com/plausible/ch/blob/v0.3.0/CHANGELOG.md)
+
 ## 0.5.0 (2024-11-05)
 
 - remove some unnecessary parens from generated SQL to avoid hitting TOO_DEEP_RECURSION https://github.com/plausible/ecto_ch/pull/207
