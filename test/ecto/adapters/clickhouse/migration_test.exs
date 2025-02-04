@@ -1,6 +1,6 @@
 defmodule Ecto.Adapters.ClickHouse.MigrationTest do
   use ExUnit.Case
-
+  import Ecto.Integration.Case, only: [client_opts: 1]
   alias Ecto.Adapters.ClickHouse
 
   defmodule MigrationRepo do
@@ -55,13 +55,15 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
 
   test "events (table+index)" do
     database = "ecto_ch_migration_test_events"
-    opts = [database: database]
+    opts = client_opts(database: database)
 
     assert :ok = ClickHouse.storage_up(opts)
     on_exit(fn -> ClickHouse.storage_down(opts) end)
 
     Application.put_env(:migration_test, MigrationRepo,
       database: database,
+      username: Keyword.fetch!(opts, :username),
+      password: Keyword.fetch!(opts, :password),
       show_sensitive_data_on_connection_error: true
     )
 

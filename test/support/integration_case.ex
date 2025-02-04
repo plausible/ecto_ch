@@ -45,4 +45,10 @@ defmodule Ecto.Integration.Case do
     [[version]] = TestRepo.query!("select version()").rows
     version
   end
+
+  def client_opts(overrides \\ []) do
+    TestRepo.config()
+    |> Keyword.put(:pool_size, 1)
+    |> Keyword.merge(overrides)
+  end
 end

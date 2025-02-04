@@ -46,6 +46,7 @@ jobs:
           - 8123:8123
         env:
           TZ: ${{ matrix.timezone }}
+          CLICKHOUSE_PASSWORD: default
           options: >-
             --health-cmd nc -zw3 localhost 8124
             --health-interval 10s

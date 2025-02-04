@@ -1,6 +1,6 @@
 defmodule Ecto.Adapters.ClickHouse.StructureTest do
   use ExUnit.Case
-
+  import Ecto.Integration.Case, only: [client_opts: 1]
   alias Ecto.Adapters.ClickHouse
 
   defmodule Repo do
@@ -83,7 +83,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
   describe "structure_dump/1" do
     test "dump unknown db" do
-      opts = [database: "ecto_ch_does_not_exist"]
+      opts = client_opts(database: "ecto_ch_does_not_exist")
 
       assert {:error, %Ch.Error{code: 81, message: message}} =
                ClickHouse.structure_dump("priv/repo", opts)
@@ -92,7 +92,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
     end
 
     test "dumps empty database" do
-      opts = [database: "ecto_ch_temp_structure_empty"]
+      opts = client_opts(database: "ecto_ch_temp_structure_empty")
 
       assert :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
@@ -105,13 +105,15 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
     test "dumps migrated database" do
       database = "ecto_ch_temp_structure_migrated"
-      opts = [database: database]
+      opts = client_opts(database: database)
 
       assert :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
 
       Application.put_env(:structure_test, Repo,
         database: database,
+        username: Keyword.fetch!(opts, :username),
+        password: Keyword.fetch!(opts, :password),
         show_sensitive_data_on_connection_error: true
       )
 
@@ -238,13 +240,15 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
   describe "structure_load/2" do
     setup do
       database = "ecto_ch_temp_structure_load"
-      opts = [database: database]
+      opts = client_opts(database: database)
 
       assert :ok = ClickHouse.storage_up(opts)
       on_exit(fn -> ClickHouse.storage_down(opts) end)
 
       Application.put_env(:structure_test, Repo,
         database: database,
+        username: Keyword.fetch!(opts, :username),
+        password: Keyword.fetch!(opts, :password),
         show_sensitive_data_on_connection_error: true
       )
 

@@ -9,6 +9,8 @@ alias Ecto.Integration.TestRepo
 Application.put_env(:ecto_ch, TestRepo,
   adapter: Ecto.Adapters.ClickHouse,
   database: "ecto_ch_test",
+  username: System.get_env("CLICKHOUSE_USER", "default"),
+  password: System.get_env("CLICKHOUSE_PASSWORD", "default"),
   show_sensitive_data_on_connection_error: true
 )
 
