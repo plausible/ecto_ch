@@ -34,8 +34,8 @@ jobs:
           # Plausible
           # - https://github.com/plausible/analytics/blob/master/.tool-versions
           # - https://github.com/plausible/analytics/blob/master/.github/workflows/elixir.yml
-          - elixir: 1.17.1
-            otp: 27.0
+          - elixir: 1.17.3
+            otp: 27.2.1
             clickhouse: 24.12.2.29-alpine
             timezone: UTC
 
