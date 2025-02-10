@@ -233,6 +233,32 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              """
   end
 
+  # for `with <expression> AS <identifier>`
+  # see: https://clickhouse.com/docs/en/sql-reference/statements/select/with#syntax
+  defmacro with_expr(query, expression, opts) do
+    identifier = Keyword.fetch!(opts, :as)
+
+    quote do
+      with_cte(unquote(query), unquote(identifier),
+        as: unquote(expression),
+        # used by Ecto.Adapters.ClickHouse.Connection.cte/3
+        # to know when to flip the expression/identifier args
+        operation: :update_all
+      )
+    end
+  end
+
+  test "commom table expression with expression instead of subquery" do
+    query =
+      Schema
+      |> with_expr(fragment("123"), as: "value")
+      |> select([], fragment("value"))
+
+    assert all(query) == """
+           WITH 123 AS "value" SELECT value FROM "schema" AS s0\
+           """
+  end
+
   test "reference common table in union" do
     comments_scope_query =
       "comments"
