@@ -237,7 +237,7 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
            ]
   end
 
-  # https://github.com/ClickHouse/ClickHouse/blob/master/tests/queries/0_stateless/00976_asof_join_on.sql
+  # https://github.com/ClickHouse/ClickHouse/blob/master/tests/queries/0_stateless/00976_asof_join_on.sql.j2
   # https://github.com/ClickHouse/ClickHouse/blob/master/tests/queries/0_stateless/00976_asof_join_on.reference
   test "00976_asof_join_on" do
     TestRepo.query!("CREATE TABLE 00976_A(a UInt32, t UInt32) ENGINE = Memory")
@@ -411,8 +411,17 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
       )
     end
 
+    [[ch_version]] = TestRepo.query!("select version()").rows
+
+    expected_error =
+      if ch_version >= "25.2" do
+        ~r/INVALID_JOIN_ON_EXPRESSION/
+      else
+        ~r/NOT_IMPLEMENTED/
+      end
+
     # SELECT A.a, A.t, B.b, B.t FROM A ASOF JOIN B ON A.a == B.b AND A.t < B.t OR A.a == B.b + 1 ORDER BY (A.a, A.t); -- { serverError 48 }
-    assert_raise Ch.Error, ~r/NOT_IMPLEMENTED/, fn ->
+    assert_raise Ch.Error, expected_error, fn ->
       TestRepo.all(
         from a in "00976_A",
           join: b in "00976_B",
