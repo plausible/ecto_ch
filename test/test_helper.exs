@@ -12,6 +12,23 @@ Application.put_env(:ecto_ch, TestRepo,
   show_sensitive_data_on_connection_error: true
 )
 
+clickhouse_available? =
+  case :httpc.request(:get, {~c"http://localhost:8123/ping", []}, [], []) do
+    {:ok, {{_version, _status = 200, _reason}, _headers, ~c"Ok.\n"}} ->
+      true
+
+    {:error, {:failed_connect, [{:to_address, _to_address}, {:inet, [:inet], :econnrefused}]}} ->
+      false
+  end
+
+unless clickhouse_available? do
+  Mix.shell().error("""
+  ClickHouse is not detected! Please start the local container with the following command:
+
+      docker compose up -d clickhouse
+  """)
+end
+
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
 
 _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())

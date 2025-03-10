@@ -22,9 +22,7 @@ defmodule EctoCh.MixProject do
 
   # Run "mix help compile.app" to learn about applications.
   def application do
-    [
-      extra_applications: [:logger]
-    ]
+    [extra_applications: extra_applications(Mix.env())]
   end
 
   # Specifies which paths to compile per environment.
@@ -34,6 +32,9 @@ defmodule EctoCh.MixProject do
 
   defp test_paths(nil), do: ["test"]
   defp test_paths(_any), do: ["integration_test"]
+
+  defp extra_applications(:test), do: [:logger, :inets]
+  defp extra_applications(_), do: [:logger]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
