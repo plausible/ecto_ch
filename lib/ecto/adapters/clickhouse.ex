@@ -119,7 +119,7 @@ defmodule Ecto.Adapters.ClickHouse do
       end
 
       @doc """
-      Similar to Ecto.Repo.update_all/3 but uses [`ALTER TABLE ... UPDATE`](https://clickhouse.com/docs/en/sql-reference/statements/alter/update) instead.
+      Similar to `c:Ecto.Repo.update_all/3` but uses [`ALTER TABLE ... UPDATE`](https://clickhouse.com/docs/en/sql-reference/statements/alter/update) instead.
 
       For more information and performance implications please see:
 
