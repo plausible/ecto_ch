@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.6.1 (2025-03-20)
+- fix warning in docs for the Ecto repo https://github.com/plausible/ecto_ch/pull/227
+
 ## 0.6.0 (2025-02-04)
 
 - update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to [v0.3.0](https://github.com/plausible/ch/blob/v0.3.0/CHANGELOG.md)
