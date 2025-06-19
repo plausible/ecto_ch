@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (2025-06-19)
+
+- restrict to Ecto v3.12
+
 ## 0.4.0 (2024-10-15)
 
 - use `UNION DISTINCT` instead of `UNION` for `Ecto.Query.union/2` https://github.com/plausible/ecto_ch/pull/204
