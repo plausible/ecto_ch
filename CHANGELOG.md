@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.3 (2025-06-19)
+
+- restrict Ecto to 3.12
+
 ## 0.6.1 (2025-03-20)
 - fix warning in docs for the Ecto repo https://github.com/plausible/ecto_ch/pull/227
 
