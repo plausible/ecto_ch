@@ -737,6 +737,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     quote_name(literal)
   end
 
+  defp expr({:identifier, _, [name]}, _sources, _params, _query) do
+    quote_name(name)
+  end
+
   defp expr({:selected_as, _, [name]}, _sources, _params, _query) do
     quote_name(name)
   end
