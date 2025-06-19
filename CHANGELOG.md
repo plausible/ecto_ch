@@ -1,18 +1,33 @@
 # Changelog
 
 ## 0.7.0 (2025-06-19)
-- support Ecto's `3.13.0` `:identifier` https://github.com/plausible/ecto_ch/pull/231
+
+- support Ecto's v3.13 `:identifier` https://github.com/plausible/ecto_ch/pull/231
+- restrict to Ecto v3.13
+
+## 0.6.3 (2025-06-19)
+
+- restrict to Ecto v3.12
 
 ## 0.6.1 (2025-03-20)
+
 - fix warning in docs for the Ecto repo https://github.com/plausible/ecto_ch/pull/227
 
 ## 0.6.0 (2025-02-04)
 
 - update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to [v0.3.0](https://github.com/plausible/ch/blob/v0.3.0/CHANGELOG.md)
 
+## 0.5.1 (2025-06-19)
+
+- restrict to Ecto v3.12
+
 ## 0.5.0 (2024-11-05)
 
 - remove some unnecessary parens from generated SQL to avoid hitting TOO_DEEP_RECURSION https://github.com/plausible/ecto_ch/pull/207
+
+## 0.4.1 (2025-06-19)
+
+- restrict to Ecto v3.12
 
 ## 0.4.0 (2024-10-15)
 
