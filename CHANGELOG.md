@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.2 (2025-06-19)
+## 0.7.0 (2025-06-19)
 - support Ecto's `3.13.0` `:identifier` https://github.com/plausible/ecto_ch/pull/231
 
 ## 0.6.1 (2025-03-20)
