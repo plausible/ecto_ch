@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 (2025-06-19)
+
+- restrict to Ecto v3.12
+
 ## 0.5.0 (2024-11-05)
 
 - remove some unnecessary parens from generated SQL to avoid hitting TOO_DEEP_RECURSION https://github.com/plausible/ecto_ch/pull/207
