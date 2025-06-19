@@ -27,7 +27,7 @@ defmodule Ecto.Adapters.ClickHouse.API do
       |> Enum.join(", ")
 
     %Ecto.Query{from: %Ecto.Query.FromExpr{source: {:fragment, _ctx = [], fragment}} = from} =
-      query = from(fragment("input(?)", literal(^structure)))
+      query = from(fragment("input(?)", identifier(^structure)))
 
     # TODO or maybe build query struct manually with a custom :fragment (like a custom op)
     #      which would be handled in connection.ex
