@@ -28,15 +28,24 @@ jobs:
             clickhouse: latest
             timezone: UTC
           - elixir: 1.18
-            otp: 27
+            otp: 28
+            clickhouse: latest
+            timezone: UTC
+          - elixir: 1.18
+            otp: 28
             clickhouse: latest
             timezone: Europe/Berlin
+          # TODO
+          # - elixir: 1.19.0-rc.0
+          #   otp: 28
+          #   clickhouse: latest
+          #   timezone: UTC
           # Plausible
           # - https://github.com/plausible/analytics/blob/master/.tool-versions
           # - https://github.com/plausible/analytics/blob/master/.github/workflows/elixir.yml
-          - elixir: 1.17.3
-            otp: 27.2.1
-            clickhouse: 24.12.2.29-alpine
+          - elixir: 1.18.3
+            otp: 27.3.1
+            clickhouse: 24.12.2.29
             timezone: UTC
 
     services:
@@ -59,19 +68,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+
+      - id: beam
+        uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
+
       - uses: actions/cache@v4
         with:
           path: |
             deps
             _build
-          key: mix-test-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          key: test-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            test-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-
-            test-${{ matrix.otp }}-${{ matrix.elixir }}-refs/heads/master-
+            test-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-
+            test-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-refs/heads/master-
+
       - run: mix deps.get --only $MIX_ENV
       - run: mix compile --warnings-as-errors
       - run: mix test
@@ -82,26 +95,26 @@ jobs:
     env:
       MIX_ENV: prod
 
-    strategy:
-      matrix:
-        elixir: [1]
-        otp: [27]
-
     steps:
       - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+
+      - id: beam
+        uses: erlef/setup-beam@v1
         with:
-          elixir-version: ${{ matrix.elixir }}
-          otp-version: ${{ matrix.otp }}
+          elixir-version: 1
+          otp-version: 28
+
       - run: elixir -v
+
       - uses: actions/cache@v4
         with:
           path: |
             deps
             _build
-          key: mix-format-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          key: format-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            format-${{ matrix.otp }}-${{ matrix.elixir }}-${{ github.head_ref || github.ref }}-
-            format-${{ matrix.otp }}-${{ matrix.elixir }}-refs/heads/master-
+            format-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-
+            format-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-refs/heads/master-
+
       - run: mix deps.get --only $MIX_ENV
       - run: mix format --check-formatted

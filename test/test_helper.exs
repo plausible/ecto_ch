@@ -1,17 +1,3 @@
-Logger.configure(level: :info)
-Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
-
-Code.require_file("test/support/ecto_schemas.exs")
-Code.require_file("test/support/schemas.exs")
-
-alias Ecto.Integration.TestRepo
-
-Application.put_env(:ecto_ch, TestRepo,
-  adapter: Ecto.Adapters.ClickHouse,
-  database: "ecto_ch_test",
-  show_sensitive_data_on_connection_error: true
-)
-
 clickhouse_available? =
   case :httpc.request(:get, {~c"http://localhost:8123/ping", []}, [], []) do
     {:ok, {{_version, _status = 200, _reason}, _headers, ~c"Ok.\n"}} ->
@@ -27,7 +13,23 @@ unless clickhouse_available? do
 
       docker compose up -d clickhouse
   """)
+
+  System.halt(1)
 end
+
+Logger.configure(level: :info)
+Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
+
+Code.require_file("test/support/ecto_schemas.exs")
+Code.require_file("test/support/schemas.exs")
+
+alias Ecto.Integration.TestRepo
+
+Application.put_env(:ecto_ch, TestRepo,
+  adapter: Ecto.Adapters.ClickHouse,
+  database: "ecto_ch_test",
+  show_sensitive_data_on_connection_error: true
+)
 
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
 
