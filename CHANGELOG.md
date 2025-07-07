@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1 (2025-07-07)
+
+- update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to v0.4.x
+
 ## 0.7.0 (2025-06-19)
 
 - support Ecto's v3.13 `:identifier` https://github.com/plausible/ecto_ch/pull/231

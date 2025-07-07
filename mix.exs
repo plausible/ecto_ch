@@ -2,7 +2,7 @@ defmodule EctoCh.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/plausible/ecto_ch"
-  @version "0.7.0"
+  @version "0.7.1"
 
   def project do
     [
@@ -39,7 +39,7 @@ defmodule EctoCh.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, "~> 0.3.0"},
+      {:ch, "~> 0.4.0"},
       {:ecto_sql, "~> 3.13.0"},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
