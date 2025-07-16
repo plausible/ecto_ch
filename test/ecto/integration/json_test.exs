@@ -44,7 +44,15 @@ defmodule Ecto.Integration.JsonTest do
     ) ENGINE MergeTree ORDER BY time
     """)
 
-    TestRepo.insert!(%SemiStructured{json: %{foo: "bar", baz: 42}, time: ~N[2023-10-01 12:00:00]})
+    %SemiStructured{}
+    |> Ecto.Changeset.cast(
+      %{
+        json: %{"foo" => "bar", "baz" => 42},
+        time: ~N[2023-10-01 12:00:00]
+      },
+      [:json, :time]
+    )
+    |> TestRepo.insert!()
 
     assert [
              %SemiStructured{
