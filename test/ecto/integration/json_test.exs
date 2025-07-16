@@ -1,5 +1,6 @@
 defmodule Ecto.Integration.JsonTest do
   use Ecto.Integration.Case
+  import Ecto.Query, only: [from: 2]
 
   @moduletag :json
 
@@ -36,7 +37,7 @@ defmodule Ecto.Integration.JsonTest do
     end
   end
 
-  test "it works" do
+  test "basic" do
     TestRepo.query!("""
     CREATE TABLE semi_structured (
       json JSON,
@@ -47,19 +48,22 @@ defmodule Ecto.Integration.JsonTest do
     %SemiStructured{}
     |> Ecto.Changeset.cast(
       %{
-        json: %{"foo" => "bar", "baz" => 42},
+        json: %{"from" => "insert"},
         time: ~N[2023-10-01 12:00:00]
       },
       [:json, :time]
     )
     |> TestRepo.insert!()
 
-    assert [
-             %SemiStructured{
-               json: %{"foo" => "bar", "baz" => "42"},
-               time: ~N[2023-10-01 12:00:00]
-             }
-           ] =
-             TestRepo.all(SemiStructured)
+    TestRepo.insert_all(SemiStructured, [
+      %{json: %{"from" => "insert_all"}, time: ~N[2023-10-01 13:00:00]},
+      %{json: %{"from" => "another_insert_all"}, time: ~N[2023-10-01 13:01:00]}
+    ])
+
+    assert TestRepo.all(from s in SemiStructured, select: s.json, order_by: s.time) == [
+             %{"from" => "insert"},
+             %{"from" => "insert_all"},
+             %{"from" => "another_insert_all"}
+           ]
   end
 end
