@@ -28,7 +28,12 @@ alias Ecto.Integration.TestRepo
 Application.put_env(:ecto_ch, TestRepo,
   adapter: Ecto.Adapters.ClickHouse,
   database: "ecto_ch_test",
-  show_sensitive_data_on_connection_error: true
+  show_sensitive_data_on_connection_error: true,
+  settings: [
+    enable_json_type: 1,
+    output_format_binary_write_json_as_string: 1,
+    input_format_binary_read_json_as_string: 1
+  ]
 )
 
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
@@ -39,4 +44,14 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 {:ok, _} = TestRepo.start_link()
 :ok = Ecto.Migrator.up(TestRepo, 0, EctoClickHouse.Integration.Migration, log: false)
 
-ExUnit.start()
+%{rows: [[ch_version]]} = TestRepo.query!("select version()")
+
+exclude =
+  if ch_version >= "25" do
+    []
+  else
+    # JSON type is not supported in ClickHouse < 25
+    [:json]
+  end
+
+ExUnit.start(exclude: exclude)
