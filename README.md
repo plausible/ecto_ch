@@ -10,7 +10,7 @@ Uses [Ch](https://github.com/plausible/ch) as driver.
 ```elixir
 defp deps do
   [
-    {:ecto_ch, "~> 0.7.0"}
+    {:ecto_ch, "~> 0.8.0"}
   ]
 end
 ```

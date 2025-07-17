@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2025-07-17)
 
 - update Ch to [v0.5.x](https://github.com/plausible/ch/blob/master/CHANGELOG.md#050-2025-07-17) which adds Time, Variant, and JSON support https://github.com/plausible/ecto_ch/pull/233
 
