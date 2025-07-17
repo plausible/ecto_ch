@@ -39,14 +39,4 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 {:ok, _} = TestRepo.start_link()
 :ok = Ecto.Migrator.up(TestRepo, 0, EctoClickHouse.Integration.Migration, log: false)
 
-%{rows: [[ch_version]]} = TestRepo.query!("select version()")
-
-exclude =
-  if ch_version >= "25" do
-    []
-  else
-    # JSON type is not supported in ClickHouse < 25
-    [:json]
-  end
-
-ExUnit.start(exclude: exclude)
+ExUnit.start()
