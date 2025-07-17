@@ -2,9 +2,7 @@
 
 ## Unreleased
 
-- add [Time](https://clickhouse.com/docs/sql-reference/data-types/time) and [Time64](https://clickhouse.com/docs/sql-reference/data-types/time64) types support
-- add [Variant](https://clickhouse.com/docs/sql-reference/data-types/variant) type support
-- add [JSON](https://clickhouse.com/docs/sql-reference/data-types/newjson) type support
+- update Ch to [v0.5.x](https://github.com/plausible/ch/blob/master/CHANGELOG.md#050-2025-07-17) which adds Time, Variant, and JSON support https://github.com/plausible/ecto_ch/pull/233
 
 ## 0.7.1 (2025-07-07)
 
