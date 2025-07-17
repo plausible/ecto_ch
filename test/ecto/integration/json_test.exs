@@ -7,7 +7,7 @@ defmodule Ecto.Integration.JsonTest do
   alias Ecto.Integration.TestRepo
   alias EctoClickHouse.Integration.Setting
 
-  @tag :skip
+  @tag skip: true
   test "serializes json correctly" do
     # Insert a record purposefully with atoms as the map key. We are going to
     # verify later they were coerced into strings.

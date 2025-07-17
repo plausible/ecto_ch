@@ -189,8 +189,9 @@ defmodule EctoClickHouse.Integration.Migration do
       add :z, :Float64
     end
 
-    create table(:settings, primary_key: false, engine: "MergeTree", options: "order by tuple()") do
-      add :properties, :JSON
-    end
+    # TODO
+    # create table(:settings, primary_key: false, engine: "MergeTree") do
+    #   add :properties, :JSON
+    # end
   end
 end
