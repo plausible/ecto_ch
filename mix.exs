@@ -39,7 +39,7 @@ defmodule EctoCh.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, github: "plausible/ch", branch: "text-json"},
+      {:ch, "~> 0.5.0"},
       {:ecto_sql, "~> 3.13.0"},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},

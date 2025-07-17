@@ -28,12 +28,7 @@ alias Ecto.Integration.TestRepo
 Application.put_env(:ecto_ch, TestRepo,
   adapter: Ecto.Adapters.ClickHouse,
   database: "ecto_ch_test",
-  show_sensitive_data_on_connection_error: true,
-  settings: [
-    enable_json_type: 1,
-    output_format_binary_write_json_as_string: 1,
-    input_format_binary_read_json_as_string: 1
-  ]
+  show_sensitive_data_on_connection_error: true
 )
 
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)

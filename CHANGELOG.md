@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- add [Time](https://clickhouse.com/docs/sql-reference/data-types/time) and [Time64](https://clickhouse.com/docs/sql-reference/data-types/time64) types support
+- add [Variant](https://clickhouse.com/docs/sql-reference/data-types/variant) type support
+- add [JSON](https://clickhouse.com/docs/sql-reference/data-types/newjson) type support
+
 ## 0.7.1 (2025-07-07)
 
 - update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to v0.4.x
