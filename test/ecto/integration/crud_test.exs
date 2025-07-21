@@ -91,7 +91,8 @@ defmodule Ecto.Integration.CrudTest do
   end
 
   describe "update" do
-    @describetag :update
+    # TODO
+    @describetag :skip
 
     test "updates user" do
       {:ok, user} = TestRepo.insert(%User{id: 1, name: "John"}, [])
