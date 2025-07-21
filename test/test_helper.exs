@@ -40,4 +40,14 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 {:ok, _} = TestRepo.start_link()
 :ok = Ecto.Migrator.up(TestRepo, 0, EctoClickHouse.Integration.Migration, log: false)
 
-ExUnit.start()
+%{rows: [[ch_version]]} = TestRepo.query!("SELECT version()")
+
+exclude =
+  if ch_version >= "25" do
+    []
+  else
+    # Time type is not supported in older ClickHouse versions we have in the CI
+    [:time]
+  end
+
+ExUnit.start(exclude: exclude)

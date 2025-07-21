@@ -62,7 +62,7 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
              """
     end
 
-    @tag :json
+    @tag :time
     test "all types" do
       Ecto.Integration.TestRepo.query!(
         """
