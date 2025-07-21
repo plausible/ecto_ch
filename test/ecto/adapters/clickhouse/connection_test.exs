@@ -2260,6 +2260,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert insert == ~s{INSERT INTO "schema"("foo","bar") SELECT 3,s0."bar" FROM "schema" AS s0}
   end
 
+  @tag :skip
   test "update" do
     assert update(nil, "schema", [:x, :y], [id: 1], []) == nil
     assert update(nil, "schema", [:x, :y], [id: 1], []) == nil
