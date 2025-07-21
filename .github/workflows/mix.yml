@@ -33,6 +33,10 @@ jobs:
             timezone: UTC
           - elixir: 1.18
             otp: 28
+            clickhouse: head
+            timezone: UTC
+          - elixir: 1.18
+            otp: 28
             clickhouse: latest
             timezone: Europe/Berlin
           # TODO

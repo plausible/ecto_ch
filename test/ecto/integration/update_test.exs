@@ -166,9 +166,17 @@ defmodule Ecto.Integration.UpdateTest do
 
   describe "update_all/2" do
     test "updates all rows if no where is provided" do
-      TestRepo.query!(
-        "CREATE TABLE update_no_where_test(s String, i UInt8) ENGINE MergeTree ORDER BY tuple()"
+      TestRepo.query!("""
+      CREATE TABLE update_no_where_test(
+        s String,
+        i UInt8
       )
+      ENGINE MergeTree
+      ORDER BY tuple()
+      SETTINGS
+        enable_block_number_column = true,
+        enable_block_offset_column = true
+      """)
 
       on_exit(fn -> TestRepo.query!("DROP TABLE update_no_where_test") end)
       TestRepo.query!("INSERT INTO update_no_where_test VALUES ('Hello', 0), ('World', 0)")
@@ -193,9 +201,17 @@ defmodule Ecto.Integration.UpdateTest do
     end
 
     test "set/inc" do
-      TestRepo.query!(
-        "CREATE TABLE update_inc_test(s String, i UInt8) ENGINE MergeTree ORDER BY tuple()"
+      TestRepo.query!("""
+      CREATE TABLE update_inc_test(
+        s String,
+        i UInt8
       )
+      ENGINE MergeTree
+      ORDER BY tuple()
+      SETTINGS
+        enable_block_number_column = true,
+        enable_block_offset_column = true
+      """)
 
       on_exit(fn -> TestRepo.query!("DROP TABLE update_inc_test") end)
       TestRepo.query!("INSERT INTO update_inc_test VALUES ('Hello', 0), ('World', 0)")
@@ -259,9 +275,17 @@ defmodule Ecto.Integration.UpdateTest do
     end
 
     test "push/pull" do
-      TestRepo.query!(
-        "CREATE TABLE update_arrays_test(s String, arr Array(UInt8)) ENGINE MergeTree ORDER BY tuple()"
+      TestRepo.query!("""
+      CREATE TABLE update_arrays_test(
+        s String,
+        arr Array(UInt8)
       )
+      ENGINE MergeTree
+      ORDER BY tuple()
+      SETTINGS
+        enable_block_number_column = true,
+        enable_block_offset_column = true
+      """)
 
       on_exit(fn -> TestRepo.query!("DROP TABLE update_arrays_test") end)
 
