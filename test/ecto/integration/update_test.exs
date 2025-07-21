@@ -22,14 +22,14 @@ defmodule Ecto.Integration.UpdateTest do
                "events"
                |> where(name: "hello")
                |> update(set: [i: 1])
-             ) == {~s[UPDATE TABLE "events" SET "i"=1 WHERE ("name" = 'hello')], []}
+             ) == {~s[UPDATE "events" SET "i"=1 WHERE ("name" = 'hello')], []}
 
       assert to_sql(
                "events"
                |> where(name: "hello")
                |> update(set: [i: ^1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"={$0:Int64} WHERE ("name" = 'hello')],
+               ~s[UPDATE "events" SET "i"={$0:Int64} WHERE ("name" = 'hello')],
                [1]
              }
 
@@ -38,7 +38,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(set: [i: ^1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"={$0:Int64} WHERE ("name" = {$1:String})],
+               ~s[UPDATE "events" SET "i"={$0:Int64} WHERE ("name" = {$1:String})],
                [1, "hello"]
              }
 
@@ -47,7 +47,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(set: [i: 1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=1 WHERE ("name" = {$0:String})],
+               ~s[UPDATE "events" SET "i"=1 WHERE ("name" = {$0:String})],
                ["hello"]
              }
     end
@@ -58,7 +58,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: "hello")
                |> update(inc: [i: 1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"="i"+1 WHERE ("name" = 'hello')],
+               ~s[UPDATE "events" SET "i"="i"+1 WHERE ("name" = 'hello')],
                []
              }
 
@@ -67,21 +67,21 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(inc: [i: ^1])
              ) ==
-               {~s[UPDATE TABLE "events" SET "i"="i"+{$0:Int64} WHERE ("name" = {$1:String})],
+               {~s[UPDATE "events" SET "i"="i"+{$0:Int64} WHERE ("name" = {$1:String})],
                 [1, "hello"]}
 
       assert to_sql(
                "events"
                |> where(name: "hello")
                |> update(inc: [i: -1])
-             ) == {~s[UPDATE TABLE "events" SET "i"="i"+-1 WHERE ("name" = 'hello')], []}
+             ) == {~s[UPDATE "events" SET "i"="i"+-1 WHERE ("name" = 'hello')], []}
 
       assert to_sql(
                "events"
                |> where(name: ^"hello")
                |> update(inc: [i: ^(-1)])
              ) ==
-               {~s[UPDATE TABLE "events" SET "i"="i"+{$0:Int64} WHERE ("name" = {$1:String})],
+               {~s[UPDATE "events" SET "i"="i"+{$0:Int64} WHERE ("name" = {$1:String})],
                 [-1, "hello"]}
     end
 
@@ -91,7 +91,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: "hello")
                |> update(push: [i: 1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayPushBack("i",1) WHERE ("name" = 'hello')],
+               ~s[UPDATE "events" SET "i"=arrayPushBack("i",1) WHERE ("name" = 'hello')],
                []
              }
 
@@ -100,7 +100,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: "hello")
                |> update(push: [i: ^1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayPushBack("i",{$0:Int64}) WHERE ("name" = 'hello')],
+               ~s[UPDATE "events" SET "i"=arrayPushBack("i",{$0:Int64}) WHERE ("name" = 'hello')],
                [1]
              }
 
@@ -109,7 +109,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(push: [i: ^1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayPushBack("i",{$0:Int64}) WHERE ("name" = {$1:String})],
+               ~s[UPDATE "events" SET "i"=arrayPushBack("i",{$0:Int64}) WHERE ("name" = {$1:String})],
                [1, "hello"]
              }
 
@@ -118,7 +118,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(push: [i: 1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayPushBack("i",1) WHERE ("name" = {$0:String})],
+               ~s[UPDATE "events" SET "i"=arrayPushBack("i",1) WHERE ("name" = {$0:String})],
                ["hello"]
              }
     end
@@ -129,7 +129,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: "hello")
                |> update(pull: [i: 1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayFilter(x->x!=1,"i") WHERE ("name" = 'hello')],
+               ~s[UPDATE "events" SET "i"=arrayFilter(x->x!=1,"i") WHERE ("name" = 'hello')],
                []
              }
 
@@ -138,7 +138,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: "hello")
                |> update(pull: [i: ^1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE ("name" = 'hello')],
+               ~s[UPDATE "events" SET "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE ("name" = 'hello')],
                [1]
              }
 
@@ -147,7 +147,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(pull: [i: ^1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE ("name" = {$1:String})],
+               ~s[UPDATE "events" SET "i"=arrayFilter(x->x!={$0:Int64},"i") WHERE ("name" = {$1:String})],
                [1, "hello"]
              }
 
@@ -156,7 +156,7 @@ defmodule Ecto.Integration.UpdateTest do
                |> where(name: ^"hello")
                |> update(pull: [i: 1])
              ) == {
-               ~s[UPDATE TABLE "events" SET "i"=arrayFilter(x->x!=1,"i") WHERE ("name" = {$0:String})],
+               ~s[UPDATE "events" SET "i"=arrayFilter(x->x!=1,"i") WHERE ("name" = {$0:String})],
                ["hello"]
              }
     end
@@ -165,7 +165,7 @@ defmodule Ecto.Integration.UpdateTest do
   describe "update_all/2" do
     test "updates all rows if no where is provided" do
       TestRepo.query!(
-        "CREATE TABLE update_no_where_test(s String, i UInt8) ENGINE = MergeTree ORDER BY tuple()"
+        "CREATE TABLE update_no_where_test(s String, i UInt8) ENGINE MergeTree ORDER BY tuple()"
       )
 
       on_exit(fn -> TestRepo.query!("DROP TABLE update_no_where_test") end)
@@ -191,7 +191,10 @@ defmodule Ecto.Integration.UpdateTest do
     end
 
     test "set/inc" do
-      TestRepo.query!("CREATE TABLE update_inc_test(s String, i UInt8) ENGINE = Memory")
+      TestRepo.query!(
+        "CREATE TABLE update_inc_test(s String, i UInt8) ENGINE MergeTree ORDER BY tuple()"
+      )
+
       on_exit(fn -> TestRepo.query!("DROP TABLE update_inc_test") end)
       TestRepo.query!("INSERT INTO update_inc_test VALUES ('Hello', 0), ('World', 0)")
 
@@ -255,7 +258,7 @@ defmodule Ecto.Integration.UpdateTest do
 
     test "push/pull" do
       TestRepo.query!(
-        "CREATE TABLE update_arrays_test(s String, arr Array(UInt8)) ENGINE = Memory"
+        "CREATE TABLE update_arrays_test(s String, arr Array(UInt8)) ENGINE MergeTree ORDER BY tuple()"
       )
 
       on_exit(fn -> TestRepo.query!("DROP TABLE update_arrays_test") end)

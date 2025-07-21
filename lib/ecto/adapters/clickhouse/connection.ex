@@ -89,22 +89,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     unless query.joins == [] do
       raise Ecto.QueryError,
         query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements"
+        message: "Ecto.Adapters.ClickHouse does not support JOIN in UPDATE statements"
     end
 
     if query.select do
       raise Ecto.QueryError,
         query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements"
+        message: "Ecto.Adapters.ClickHouse does not support RETURNING in UPDATE statements"
     end
 
     if query.with_ctes do
       raise Ecto.QueryError,
         query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support CTEs in ALTER TABLE ... UPDATE statements"
+        message: "Ecto.Adapters.ClickHouse does not support CTEs in UPDATE statements"
     end
 
     %{sources: sources} = query
