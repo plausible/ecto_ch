@@ -1187,49 +1187,36 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "update_all" do
-    error_message =
-      ~r/ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead/
-
     query =
       (m in Schema)
       |> from(update: [set: [x: 0]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       (m in Schema)
       |> from(update: [set: [x: 0], inc: [y: 1, z: -3]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       (e in Schema)
       |> from(where: e.x == 123, update: [set: [x: 0]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       (m in Schema)
       |> from(update: [set: [x: ^0]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       Schema
       |> join(:inner, [p], q in Schema2, on: p.x == q.z)
       |> update([_], set: [x: 0])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       (e in Schema)
@@ -1240,9 +1227,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         on: e.x == q.z
       )
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       from(
@@ -1252,9 +1237,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         update: [set: [title: "bar"]]
       )
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
   end
 
   test "update_all with prefix" do
@@ -1263,18 +1246,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> from(update: [set: [x: 0]])
       |> Map.put(:prefix, "prefix")
 
-    assert_raise Ecto.QueryError, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
 
     query =
       (m in Schema)
       |> from(prefix: "first", update: [set: [x: 0]])
       |> Map.put(:prefix, "prefix")
 
-    assert_raise Ecto.QueryError, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == nil
   end
 
   test "update all with returning" do
