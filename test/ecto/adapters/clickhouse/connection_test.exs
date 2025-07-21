@@ -1199,26 +1199,34 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       (m in Schema)
       |> from(update: [set: [x: 0], inc: [y: 1, z: -3]])
 
-    assert update_all(query) == nil
+    assert update_all(query) == """
+           UPDATE "schema" SET "x"=0,"y"="y"+1,"z"="z"+-3 WHERE 1\
+           """
 
     query =
       (e in Schema)
       |> from(where: e.x == 123, update: [set: [x: 0]])
 
-    assert update_all(query) == nil
+    assert update_all(query) == """
+           UPDATE "schema" SET "x"=0 WHERE ("x" = 123)\
+           """
 
     query =
       (m in Schema)
       |> from(update: [set: [x: ^0]])
 
-    assert update_all(query) == nil
+    assert update_all(query) == """
+           UPDATE "schema" SET "x"={$0:Int64} WHERE 1\
+           """
 
     query =
       Schema
       |> join(:inner, [p], q in Schema2, on: p.x == q.z)
       |> update([_], set: [x: 0])
 
-    assert update_all(query) == nil
+    assert_raise Ecto.QueryError, ~r/does not support JOIN in UPDATE statements/, fn ->
+      update_all(query)
+    end
 
     query =
       (e in Schema)
@@ -1229,7 +1237,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         on: e.x == q.z
       )
 
-    assert update_all(query) == nil
+    assert_raise Ecto.QueryError, ~r/does not support JOIN in UPDATE statements/, fn ->
+      update_all(query)
+    end
 
     query =
       from(
@@ -1239,7 +1249,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         update: [set: [title: "bar"]]
       )
 
-    assert update_all(query) == nil
+    assert_raise Ecto.QueryError, ~r/does not support RETURNING in UPDATE statements/, fn ->
+      update_all(query)
+    end
   end
 
   test "update_all with prefix" do
@@ -1257,7 +1269,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> from(prefix: "first", update: [set: [x: 0]])
       |> Map.put(:prefix, "prefix")
 
-    assert update_all(query) == nil
+    assert update_all(query) == """
+           UPDATE "first"."schema" SET "x"=0 WHERE 1\
+           """
   end
 
   test "update all with returning" do

@@ -3,6 +3,8 @@ defmodule Ecto.Integration.UpdateTest do
   import Ecto.Query
   alias Ecto.Integration.TestRepo
 
+  @moduletag :update
+
   # https://clickhouse.com/docs/sql-reference/statements/update
 
   # TODO please open an issue if you need this functionality!
