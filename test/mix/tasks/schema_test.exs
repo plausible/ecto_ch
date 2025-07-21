@@ -126,7 +126,6 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
           Mix.Tasks.Ecto.Ch.Schema.run(["all_types"])
         end)
 
-      # You will need to fill this assertion with the expected Ecto schema output
       assert schema == """
              @primary_key false
              schema "all_types" do
