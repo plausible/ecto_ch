@@ -114,7 +114,7 @@ defmodule Ecto.Integration.JsonTest do
                order_by: t.created_at,
                select: %{
                  mint: t.mint,
-                 name: fragment("?.nested.name::text", t.data)
+                 name: fragment("?.nested.name", t.data)
                }
            ) == [
              %{mint: "123", name: "Test"},
