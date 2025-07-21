@@ -77,9 +77,9 @@ defmodule Ecto.Integration.JsonTest do
 
     @primary_key false
     schema "token_infos" do
-      field :mint, Ch, type: "String"
-      field :data, Ch, type: "JSON", source: :data
-      field :created_at, Ch, type: "DateTime"
+      field :mint, :string
+      field :data, Ch, type: "JSON"
+      field :created_at, :naive_datetime
     end
   end
 
@@ -98,12 +98,12 @@ defmodule Ecto.Integration.JsonTest do
       %{
         mint: "123",
         data: %{"name" => "Test", "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]}},
-        created_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+        created_at: NaiveDateTime.utc_now(:second)
       },
       %{
         mint: "325",
         data: %{"name" => "Test", "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]}},
-        created_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+        created_at: NaiveDateTime.utc_now(:second)
       }
     ]
 
@@ -111,14 +111,15 @@ defmodule Ecto.Integration.JsonTest do
 
     assert TestRepo.all(
              from t in TokenInfoSchema,
-               order_by: t.created_at,
+               order_by: t.mint,
                select: %{
                  mint: t.mint,
-                 name: fragment("?.nested.name", t.data)
+                 name: fragment("?.nested.name", t.data),
+                 arr: fragment("?.nested.arr", t.data)
                }
            ) == [
-             %{mint: "123", name: "Test"},
-             %{mint: "325", name: "Test"}
+             %{mint: "123", name: "Test", arr: ["abc", "b=deb"]},
+             %{mint: "325", name: "Test", arr: ["abc", "b=deb"]}
            ]
   end
 end
