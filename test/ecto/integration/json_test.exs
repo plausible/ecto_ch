@@ -98,12 +98,12 @@ defmodule Ecto.Integration.JsonTest do
       %{
         mint: "123",
         data: %{"name" => "Test", "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]}},
-        created_at: NaiveDateTime.utc_now(:second)
+        created_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
       },
       %{
         mint: "325",
         data: %{"name" => "Test", "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]}},
-        created_at: NaiveDateTime.utc_now(:second)
+        created_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
       }
     ]
 
