@@ -29,6 +29,7 @@ defmodule Ecto.Integration.SchemaTest do
   end
 
   describe "insert_all/3" do
+    @tag :dynamic
     test "with array of tuples containing dynamic type" do
       TestRepo.insert_all(
         Schema,
