@@ -281,11 +281,9 @@ defmodule Ecto.Adapters.ClickHouse do
     Ecto.Adapters.ClickHouse.Schema.insert(adapter_meta, schema_meta, params, opts)
   end
 
-  @dialyzer {:no_return, update: 6}
   @impl Ecto.Adapter.Schema
-  def update(_adapter_meta, _schema_meta, _fields, _params, _returning, _opts) do
-    raise ArgumentError,
-          "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
+  def update(adapter_meta, schema_meta, fields, params, _returning, opts) do
+    Ecto.Adapters.ClickHouse.Schema.update(adapter_meta, schema_meta, fields, params, opts)
   end
 
   # TODO
@@ -317,6 +315,7 @@ defmodule Ecto.Adapters.ClickHouse do
       case operation do
         :all -> [{:command, :select} | opts]
         :delete_all -> [{:command, :delete} | opts]
+        :update_all -> [{:command, :update} | opts]
         :alter_update_all -> [{:command, :alter} | opts]
       end
 
@@ -329,6 +328,10 @@ defmodule Ecto.Adapters.ClickHouse do
 
       :delete_all ->
         # clickhouse doesn't give us any info on how many rows have been deleted
+        {0, nil}
+
+      :update_all ->
+        # clickhouse doesn't give us any info on how many rows have been updated
         {0, nil}
 
       :alter_update_all ->

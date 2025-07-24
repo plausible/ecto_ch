@@ -1,6 +1,6 @@
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:latest-alpine
+    image: clickhouse/clickhouse-server:head
     ports:
       - 8123:8123
     environment:

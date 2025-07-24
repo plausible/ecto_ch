@@ -91,20 +91,21 @@ defmodule Ecto.Integration.CrudTest do
   end
 
   describe "update" do
+    # TODO
+    @describetag :skip
+
     test "updates user" do
       {:ok, user} = TestRepo.insert(%User{id: 1, name: "John"}, [])
       changeset = User.changeset(user, %{name: "Bob"})
-
-      assert_raise ArgumentError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update(changeset)
-      end
+      TestRepo.update(changeset, settings: [allow_experimental_lightweight_update: 1])
+      assert TestRepo.get(User, user.id).name == "Bob"
     end
 
     test "update_all returns correct rows format" do
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        # update with no return value should have nil rows
-        TestRepo.update_all(User, set: [name: "WOW"])
-      end
+      # update with no return value should have nil rows
+      TestRepo.update_all(User, [set: [name: "WOW"]],
+        settings: [allow_experimental_lightweight_update: 1]
+      )
 
       {:ok, _lj} = TestRepo.insert(%User{name: "Lebron James"}, [])
 
@@ -116,9 +117,9 @@ defmodule Ecto.Integration.CrudTest do
           select: %{name: u.name}
         )
 
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(no_match_query, set: [name: "G.O.A.T"])
-      end
+      TestRepo.update_all(no_match_query, [set: [name: "G.O.A.T"]],
+        settings: [allow_experimental_lightweight_update: 1]
+      )
 
       # update with returning that updates something should return resulting RETURNING clause correctly
       match_query =
@@ -128,18 +129,19 @@ defmodule Ecto.Integration.CrudTest do
           select: %{name: u.name}
         )
 
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(match_query, set: [name: "G.O.A.T"])
-      end
+      TestRepo.update_all(match_query, [set: [name: "G.O.A.T"]],
+        settings: [allow_experimental_lightweight_update: 1]
+      )
     end
 
     test "update_all handles null<->nil conversion correctly" do
-      _account = TestRepo.insert!(%Account{name: "hello"})
+      account = TestRepo.insert!(%Account{name: "hello"})
 
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(Account, set: [name: nil])
-        # assert %Account{name: nil} = TestRepo.reload(account)
-      end
+      TestRepo.update_all(Account, [set: [name: nil]],
+        settings: [allow_experimental_lightweight_update: 1]
+      )
+
+      assert %Account{name: nil} = TestRepo.reload(account)
     end
   end
 

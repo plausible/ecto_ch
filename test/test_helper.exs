@@ -43,11 +43,8 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 %{rows: [[ch_version]]} = TestRepo.query!("SELECT version()")
 
 exclude =
-  if ch_version >= "25" do
-    []
-  else
-    # Time type is not supported in older ClickHouse versions we have in the CI
-    [:time]
-  end
+  [time: fn v -> v < "25" end, update: fn v -> v < "25.8" end]
+  |> Enum.filter(fn {_tag, check} -> check.(ch_version) end)
+  |> Enum.map(fn {tag, _check} -> tag end)
 
 ExUnit.start(exclude: exclude)
