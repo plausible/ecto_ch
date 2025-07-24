@@ -112,7 +112,8 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
           dynamic Dynamic,
           dynamic_max_10 Dynamic(max_types = 10),
           variant Variant(String, UInt64, Array(String), Map(String, UInt64)),
-          low_cardinality_string LowCardinality(String)
+          low_cardinality_string LowCardinality(String),
+          array_tuple_dynamic Array(Tuple(a LowCardinality(String), b LowCardinality(String), c LowCardinality(String), d Dynamic))
         ) ENGINE = MergeTree ORDER BY tuple()
         """,
         _no_params = [],
@@ -175,6 +176,7 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
                field :dynamic_max_10, Ch, type: "Dynamic"
                field :variant, Ch, type: "Variant(Array(String), Map(String, UInt64), String, UInt64)"
                field :low_cardinality_string, Ch, type: "LowCardinality(String)"
+               field :array_tuple_dynamic, {:array, Ch}, type: "Tuple(LowCardinality(String), LowCardinality(String), LowCardinality(String), Dynamic)"
              end
              """
     end
