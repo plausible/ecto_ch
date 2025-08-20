@@ -207,7 +207,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @impl true
   def table_exists_query(table) do
-    {"SELECT name FROM system.tables WHERE name={$0:String} AND database=currentDatabase() LIMIT 1", [table]}
+    {"SELECT name FROM system.tables WHERE name={$0:String} AND database=currentDatabase() LIMIT 1",
+     [table]}
   end
 
   @impl true
