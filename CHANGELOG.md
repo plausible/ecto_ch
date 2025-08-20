@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.1 (2025-08-20)
 
 - Use `currentDatabase()` filter when loading tables https://github.com/plausible/ecto_ch/pull/238
 
