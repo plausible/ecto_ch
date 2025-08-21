@@ -8,6 +8,10 @@
 
 - update Ch to [v0.5.x](https://github.com/plausible/ch/blob/master/CHANGELOG.md#050-2025-07-17) which adds Time, Variant, and JSON support https://github.com/plausible/ecto_ch/pull/233
 
+## 0.7.2 (2025-08-20)
+
+- Use `currentDatabase()` filter when loading tables https://github.com/plausible/ecto_ch/pull/238 (cherry-picked from v0.8.1)
+
 ## 0.7.1 (2025-07-07)
 
 - update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to v0.4.x
