@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2 (2025-08-20)
+
+- Use `currentDatabase()` filter when loading tables https://github.com/plausible/ecto_ch/pull/238
+
 ## 0.7.1 (2025-07-07)
 
 - update [Ch](https://github.com/plausible/ch) (our ClickHouse client) to v0.4.x
