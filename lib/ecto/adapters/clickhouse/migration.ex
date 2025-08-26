@@ -434,11 +434,6 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     raise ArgumentError, "type :numeric is not supported"
   end
 
-  # TODO
-  defp column_type(:time) do
-    raise ArgumentError, "type :time is not supported"
-  end
-
   defp column_type(:map) do
     raise ArgumentError,
           ~s[type :map is ambiguous, use a literal (e.g. :JSON or :"Map(String, UInt8)") instead]

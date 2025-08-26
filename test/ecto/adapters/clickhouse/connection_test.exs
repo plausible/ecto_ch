@@ -2622,15 +2622,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
-  # TODO
   test "create table with time columns" do
     create =
       {:create, table(:posts),
        [{:add, :published_at, :time, []}, {:add, :submitted_at, :time, []}]}
 
-    assert_raise ArgumentError, "type :time is not supported", fn ->
-      execute_ddl(create)
-    end
+    assert execute_ddl(create) == [
+             ~s[CREATE TABLE "posts" ("published_at" time,"submitted_at" time) ENGINE=TinyLog]
+           ]
   end
 
   test "create table with utc_datetime columns" do

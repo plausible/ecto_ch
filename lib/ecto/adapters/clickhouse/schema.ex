@@ -264,7 +264,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp remap_type({:parameterized, {Ch, t}}, _original, _schema, _field), do: t
 
   defp remap_type(t, _original, _schema, _field)
-       when t in [:string, :date, :uuid, :boolean],
+       when t in [:string, :date, :time, :uuid, :boolean],
        do: t
 
   defp remap_type(dt, _original, _schema, _field)
@@ -274,6 +274,8 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp remap_type(usec, _original, _schema, _field)
        when usec in [:naive_datetime_usec, :utc_datetime_usec],
        do: {:datetime64, _precision = 6}
+
+  defp remap_type(:time_usec, _original, _schema, _field), do: {:time64, _precision = 6}
 
   # TODO remove
   defp remap_type(t, _original, _schema, _field)
@@ -290,12 +292,6 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     do: {a, remap_type(t, original, schema, field)}
 
   defp remap_type(:integer, _original, Ecto.Migration.SchemaMigration, :version), do: :i64
-
-  # TODO
-  defp remap_type(time, _original, _schema, _field) when time in [:time, :time_usec] do
-    raise ArgumentError,
-          "`#{inspect(time)}` type is not supported as there is no `Time` type in ClickHouse."
-  end
 
   defp remap_type(other, original, schema, field) do
     ch_type = ch_type_hint(original)
