@@ -291,6 +291,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp remap_type(:integer, _original, Ecto.Migration.SchemaMigration, :version), do: :i64
 
+  # TODO
   defp remap_type(time, _original, _schema, _field) when time in [:time, :time_usec] do
     raise ArgumentError,
           "`#{inspect(time)}` type is not supported as there is no `Time` type in ClickHouse."

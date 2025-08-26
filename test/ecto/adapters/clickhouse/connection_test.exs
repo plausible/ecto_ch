@@ -962,6 +962,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT CAST(s0."x" + 1 AS UInt16) FROM "schema" AS s0]
   end
 
+  # TODO
   test "tagged unknown type" do
     query = from e in "events", select: type(e.count + 1, :time)
 
@@ -2621,6 +2622,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
+  # TODO
   test "create table with time columns" do
     create =
       {:create, table(:posts),
