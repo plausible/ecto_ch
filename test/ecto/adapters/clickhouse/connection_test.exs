@@ -861,6 +861,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ({$0:Int64} = "query?")]
 
+    query = Schema |> select([r], r.x) |> limit(fragment("?", constant(^1)))
+    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 LIMIT 1]
+
+    query = Schema |> select(fragment("?", constant(^"let's escape")))
+    assert all(query) == ~s[SELECT 'let''s escape' FROM "schema" AS s0]
+
     query =
       Schema
       |> select([r], r.x)
