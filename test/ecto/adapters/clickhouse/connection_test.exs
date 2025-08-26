@@ -861,6 +861,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ({$0:Int64} = "query?")]
 
+    query =
+      Schema
+      |> select([r], r.x)
+      |> where([r], fragment("? in (?,?,?)", r.x, ^1, splice(^[2, 3, 4]), ^5))
+
+    assert all(query) ==
+             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE (s0."x" in ({$0:Int64},{$1:Int64},{$2:Int64},{$3:Int64},{$4:Int64}))]
+
     value = 13
     query = Schema |> select([r], fragment("lcase(?, ?)", r.x, ^value))
     assert all(query) == ~s[SELECT lcase(s0."x", {$0:Int64}) FROM "schema" AS s0]
