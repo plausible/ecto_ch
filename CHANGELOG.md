@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `Ecto.Query.API.splice/1` support https://github.com/plausible/ecto_ch/pull/240
+
 ## 0.8.1 (2025-08-20)
 
 - Use `currentDatabase()` filter when loading tables https://github.com/plausible/ecto_ch/pull/238

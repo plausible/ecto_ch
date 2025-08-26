@@ -742,6 +742,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     quote_name(name)
   end
 
+  defp expr({:splice, _, [{:^, _, [idx, length]}]}, _sources, params, _query) do
+    Enum.map_join(1..length, ",", fn i ->
+      pos = idx + i - 1
+      build_param(pos, Enum.at(params, pos))
+    end)
+  end
+
   defp expr({:selected_as, _, [name]}, _sources, _params, _query) do
     quote_name(name)
   end
