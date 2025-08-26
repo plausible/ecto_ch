@@ -742,6 +742,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     quote_name(name)
   end
 
+  defp expr({:constant, _, [literal]}, _sources, _params, _query) when is_binary(literal) do
+    [?', escape_string(literal), ?']
+  end
+
+  defp expr({:constant, _, [literal]}, _sources, _params, _query) when is_number(literal) do
+    [to_string(literal)]
+  end
+
   defp expr({:splice, _, [{:^, _, [idx, length]}]}, _sources, params, _query) do
     Enum.map_join(1..length, ",", fn i ->
       pos = idx + i - 1
