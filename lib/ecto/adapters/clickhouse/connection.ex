@@ -738,8 +738,27 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     quote_name(literal)
   end
 
+  defp expr({:values, _, [types, idx, num_rows]}, _sources, _params, query) do
+    [?(, values_list(types, idx + 1, num_rows, query), ?)]
+  end
+
   defp expr({:identifier, _, [name]}, _sources, _params, _query) do
     quote_name(name)
+  end
+
+  defp expr({:constant, _, [literal]}, _sources, _params, _query) when is_binary(literal) do
+    [?', escape_string(literal), ?']
+  end
+
+  defp expr({:constant, _, [literal]}, _sources, _params, _query) when is_number(literal) do
+    [to_string(literal)]
+  end
+
+  defp expr({:splice, _, [{:^, _, [idx, length]}]}, _sources, params, _query) do
+    Enum.map_join(1..length, ",", fn i ->
+      pos = idx + i - 1
+      build_param(pos, Enum.at(params, pos))
+    end)
   end
 
   defp expr({:selected_as, _, [name]}, _sources, _params, _query) do
@@ -894,6 +913,25 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     expr(expr, sources, params, query)
   end
 
+  defp values_list(types, idx, num_rows, query) do
+    rows = :lists.seq(1, num_rows, 1)
+
+    [
+      "VALUES ",
+      intersperse_reduce(rows, ?,, idx, fn _, idx ->
+        {value, idx} = values_expr(types, idx, query)
+        {[?(, value, ?)], idx}
+      end)
+      |> elem(0)
+    ]
+  end
+
+  defp values_expr(types, idx, query) do
+    intersperse_reduce(types, ?,, idx, fn {_field, type}, idx ->
+      {[?$, Integer.to_string(idx), ?:, ?: | ecto_to_db(type, query)], idx + 1}
+    end)
+  end
+
   defp create_names(%{sources: sources}, as_prefix) do
     sources |> create_names(0, tuple_size(sources), as_prefix) |> List.to_tuple()
   end
@@ -938,6 +976,21 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   def intersperse_map([], _separator, _mapper), do: []
+
+  defp intersperse_reduce(list, separator, user_acc, reducer, acc \\ [])
+
+  defp intersperse_reduce([], _separator, user_acc, _reducer, acc),
+    do: {acc, user_acc}
+
+  defp intersperse_reduce([elem], _separator, user_acc, reducer, acc) do
+    {elem, user_acc} = reducer.(elem, user_acc)
+    {[acc | elem], user_acc}
+  end
+
+  defp intersperse_reduce([elem | rest], separator, user_acc, reducer, acc) do
+    {elem, user_acc} = reducer.(elem, user_acc)
+    intersperse_reduce(rest, separator, user_acc, reducer, [acc, elem, separator])
+  end
 
   @inline_tag :__ecto_ch_inline__
 

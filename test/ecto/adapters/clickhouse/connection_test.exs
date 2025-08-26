@@ -851,8 +851,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = Schema |> select([r], fragment("fun(?)", r))
     assert all(query) == ~s[SELECT fun(s0) FROM "schema" AS s0]
 
-    query = Schema |> select([r], fragment("lcase(?)", r.x))
-    assert all(query) == ~s[SELECT lcase(s0."x") FROM "schema" AS s0]
+    query = Schema |> select([r], fragment("lower(?)", r.x))
+    assert all(query) == ~s[SELECT lower(s0."x") FROM "schema" AS s0]
+
+    # query = Schema |> select([r], r.x) |> order_by([r], asc: fragment("? COLLATE ?", r.x, identifier(^"es_ES"))
+    # assert all(query) == ~s{SELECT s0."x" FROM "schema" as s0 ORDER BY s0."s" ASC COLLATE "es_ES"}
 
     query =
       Schema
@@ -861,9 +864,23 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 WHERE ({$0:Int64} = "query?")]
 
+    query = Schema |> select([r], r.x) |> limit(fragment("?", constant(^1)))
+    assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 LIMIT 1]
+
+    query = Schema |> select(fragment("?", constant(^"let's escape")))
+    assert all(query) == ~s[SELECT 'let''s escape' FROM "schema" AS s0]
+
+    query =
+      Schema
+      |> select([r], r.x)
+      |> where([r], fragment("? in (?,?,?)", r.x, ^1, splice(^[2, 3, 4]), ^5))
+
+    assert all(query) ==
+             ~s[SELECT s0."x" FROM "schema" AS s0 WHERE (s0."x" in ({$0:Int64},{$1:Int64},{$2:Int64},{$3:Int64},{$4:Int64}))]
+
     value = 13
-    query = Schema |> select([r], fragment("lcase(?, ?)", r.x, ^value))
-    assert all(query) == ~s[SELECT lcase(s0."x", {$0:Int64}) FROM "schema" AS s0]
+    query = Schema |> select([r], fragment("lower(?, ?)", r.x, ^value))
+    assert all(query) == ~s[SELECT lower(s0."x", {$0:Int64}) FROM "schema" AS s0]
 
     assert_raise Ecto.QueryError,
                  ~r/ClickHouse adapter does not support keyword or interpolated fragments/,
