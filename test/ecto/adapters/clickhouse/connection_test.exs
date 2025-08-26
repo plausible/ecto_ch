@@ -888,6 +888,28 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                  end
   end
 
+  test "values: all" do
+    uuid = Ecto.UUID.generate()
+    values = [%{bid: uuid, num: 1}, %{num: 2, bid: uuid}]
+    types = %{bid: Ecto.UUID, num: :integer}
+
+    query =
+      from(v1 in values(values, types),
+        join: v2 in values(values, types),
+        on: v1.bid == v2.bid,
+        select: v2,
+        where: v1.num == ^2
+      )
+
+    assert all(query) ==
+             """
+             SELECT v1."bid",v1."num" \
+             FROM VALUES('bid UUID,num Int64',({$0:String},{$1:Int64}),({$2:String},{$3:Int64})) AS v0 \
+             INNER JOIN VALUES('bid UUID,num Int64',({$4:String},{$5:Int64}),({$6:String},{$7:Int64})) AS v1 ON v0."bid" = v1."bid" \
+             WHERE (v0."num" = {$8:Int64})\
+             """
+  end
+
   test "literals" do
     query = "schema" |> where(foo: true) |> select([], true)
     # TODO is true?

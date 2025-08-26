@@ -738,6 +738,23 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     quote_name(literal)
   end
 
+  defp expr({:values, _, [types, idx, num_rows]}, _sources, params, query) do
+    rows = :lists.seq(1, num_rows, 1)
+
+    structure =
+      Enum.map_intersperse(types, ?,, fn {field, type} ->
+        [escape_string(Atom.to_string(field)), ?\s, ecto_to_db(type, query)]
+      end)
+
+    {rows, _idx} =
+      intersperse_reduce(rows, ?,, idx, fn _, idx ->
+        {value, idx} = values_expr(types, idx, params)
+        {[?(, value, ?)], idx}
+      end)
+
+    ["VALUES('", structure, ?', ?,, rows, ?)]
+  end
+
   defp expr({:identifier, _, [name]}, _sources, _params, _query) do
     quote_name(name)
   end
@@ -909,6 +926,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     expr(expr, sources, params, query)
   end
 
+  defp values_expr(types, idx, params) do
+    intersperse_reduce(types, ?,, idx, fn {_field, _type}, idx ->
+      {build_param(idx, Enum.at(params, idx)), idx + 1}
+    end)
+  end
+
   defp create_names(%{sources: sources}, as_prefix) do
     sources |> create_names(0, tuple_size(sources), as_prefix) |> List.to_tuple()
   end
@@ -927,6 +950,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     case elem(sources, pos) do
       {:fragment, _, _} ->
         {nil, as_prefix ++ [?f | Integer.to_string(pos)], nil}
+
+      {:values, _, _} ->
+        {nil, as_prefix ++ [?v | Integer.to_string(pos)], nil}
 
       {table, schema, prefix} ->
         name = as_prefix ++ [create_alias(table) | Integer.to_string(pos)]
@@ -953,6 +979,21 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   def intersperse_map([], _separator, _mapper), do: []
+
+  defp intersperse_reduce(list, separator, user_acc, reducer, acc \\ [])
+
+  defp intersperse_reduce([], _separator, user_acc, _reducer, acc),
+    do: {acc, user_acc}
+
+  defp intersperse_reduce([elem], _separator, user_acc, reducer, acc) do
+    {elem, user_acc} = reducer.(elem, user_acc)
+    {[acc | elem], user_acc}
+  end
+
+  defp intersperse_reduce([elem | rest], separator, user_acc, reducer, acc) do
+    {elem, user_acc} = reducer.(elem, user_acc)
+    intersperse_reduce(rest, separator, user_acc, reducer, [acc, elem, separator])
+  end
 
   @inline_tag :__ecto_ch_inline__
 

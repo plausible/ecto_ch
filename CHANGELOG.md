@@ -4,6 +4,7 @@
 
 - Add `Ecto.Query.API.splice/1` support https://github.com/plausible/ecto_ch/pull/240
 - Add `Ecto.Query.API.constant/1` support https://github.com/plausible/ecto_ch/pull/243
+- Add `Ecto.Query.API.values/2` support https://github.com/plausible/ecto_ch/pull/244
 
 ## 0.8.1 (2025-08-20)
 
