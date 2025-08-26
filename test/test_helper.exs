@@ -23,14 +23,37 @@ Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
 Code.require_file("test/support/ecto_schemas.exs")
 Code.require_file("test/support/schemas.exs")
 
+%{rows: [[ch_version]]} =
+  Task.async(fn ->
+    {:ok, pid} = Ch.start_link()
+    Ch.query!(pid, "select version()")
+  end)
+  |> Task.await()
+
 alias Ecto.Integration.TestRepo
 
-Application.put_env(:ecto_ch, TestRepo,
+env = [
   adapter: Ecto.Adapters.ClickHouse,
   database: "ecto_ch_test",
-  settings: [enable_json_type: 1],
   show_sensitive_data_on_connection_error: true
-)
+]
+
+env =
+  if ch_version >= "25" do
+    Keyword.put(env, :settings, enable_json_type: 1)
+  else
+    env
+  end
+
+Application.put_env(:ecto_ch, TestRepo, env)
+
+exclude =
+  if ch_version >= "25" do
+    []
+  else
+    # these types are not supported in older ClickHouse versions we have in the CI
+    [:time, :variant, :json, :dynamic]
+  end
 
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
 
@@ -39,15 +62,5 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 
 {:ok, _} = TestRepo.start_link()
 :ok = Ecto.Migrator.up(TestRepo, 0, EctoClickHouse.Integration.Migration, log: false)
-
-%{rows: [[ch_version]]} = TestRepo.query!("SELECT version()")
-
-exclude =
-  if ch_version >= "25" do
-    []
-  else
-    # Time type is not supported in older ClickHouse versions we have in the CI
-    [:time]
-  end
 
 ExUnit.start(exclude: exclude)
