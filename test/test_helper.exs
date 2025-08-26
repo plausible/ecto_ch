@@ -46,8 +46,8 @@ exclude =
   if ch_version >= "25" do
     []
   else
-    # Time type is not supported in older ClickHouse versions we have in the CI
-    [:time]
+    # Time and Dynamic types are not supported in older ClickHouse versions we have in the CI
+    [:time, :dynamic]
   end
 
 ExUnit.start(exclude: exclude)
