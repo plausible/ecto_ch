@@ -960,9 +960,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "tagged column type" do
     query = from s in Schema, select: type(s.x + 1, s.y)
     assert all(query) == ~s[SELECT CAST(s0."x" + 1 AS UInt16) FROM "schema" AS s0]
+  end
 
+  @tag :time
+  test "tagged as time" do
     query = from e in "events", select: type(e.count + 1, :time)
-    assert all(query) == nil
+    assert all(query) == ~s[SELECT CAST(e0."count" + CAST(1 AS Time) AS Time) FROM "events" AS e0]
   end
 
   test "tagged unknown type" do
