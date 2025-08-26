@@ -47,6 +47,12 @@ jobs:
             otp: 27.3.1
             clickhouse: 24.12.2.29
             timezone: UTC
+          # some older pre-JSON ClickHouse version
+          # https://github.com/plausible/ch/issues/273
+          - elixir: 1.18
+            otp: 28
+            clickhouse: 24.5.4.49
+            timezone: UTC
 
     services:
       clickhouse:
@@ -80,10 +86,10 @@ jobs:
           path: |
             deps
             _build
-          key: test-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          key: test-${{ steps.beam.outputs.elixir-version }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            test-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-
-            test-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-refs/heads/master-
+            test-${{ steps.beam.outputs.elixir-version }}-${{ github.head_ref || github.ref }}-
+            test-${{ steps.beam.outputs.elixir-version }}-refs/heads/master-
 
       - run: mix deps.get --only $MIX_ENV
       - run: mix compile --warnings-as-errors
@@ -111,10 +117,10 @@ jobs:
           path: |
             deps
             _build
-          key: format-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
+          key: format-${{ steps.beam.outputs.elixir-version }}-${{ github.head_ref || github.ref }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            format-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ github.head_ref || github.ref }}-
-            format-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-refs/heads/master-
+            format-${{ steps.beam.outputs.elixir-version }}-${{ github.head_ref || github.ref }}-
+            format-${{ steps.beam.outputs.elixir-version }}-refs/heads/master-
 
       - run: mix deps.get --only $MIX_ENV
       - run: mix format --check-formatted
