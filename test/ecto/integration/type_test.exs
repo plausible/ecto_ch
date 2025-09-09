@@ -250,7 +250,11 @@ defmodule Ecto.Integration.TypeTest do
         select: p.id
 
     expected_error_message =
-      if clickhouse_version() > "24", do: ~r/UNSUPPORTED_METHOD/, else: ~r/UNKNOWN_IDENTIFIER/
+      cond do
+        clickhouse_version() >= "25.8" -> ~r/NOT_IMPLEMENTED/
+        clickhouse_version() >= "24" -> ~r/UNSUPPORTED_METHOD/
+        true -> ~r/UNKNOWN_IDENTIFIER/
+      end
 
     assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(query)
