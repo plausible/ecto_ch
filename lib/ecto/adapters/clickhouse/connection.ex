@@ -678,14 +678,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_ix, 0]}]}, _sources, _params, _query), do: "0"
 
-  # Handle IN with pinned array parameter - use single array param instead of expanding
   defp expr({:in, _, [left, {:^, _, [ix, len]}]}, sources, params, query) when len > 0 do
-    # Collect all the individual params into a single array
-    array_values = Enum.map(ix..(ix + len - 1), &Enum.at(params, &1))
-    p = build_param(ix, array_values)
-    binding() |> dbg
+    array_values = Enum.at(params, ix)
+    param = build_param(ix, array_values)
 
-    [expr(left, sources, params, query), " IN ", p]
+    [expr(left, sources, params, query), " IN ", param]
   end
 
   defp expr({:in, _, [left, right]}, sources, params, query) do
