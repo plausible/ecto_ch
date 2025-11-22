@@ -5,6 +5,7 @@ defmodule Ecto.Integration.AssocTest do
   alias Ecto.Integration.{Post, Comment, Permalink}
 
   test "has_many assoc" do
+    Logger.configure(level: :debug)
     p1 = TestRepo.insert!(%Post{title: "1"})
     p2 = TestRepo.insert!(%Post{title: "2"})
 
@@ -15,6 +16,8 @@ defmodule Ecto.Integration.AssocTest do
     [c1, c2] = TestRepo.all(Ecto.assoc(p1, :comments)) |> Enum.sort_by(& &1.id)
     assert c1.id == cid1
     assert c2.id == cid2
+
+    TestRepo.to_sql(:all, Ecto.assoc([p1, p2], :comments)) |> dbg
 
     [c1, c2, c3] = TestRepo.all(Ecto.assoc([p1, p2], :comments)) |> Enum.sort_by(& &1.id)
     assert c1.id == cid1
