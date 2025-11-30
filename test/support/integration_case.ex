@@ -43,6 +43,6 @@ defmodule Ecto.Integration.Case do
 
   def clickhouse_version do
     [[version]] = TestRepo.query!("select version()").rows
-    version
+    version |> String.split(".") |> Enum.map(&String.to_integer/1)
   end
 end

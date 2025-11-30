@@ -251,8 +251,8 @@ defmodule Ecto.Integration.TypeTest do
 
     expected_error_message =
       cond do
-        clickhouse_version() >= "25.8" -> ~r/NOT_IMPLEMENTED/
-        clickhouse_version() >= "24" -> ~r/UNSUPPORTED_METHOD/
+        clickhouse_version() >= [25, 8] -> ~r/NOT_IMPLEMENTED/
+        clickhouse_version() >= [24] -> ~r/UNSUPPORTED_METHOD/
         true -> ~r/UNKNOWN_IDENTIFIER/
       end
 
@@ -301,7 +301,7 @@ defmodule Ecto.Integration.TypeTest do
     # fails: select * from tags t where 0 in t.ints
 
     expected_error_message =
-      if clickhouse_version() > "24", do: ~r/UNSUPPORTED_METHOD/, else: ~r/UNKNOWN_TABLE/
+      if clickhouse_version() > [24], do: ~r/UNSUPPORTED_METHOD/, else: ~r/UNKNOWN_TABLE/
 
     assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)

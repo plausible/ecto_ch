@@ -411,10 +411,8 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
       )
     end
 
-    [[ch_version]] = TestRepo.query!("select version()").rows
-
     expected_error =
-      if ch_version >= "25.2" do
+      if clickhouse_version() >= [25, 2] do
         ~r/INVALID_JOIN_ON_EXPRESSION/
       else
         ~r/NOT_IMPLEMENTED/
