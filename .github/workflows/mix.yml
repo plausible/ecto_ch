@@ -43,8 +43,8 @@ jobs:
           # Plausible
           # - https://github.com/plausible/analytics/blob/master/.tool-versions
           # - https://github.com/plausible/analytics/blob/master/.github/workflows/elixir.yml
-          - elixir: 1.18.3
-            otp: 27.3.1
+          - elixir: 1.19.4
+            otp: 27.3.4.6
             clickhouse: 24.12.2.29
             timezone: UTC
           # some older pre-JSON ClickHouse version
