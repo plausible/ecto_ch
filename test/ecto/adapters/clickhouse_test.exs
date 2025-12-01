@@ -25,7 +25,7 @@ defmodule Ecto.Adapters.ClickHouseTest do
     end
 
     test "fails if no database is specified" do
-      assert_raise KeyError, "key :database not found in: []", fn ->
+      assert_raise KeyError, ~r"key :database not found in:", fn ->
         ClickHouse.storage_up([])
       end
     end
