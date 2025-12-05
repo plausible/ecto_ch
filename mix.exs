@@ -16,7 +16,8 @@ defmodule EctoCh.MixProject do
       description: "ClickHouse adapter for Ecto",
       docs: docs(),
       package: package(),
-      source_url: @source_url
+      source_url: @source_url,
+      dialyzer: [plt_local_path: "plts", plt_core_path: "plts", plt_add_apps: [:mix, :ex_unit]]
     ]
   end
 
