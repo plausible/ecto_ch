@@ -1472,6 +1472,20 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert delete_all(query) == ~s{DELETE FROM "first"."schema" WHERE 1}
   end
 
+  # https://github.com/plausible/ecto_ch/issues/247
+  test "delete all with subquery" do
+    hashes =
+      from uim in "user_id_map",
+        where: uim.account_id == ^91241 and like(uim.user_id, "anon:%"),
+        select: uim.user_id_hash
+
+    query =
+      from rup in "recent_user_profiles",
+        where: rup.account_id == ^91241 and rup.user_id_hash in subquery(hashes)
+
+    assert delete_all(query) == nil
+  end
+
   test "CTE alter_update_all" do
     cte_query =
       from(x in Schema,
