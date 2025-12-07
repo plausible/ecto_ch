@@ -1472,6 +1472,28 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert delete_all(query) == ~s{DELETE FROM "first"."schema" WHERE 1}
   end
 
+  # https://github.com/plausible/ecto_ch/issues/247
+  test "delete all with subquery" do
+    hashes =
+      from uim in "user_id_map",
+        where: uim.account_id == ^91241 and like(uim.user_id, "anon:%"),
+        select: uim.user_id_hash
+
+    query =
+      from rup in "recent_user_profiles",
+        where: rup.account_id == ^91241 and rup.user_id_hash in subquery(hashes)
+
+    assert delete_all(query) == """
+           DELETE FROM "recent_user_profiles" \
+           WHERE (\
+           ("account_id" = {$0:Int64}) AND \
+           ("user_id_hash" IN (\
+           SELECT su0."user_id_hash" FROM "user_id_map" AS su0 \
+           WHERE (\
+           (su0."account_id" = {$1:Int64}) AND (su0."user_id" LIKE 'anon:%')))))\
+           """
+  end
+
   test "CTE alter_update_all" do
     cte_query =
       from(x in Schema,
@@ -1511,6 +1533,28 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert_raise Ecto.QueryError,
                  ~r/ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements/,
                  fn -> alter_update_all(query) end
+  end
+
+  test "alter_update_all with subquery" do
+    hashes =
+      from uim in "user_id_map",
+        where: uim.account_id == ^91241 and like(uim.user_id, "anon:%"),
+        select: uim.user_id_hash
+
+    query =
+      from rup in "recent_user_profiles",
+        where: rup.account_id == ^91241 and rup.user_id_hash in subquery(hashes),
+        update: [set: [timestamp: ^0]]
+
+    assert alter_update_all(query) == """
+           ALTER TABLE "recent_user_profiles" UPDATE "timestamp"={$0:Int64} \
+           WHERE (\
+           ("account_id" = {$1:Int64}) AND \
+           ("user_id_hash" IN (\
+           SELECT su0."user_id_hash" FROM "user_id_map" AS su0 \
+           WHERE (\
+           (su0."account_id" = {$2:Int64}) AND (su0."user_id" LIKE 'anon:%')))))\
+           """
   end
 
   # TODO alter_delete_all

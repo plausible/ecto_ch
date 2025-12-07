@@ -125,7 +125,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     where =
       case query.wheres do
         [] -> " WHERE 1"
-        _ -> where(query, {{nil, nil, nil}}, params)
+        _ -> where(query, {{nil, nil, nil}, []}, params)
       end
 
     ["ALTER TABLE ", quote_table(prefix, table), " UPDATE ", fields, where]
@@ -196,7 +196,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     where =
       case query.wheres do
         [] -> " WHERE 1"
-        _ -> where(query, {{nil, nil, nil}}, params)
+        _ -> where(query, {{nil, nil, nil}, []}, params)
       end
 
     ["DELETE FROM ", quote_table(prefix, table) | where]

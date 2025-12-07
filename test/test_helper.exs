@@ -52,7 +52,7 @@ exclude =
     []
   else
     # these types are not supported in older ClickHouse versions we have in the CI
-    [:time, :variant, :json, :dynamic]
+    [:time, :variant, :json, :dynamic, :lightweight_delete]
   end
 
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
