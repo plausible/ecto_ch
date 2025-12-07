@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.3 (2025-12-07)
 
 - Fix `delete_all` with subqueries https://github.com/plausible/ecto_ch/pull/255
 
