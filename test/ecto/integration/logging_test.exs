@@ -188,7 +188,6 @@ defmodule Ecto.Integration.LoggingTest do
     @uuid_regex ~r/[0-9a-f]{2}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
     @naive_datetime_regex ~r/~N\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]/
 
-    @tag :skip
     test "for insert_all with query" do
       # Source query
       int = 1
