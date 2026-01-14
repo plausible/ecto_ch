@@ -530,7 +530,6 @@ defmodule Ecto.Integration.RepoTest do
   end
 
   describe "insert_all with source query" do
-    @tag :skip
     test "insert_all with query and conflict target" do
       {:ok, %Post{id: id}} =
         TestRepo.insert(%Post{
