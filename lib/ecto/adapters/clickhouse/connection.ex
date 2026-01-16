@@ -678,6 +678,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_ix, 0]}]}, _sources, _params, _query), do: "0"
 
+  defp expr({:in, _, [left, {:^, _, [ix, len]}]}, sources, params, query) when len > 0 do
+    array_values = Enum.at(params, ix)
+    param = build_param(ix, array_values)
+
+    [expr(left, sources, params, query), " IN ", param]
+  end
+
   defp expr({:in, _, [left, right]}, sources, params, query) do
     [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
   end
