@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           # some old elixir/erlang version
-          - elixir: 1.14
+          - elixir: 1.15
             otp: 25
 
           # some recent version and non-UTC timezone
