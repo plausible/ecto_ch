@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Drop Elixir v1.14 support.
+
 ## 0.8.4 (2026-01-13)
 
 - Allow `Ch` [v0.7.x](https://github.com/plausible/ch/blob/master/CHANGELOG.md#070-2026-01-13) which handles disconnects better

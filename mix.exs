@@ -8,7 +8,7 @@ defmodule EctoCh.MixProject do
     [
       app: :ecto_ch,
       version: @version,
-      elixir: "~> 1.14",
+      elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       test_paths: test_paths(System.get_env("INTEGRATION")),
       deps: deps(),
