@@ -1229,10 +1229,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["Decimal64(", Integer.to_string(scale), ?)]
   end
 
+  # context: https://github.com/plausible/analytics/pull/6049#issuecomment-3850062609
   defp param_type([]), do: "Array(Nothing)"
 
-  # TODO check whole list
-  defp param_type([v | _]), do: ["Array(", param_type(v), ?)]
+  defp param_type([v | vs]) do
+    param_type = param_type(v)
+
+    if param_type == "Array(Nothing)" do
+      param_type(vs)
+    else
+      ["Array(", param_type, ?)]
+    end
+  end
 
   defp param_type(%s{}) do
     raise ArgumentError, "struct #{inspect(s)} is not supported in params"
