@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix invalid `Array(Array(Nothing))` param type for params like `[[],[],[1]]` https://github.com/plausible/ecto_ch/pull/263
+
 ## 0.8.4 (2026-01-13)
 
 - Allow `Ch` [v0.7.x](https://github.com/plausible/ch/blob/master/CHANGELOG.md#070-2026-01-13) which handles disconnects better
