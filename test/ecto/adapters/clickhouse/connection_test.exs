@@ -3233,6 +3233,39 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s{SELECT [1,2,3] FROM "schema" AS s0}
   end
 
+  # https://github.com/plausible/ecto_ch/issues/262
+  test "empty array params" do
+    assert all(
+             from p in Post,
+               where: fragment("array(1,2,3)") in ^[[]],
+               select: p.id
+           ) ==
+             """
+             SELECT p0."id" FROM "posts" AS p0 \
+             WHERE (array(1,2,3) IN ({$0:Array(Nothing)}))\
+             """
+
+    assert all(
+             from p in Post,
+               where: fragment("array(1,2,3)") in ^[[], [], [1, 2, 3]],
+               select: p.id
+           ) ==
+             """
+             SELECT p0."id" FROM "posts" AS p0 \
+             WHERE (array(1,2,3) IN ({$0:Array(Nothing)},{$1:Array(Nothing)},{$2:Array(Int64)}))\
+             """
+
+    assert all(
+             from p in Post,
+               where: fragment("? in ?", [1, 2, 3], ^[[], [], [1, 2, 3]]),
+               select: p.id
+           ) ==
+             """
+             SELECT p0."id" FROM "posts" AS p0 \
+             WHERE ([1,2,3] in {$0:Array(Array(Int64))})\
+             """
+  end
+
   test "maps" do
     assert all(select(Schema, [], fragment("?[site_id]", ^%{}))) ==
              ~s|SELECT {$0:Map(Nothing,Nothing)}[site_id] FROM "schema" AS s0|
