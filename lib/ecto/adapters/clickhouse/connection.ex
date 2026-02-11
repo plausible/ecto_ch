@@ -1235,10 +1235,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp param_type([v | vs]) do
     param_type = param_type(v)
 
-    if param_type == "Array(Nothing)" do
-      param_type(vs)
-    else
+    if param_type != "Array(Nothing)" or vs == [] do
       ["Array(", param_type, ?)]
+    else
+      param_type(vs)
     end
   end
 
