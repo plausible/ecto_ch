@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix invalid `Array(Nothing)` param type for params like for `[[]]` https://github.com/plausible/ecto_ch/pull/264
+
 ## 0.8.5 (2026-02-11)
 
 - Fix invalid `Array(Array(Nothing))` param type for params like `[[],[],[1]]` https://github.com/plausible/ecto_ch/pull/263
