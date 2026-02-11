@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.5 (2026-02-11)
 
 - Fix invalid `Array(Array(Nothing))` param type for params like `[[],[],[1]]` https://github.com/plausible/ecto_ch/pull/263
 
