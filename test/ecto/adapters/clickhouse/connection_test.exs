@@ -3257,6 +3257,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(
              from p in Post,
+               where: fragment("? in ?", [1, 2, 3], ^[[]]),
+               select: p.id
+           ) ==
+             """
+             SELECT p0."id" FROM "posts" AS p0 \
+             WHERE ([1,2,3] in {$0:Array(Array(Nothing))})\
+             """
+
+    assert all(
+             from p in Post,
                where: fragment("? in ?", [1, 2, 3], ^[[], [], [1, 2, 3]]),
                select: p.id
            ) ==

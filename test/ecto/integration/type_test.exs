@@ -390,6 +390,11 @@ defmodule Ecto.Integration.TypeTest do
 
     assert TestRepo.all(
              from n in fragment("numbers(1)"),
+               select: fragment("array(?) in ?", n.number, ^[[]])
+           ) == [0]
+
+    assert TestRepo.all(
+             from n in fragment("numbers(1)"),
                select: fragment("array(?) in ?", n.number, ^[[], [0]])
            ) == [1]
   end
