@@ -1101,7 +1101,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db({:parameterized, {Ch, type}}, _query), do: Ch.Types.encode(type)
   defp ecto_to_db({:array, type}, query), do: ["Array(", ecto_to_db(type, query), ?)]
 
-  defp ecto_to_db(type, _query) when type in [:uuid, :string, :date, :boolean] do
+  defp ecto_to_db(type, _query) when type in [:uuid, :string, :date, :time, :boolean] do
     Ch.Types.encode(type)
   end
 

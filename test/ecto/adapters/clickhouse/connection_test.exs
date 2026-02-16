@@ -962,13 +962,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT CAST(s0."x" + 1 AS UInt16) FROM "schema" AS s0]
   end
 
-  test "tagged unknown type" do
+  @tag :time
+  test "tagged as time" do
     query = from e in "events", select: type(e.count + 1, :time)
+    assert all(query) == ~s[SELECT CAST(e0."count" + CAST(1 AS Time) AS Time) FROM "events" AS e0]
+  end
 
-    assert_raise Ecto.QueryError,
-                 ~r/unknown or ambiguous \(for ClickHouse\) Ecto type :time in query/,
-                 fn -> all(query) end
-
+  test "tagged unknown type" do
     query = from e in "events", select: type(e.count + 1, :decimal)
 
     assert_raise Ecto.QueryError,
@@ -2670,9 +2670,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       {:create, table(:posts),
        [{:add, :published_at, :time, []}, {:add, :submitted_at, :time, []}]}
 
-    assert_raise ArgumentError, "type :time is not supported", fn ->
-      execute_ddl(create)
-    end
+    assert execute_ddl(create) == [
+             ~s[CREATE TABLE "posts" ("published_at" time,"submitted_at" time) ENGINE=TinyLog]
+           ]
   end
 
   test "create table with utc_datetime columns" do
