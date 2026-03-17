@@ -35,12 +35,13 @@ alias Ecto.Integration.TestRepo
 env = [
   adapter: Ecto.Adapters.ClickHouse,
   database: "ecto_ch_test",
-  show_sensitive_data_on_connection_error: true
+  show_sensitive_data_on_connection_error: true,
+  settings: [async_insert: 0]
 ]
 
 env =
   if ch_version >= "25" do
-    Keyword.put(env, :settings, enable_json_type: 1)
+    Keyword.update!(env, :settings, fn settings -> Keyword.put(settings, :enable_json_type, 1) end)
   else
     env
   end

@@ -301,7 +301,11 @@ defmodule Ecto.Integration.TypeTest do
     # fails: select * from tags t where 0 in t.ints
 
     expected_error_message =
-      if clickhouse_version() > [24], do: ~r/UNSUPPORTED_METHOD/, else: ~r/UNKNOWN_TABLE/
+      cond do
+        clickhouse_version() > [26] -> ~r/ILLEGAL_TYPE_OF_ARGUMENT/
+        clickhouse_version() > [24] -> ~r/UNSUPPORTED_METHOD/
+        true -> ~r/UNKNOWN_TABLE/
+      end
 
     assert_raise Ch.Error, expected_error_message, fn ->
       TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
