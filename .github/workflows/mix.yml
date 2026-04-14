@@ -30,6 +30,7 @@ jobs:
             otp: 28
             dialyzer: true
             lint: true
+            coverage: true
 
           # Plausible versions
           # - https://github.com/plausible/analytics/blob/master/.tool-versions
@@ -97,6 +98,12 @@ jobs:
         if: ${{ matrix.lint }}
 
       - run: mix test
+        if: ${{ !matrix.coverage }}
+
+      - run: mix coveralls.github
+        if: ${{ matrix.coverage }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore PLTs cache
         if: ${{ matrix.dialyzer }}

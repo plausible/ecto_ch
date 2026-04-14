@@ -17,13 +17,26 @@ defmodule EctoCh.MixProject do
       docs: docs(),
       package: package(),
       source_url: @source_url,
-      dialyzer: [plt_local_path: "plts", plt_core_path: "plts", plt_add_apps: [:mix, :ex_unit]]
+      dialyzer: [plt_local_path: "plts", plt_core_path: "plts", plt_add_apps: [:mix, :ex_unit]],
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [extra_applications: extra_applications(Mix.env())]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.json": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
+      ]
+    ]
   end
 
   # Specifies which paths to compile per environment.
@@ -46,7 +59,8 @@ defmodule EctoCh.MixProject do
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :docs},
       {:rexbug, "~> 1.0", only: [:dev, :test]},
-      {:tz, "~> 0.28.1", only: [:dev, :test]}
+      {:tz, "~> 0.28.1", only: [:dev, :test]},
+      {:excoveralls, "~> 0.18.5", only: :test}
     ]
   end
 
