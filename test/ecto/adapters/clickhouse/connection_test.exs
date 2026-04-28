@@ -3467,6 +3467,113 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              "1,'a',true,'2024-04-12'::date,'2024-04-12 09:55:54.329788'::DateTime64(6,'Etc/UTC'),'2024-04-12 09:55:54'::DateTime('Etc/UTC')"
   end
 
+  test "decimal parameter boundaries" do
+    param = fn value ->
+      to_string(Connection.build_params(_ix = 0, _len = 1, [value]))
+    end
+
+    inline_param = fn value ->
+      to_string(Connection.build_params(_ix = 0, _len = 1, [Connection.mark_inline(value)]))
+    end
+
+    max_integer = String.duplicate("9", 76)
+    max_scale = "0." <> String.duplicate("0", 75) <> "1"
+
+    assert param.(Decimal.new("1.23")) == "{$0:Decimal(3,2)}"
+    assert inline_param.(Decimal.new("1.23")) == "1.23"
+
+    assert param.(Decimal.new("-1.23")) == "{$0:Decimal(3,2)}"
+    assert inline_param.(Decimal.new("-1.23")) == "-1.23"
+
+    assert param.(Decimal.new(max_integer)) == "{$0:Decimal(76,0)}"
+    assert inline_param.(Decimal.new(max_integer)) == max_integer
+
+    assert param.(Decimal.new(1, 1, -76)) == "{$0:Decimal(76,76)}"
+    assert inline_param.(Decimal.new(1, 1, -76)) == max_scale
+  end
+
+  test "decimal literal boundaries" do
+    literal = fn decimal ->
+      {query, params} = plan("schema" |> select([], true), :all)
+      query = %{query | select: %{query.select | fields: [decimal]}}
+
+      query
+      |> Connection.all(params)
+      |> IO.iodata_to_binary()
+    end
+
+    max_integer = String.duplicate("9", 76)
+    max_scale = "0." <> String.duplicate("0", 75) <> "1"
+
+    assert literal.(Decimal.new(max_integer)) == ~s[SELECT #{max_integer} FROM "schema" AS s0]
+    assert literal.(Decimal.new(1, 1, -76)) == ~s[SELECT #{max_scale} FROM "schema" AS s0]
+  end
+
+  test "decimal parameters reject over-limit values before rendering" do
+    param = fn value ->
+      to_string(Connection.build_params(_ix = 0, _len = 1, [value]))
+    end
+
+    inline_param = fn value ->
+      to_string(Connection.build_params(_ix = 0, _len = 1, [Connection.mark_inline(value)]))
+    end
+
+    assert_raise ArgumentError, ~r/precision 77 exceeds maximum 76/, fn ->
+      param.(Decimal.new(1, 1, 76))
+    end
+
+    assert_raise ArgumentError, ~r/scale 77 exceeds maximum 76/, fn ->
+      param.(Decimal.new(1, 1, -77))
+    end
+
+    assert_raise ArgumentError, ~r/precision exceeds maximum 76/, fn ->
+      param.(Decimal.new(String.duplicate("9", 77)))
+    end
+
+    assert_raise ArgumentError, ~r/precision 77 exceeds maximum 76/, fn ->
+      inline_param.(Decimal.new(1, 1, 76))
+    end
+
+    assert_raise ArgumentError, ~r/scale 77 exceeds maximum 76/, fn ->
+      inline_param.(Decimal.new(1, 1, -77))
+    end
+
+    assert_raise ArgumentError, ~r/ClickHouse Decimal values must be finite/, fn ->
+      inline_param.(Decimal.new("NaN"))
+    end
+
+    assert_raise ArgumentError, ~r/ClickHouse Decimal values must be finite/, fn ->
+      param.(Decimal.new("NaN"))
+    end
+
+    assert_raise ArgumentError, ~r/ClickHouse Decimal values must be finite/, fn ->
+      param.(Decimal.new("Infinity"))
+    end
+
+    assert_raise ArgumentError, ~r/ClickHouse Decimal values must be finite/, fn ->
+      inline_param.(Decimal.new("Infinity"))
+    end
+  end
+
+  test "decimal literals reject over-limit values before rendering" do
+    literal = fn decimal ->
+      {query, params} = plan("schema" |> select([], true), :all)
+      query = %{query | select: %{query.select | fields: [decimal]}}
+
+      query
+      |> Connection.all(params)
+      |> IO.iodata_to_binary()
+    end
+
+    assert_raise ArgumentError, ~r/precision 77 exceeds maximum 76/, fn ->
+      literal.(Decimal.new(1, 1, 76))
+    end
+
+    assert_raise ArgumentError, ~r/scale 77 exceeds maximum 76/, fn ->
+      literal.(Decimal.new(1, 1, -77))
+    end
+  end
+
   # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
   test "integer boundaries" do
     import Bitwise
