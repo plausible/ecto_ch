@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.0 (2026-05-03)
+- Adapt to `Ch` type fixes https://github.com/plausible/ecto_ch/pull/270
+
 ## 0.8.6 (2026-02-11)
 
 - Fix invalid `Array(Nothing)` param type for params like for `[[]]` https://github.com/plausible/ecto_ch/pull/264
