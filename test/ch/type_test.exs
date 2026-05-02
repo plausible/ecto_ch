@@ -615,14 +615,14 @@ defmodule Ch.TypeTest do
 
       assert Datetimes64 |> order_by([d], d.ch_3) |> all() |> unstruct() == [
                %{
-                 ch_3: ~N[1970-01-01 00:00:00.000000],
+                 ch_3: ~N[1970-01-01 00:00:00.000],
                  ch_6: ~N[1970-01-01 00:00:00.000000],
                  ch_5_utc: ~U[1970-01-01 00:00:00.00000Z],
                  naive_datetime_usec: ~N[1970-01-01 00:00:00.000000],
                  utc_datetime_usec: ~U[1970-01-01 00:00:00.000000Z]
                },
                %{
-                 ch_3: ~N[2023-04-24 09:02:00.975000],
+                 ch_3: ~N[2023-04-24 09:02:00.975],
                  ch_6: naive_now,
                  ch_5_utc: ~U[2023-04-24 09:02:00.97531Z],
                  naive_datetime_usec: naive_now,
