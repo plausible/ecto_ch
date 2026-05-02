@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-05-03)
 - Adapt to `Ch` type fixes https://github.com/plausible/ecto_ch/pull/270
 
 ## 0.8.6 (2026-02-11)
