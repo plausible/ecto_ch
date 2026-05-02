@@ -868,8 +868,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     expr(value, sources, params, query)
   end
 
-  defp expr(%Tagged{value: value, type: type}, sources, params, query) do
-    ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(type, query), ?)]
+  defp expr(%Tagged{tag: tag, type: type, value: value}, sources, params, query) do
+    ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(tag, type, query), ?)]
   end
 
   defp expr(nil, _sources, _params, _query), do: "NULL"
@@ -1092,6 +1092,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp interval(count, interval, sources, params, query) do
     [expr(count, sources, params, query), " * ", interval(1, interval, sources, params, query)]
   end
+
+  defp ecto_to_db({:parameterized, {Ch, type}}, _type, _query), do: Ch.Types.encode(type)
+  defp ecto_to_db(_tag, type, query), do: ecto_to_db(type, query)
 
   # when ecto migrator queries for versions in schema_versions it uses type(version, :integer)
   # so we need :integer to be the same as :bigint which is used for schema_versions table definition

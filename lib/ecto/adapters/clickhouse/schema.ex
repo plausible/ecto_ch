@@ -230,7 +230,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         schema.__schema__(:type, field) || find_field_source_type(schema, field) ||
           raise "missing type for field " <> inspect(field)
 
-      type |> Ecto.Type.type() |> remap_type(type, schema, field)
+      remap_type(type, schema, field)
     end)
   end
 
@@ -258,14 +258,21 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   @doc false
   def remap_type(type, schema, field) do
-    remap_type(Ecto.Type.type(type), type, schema, field)
+    remap_type(type, type, schema, field)
   end
 
   defp remap_type({:parameterized, {Ch, t}}, _original, _schema, _field), do: t
 
+  defp remap_type({:parameterized, {module, params}}, original, schema, field) do
+    type = module.type(params)
+    remap_type(type, original, schema, field)
+  end
+
   defp remap_type(t, _original, _schema, _field)
        when t in [:string, :date, :uuid, :boolean],
        do: t
+
+  defp remap_type(Ecto.UUID, _original, _schema, _field), do: :uuid
 
   defp remap_type(dt, _original, _schema, _field)
        when dt in [:naive_datetime, :utc_datetime],
@@ -296,23 +303,27 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           "`#{inspect(time)}` type is not supported as there is no `Time` type in ClickHouse."
   end
 
-  defp remap_type(other, original, schema, field) do
-    ch_type = ch_type_hint(original)
+  defp remap_type(type, original, schema, field) do
+    case Ecto.Type.type(type) do
+      ^type ->
+        raise ArgumentError, """
+        #{inspect(type)} type is ambiguous, please use `Ch` Ecto type instead.
 
-    raise ArgumentError, """
-    #{inspect(other)} type is ambiguous, please use `Ch` Ecto type instead.
+        Example:
 
-    Example:
+            schema "#{schema.__schema__(:source)}" do
+              field :#{field}, Ch, type: "#{ch_type_hint(original)}"
+            end
 
-        schema "#{schema.__schema__(:source)}" do
-          field :#{field}, Ch, type: "#{ch_type}"
-        end
+        You can also try using `ecto.ch.schema` to generate a schema:
 
-    You can also try using `ecto.ch.schema` to generate a schema:
+            mix ecto.ch.schema <database>.#{schema.__schema__(:source)}
 
-        mix ecto.ch.schema <database>.#{schema.__schema__(:source)}
+        """
 
-    """
+      type ->
+        remap_type(type, original, schema, field)
+    end
   end
 
   # https://hexdocs.pm/ecto/Ecto.Schema.html#module-primitive-types
