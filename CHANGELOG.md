@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.4 (2026-05-05)
+
+- Bound Decimal rendering to ClickHouse precision limits https://github.com/plausible/ecto_ch/pull/274
+
 ## 0.6.3 (2025-06-19)
 
 - restrict Ecto to 3.12
