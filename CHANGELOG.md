@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3 (2026-05-05)
+
+- Bound Decimal rendering to ClickHouse precision limits https://github.com/plausible/ecto_ch/pull/273
+
 ## 0.7.2 (2025-08-20)
 
 - Use `currentDatabase()` filter when loading tables https://github.com/plausible/ecto_ch/pull/238
