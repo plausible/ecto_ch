@@ -2,7 +2,7 @@ defmodule EctoCh.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/plausible/ecto_ch"
-  @version "0.9.0"
+  @version "0.9.1"
 
   def project do
     [
