@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.7 (2026-05-05)
+
+- Bound Decimal rendering to ClickHouse precision limits https://github.com/plausible/ecto_ch/pull/272
+
 ## 0.8.6 (2026-02-11)
 
 - Fix invalid `Array(Nothing)` param type for params like for `[[]]` https://github.com/plausible/ecto_ch/pull/264
