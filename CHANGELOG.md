@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Bound Decimal rendering to ClickHouse precision limits https://github.com/plausible/ecto_ch/pull/271
+
 ## 0.9.0 (2026-05-03)
 - Adapt to `Ch` type fixes https://github.com/plausible/ecto_ch/pull/270
 
