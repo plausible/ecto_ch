@@ -860,9 +860,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?[, intersperse_map(list, ?,, &expr(&1, sources, params, query)), ?]]
   end
 
-  defp expr(%Decimal{} = decimal, _sources, _params, _query) do
-    Decimal.to_string(decimal, :normal)
-  end
+  defp expr(%Decimal{} = decimal, _sources, _params, _query), do: decimal_to_string(decimal)
 
   defp expr(%Tagged{value: value, type: :any}, sources, params, query) do
     expr(value, sources, params, query)
@@ -996,6 +994,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @inline_tag :__ecto_ch_inline__
+
+  @max_decimal_precision 76
+  @max_decimal_output_digits @max_decimal_precision + 1
+  @max_decimal_coefficient Integer.pow(10, @max_decimal_precision)
 
   @doc false
   def mark_inline(param), do: {@inline_tag, param}
@@ -1168,7 +1170,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?', Date.to_string(date), suffix]
   end
 
-  defp inline_param(%Decimal{} = dec), do: Decimal.to_string(dec, :normal)
+  defp inline_param(%Decimal{} = dec), do: decimal_to_string(dec)
 
   defp inline_param(a) when is_list(a) do
     [?[, Enum.map_intersperse(a, ?,, &inline_param/1), ?]]
@@ -1223,10 +1225,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # TODO Date32
   defp param_type(%Date{}), do: "Date"
 
-  defp param_type(%Decimal{exp: exp}) do
-    # TODO use sizes 128 and 256 as well if needed
-    scale = if exp < 0, do: abs(exp), else: 0
-    ["Decimal64(", Integer.to_string(scale), ?)]
+  defp param_type(%Decimal{} = decimal) do
+    {precision, scale} = decimal_precision_and_scale!(decimal)
+    ["Decimal(", Integer.to_string(precision), ?,, Integer.to_string(scale), ?)]
   end
 
   # context: https://github.com/plausible/analytics/pull/6049#issuecomment-3850062609
@@ -1257,5 +1258,64 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       [] ->
         "Map(Nothing,Nothing)"
     end
+  end
+
+  defp decimal_to_string(decimal) do
+    decimal_precision_and_scale!(decimal)
+
+    if function_exported?(Decimal, :to_string, 3) do
+      apply(Decimal, :to_string, [
+        decimal,
+        :normal,
+        [max_digits: @max_decimal_output_digits]
+      ])
+    else
+      Decimal.to_string(decimal, :normal)
+    end
+  end
+
+  defp decimal_precision_and_scale!(%Decimal{coef: coef}) when coef in [:NaN, :inf] do
+    raise ArgumentError, "ClickHouse Decimal values must be finite"
+  end
+
+  defp decimal_precision_and_scale!(%Decimal{coef: coef, exp: exp})
+       when is_integer(coef) and coef >= 0 and is_integer(exp) do
+    scale = if exp < 0, do: -exp, else: 0
+
+    if scale > @max_decimal_precision do
+      raise ArgumentError,
+            "ClickHouse Decimal scale #{scale} exceeds maximum #{@max_decimal_precision}"
+    end
+
+    if coef >= @max_decimal_coefficient do
+      raise ArgumentError,
+            "ClickHouse Decimal precision exceeds maximum #{@max_decimal_precision}"
+    end
+
+    coefficient_digits = decimal_coefficient_digits(coef)
+
+    precision =
+      if exp >= 0 do
+        coefficient_digits + exp
+      else
+        max(coefficient_digits, scale)
+      end
+
+    if precision > @max_decimal_precision do
+      raise ArgumentError,
+            "ClickHouse Decimal precision #{precision} exceeds maximum #{@max_decimal_precision}"
+    end
+
+    {precision, scale}
+  end
+
+  defp decimal_precision_and_scale!(%Decimal{}) do
+    raise ArgumentError, "invalid Decimal struct"
+  end
+
+  defp decimal_coefficient_digits(coef) do
+    # The coefficient is already bounded to ClickHouse Decimal256 precision, so
+    # this allocates at most 76 bytes and keeps type inference straightforward.
+    coef |> Integer.to_string() |> byte_size()
   end
 end
