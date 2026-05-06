@@ -15,8 +15,8 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
     IO.puts(@moduledoc)
   end
 
-  def run(["-" <> _k | _] = kvs) do
-    run(_source = nil, kvs)
+  def run(["-" <> _k | _]) do
+    run([])
   end
 
   def run([source | kvs]) do

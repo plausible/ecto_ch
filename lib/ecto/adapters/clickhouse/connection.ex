@@ -4,7 +4,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @behaviour Ecto.Adapters.SQL.Connection
   @dialyzer :no_improper_lists
 
-  require Logger
   alias Ecto.SubQuery
   alias Ecto.Query.{QueryExpr, ByExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
 
