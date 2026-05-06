@@ -996,7 +996,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @inline_tag :__ecto_ch_inline__
 
   @max_decimal_precision 76
-  @max_decimal_output_digits @max_decimal_precision + 1
   @max_decimal_coefficient Integer.pow(10, @max_decimal_precision)
 
   @doc false
@@ -1263,16 +1262,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  defp decimal_to_string(decimal) do
-    decimal_precision_and_scale!(decimal)
-
-    if function_exported?(Decimal, :to_string, 3) do
-      apply(Decimal, :to_string, [
-        decimal,
-        :normal,
-        [max_digits: @max_decimal_output_digits]
-      ])
-    else
+  if function_exported?(Decimal, :to_string, 3) do
+    @max_decimal_output_digits @max_decimal_precision + 1
+    defp decimal_to_string(decimal) do
+      decimal_precision_and_scale!(decimal)
+      Decimal.to_string(decimal, :normal, max_digits: @max_decimal_output_digits)
+    end
+  else
+    defp decimal_to_string(decimal) do
+      decimal_precision_and_scale!(decimal)
       Decimal.to_string(decimal, :normal)
     end
   end
