@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Require Ch `~> 0.8.2` and move `function_exported?(Decimal, :to_string, 3)` to compile-time
+- Require Ch `~> 0.8.2` and move `function_exported?(Decimal, :to_string, 3)` to compile-time https://github.com/plausible/ecto_ch/pull/275
 
 ## 0.9.1 (2026-05-05)
 
