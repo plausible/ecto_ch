@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.8 (2026-05-06)
+
+- Require patched Ch releases and move `function_exported?(Decimal, :to_string, 3)` to compile-time
+
 ## 0.8.7 (2026-05-05)
 
 - Bound Decimal rendering to ClickHouse precision limits https://github.com/plausible/ecto_ch/pull/272
