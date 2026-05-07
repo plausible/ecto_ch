@@ -1019,7 +1019,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT 0 FROM "schema" AS s0]
 
     query = Schema |> select([e], 1 in ^[1, 2, 3])
-    assert all(query) == ~s[SELECT 1 IN ({$0:Int64},{$1:Int64},{$2:Int64}) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT 1 IN {$0:Array(Int64)} FROM "schema" AS s0]
 
     query = Schema |> select([e], 1 in [1, ^2, 3])
     assert all(query) == ~s[SELECT 1 IN (1,{$0:Int64},3) FROM "schema" AS s0]
@@ -1027,7 +1027,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = Schema |> select([e], e.x == ^0 or e.x in ^[1, 2, 3] or e.x == ^4)
 
     assert all(query) ==
-             ~s[SELECT (s0."x" = {$0:Int64}) OR (s0."x" IN ({$1:Int64},{$2:Int64},{$3:Int64})) OR (s0."x" = {$4:Int64}) FROM "schema" AS s0]
+             ~s[SELECT (s0."x" = {$0:Int64}) OR (s0."x" IN {$1:Array(Int64)}) OR (s0."x" = {$2:Int64}) FROM "schema" AS s0]
 
     query = Schema |> select([e], e in [1, 2, 3])
 
