@@ -1259,19 +1259,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  if function_exported?(Decimal, :to_string, 3) do
-    @max_decimal_output_digits @max_decimal_precision + 1
-
-    defp decimal_to_string(decimal) do
-      decimal_precision_and_scale!(decimal)
-      Decimal.to_string(decimal, :normal, max_digits: @max_decimal_output_digits)
-    end
-  else
-    defp decimal_to_string(decimal) do
-      decimal_precision_and_scale!(decimal)
-      Decimal.to_string(decimal, :normal)
-    end
+  defp decimal_to_string(%Decimal{coef: coef}) when coef in [:NaN, :inf] do
+    raise ArgumentError, "ClickHouse Decimal values must be finite"
   end
+
+  defp decimal_to_string(%Decimal{} = decimal), do: Decimal.to_string(decimal, :scientific)
 
   defp decimal_precision_and_scale!(%Decimal{coef: coef}) when coef in [:NaN, :inf] do
     raise ArgumentError, "ClickHouse Decimal values must be finite"
