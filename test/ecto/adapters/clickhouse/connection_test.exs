@@ -3477,7 +3477,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
 
     max_integer = String.duplicate("9", 76)
-    max_scale = "0." <> String.duplicate("0", 75) <> "1"
+    max_integer_decimal = Decimal.new(1, String.to_integer(max_integer), 0)
 
     assert param.(Decimal.new("1.23")) == "{$0:Decimal(3,2)}"
     assert inline_param.(Decimal.new("1.23")) == "1.23"
@@ -3485,11 +3485,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert param.(Decimal.new("-1.23")) == "{$0:Decimal(3,2)}"
     assert inline_param.(Decimal.new("-1.23")) == "-1.23"
 
-    assert param.(Decimal.new(max_integer)) == "{$0:Decimal(76,0)}"
-    assert inline_param.(Decimal.new(max_integer)) == max_integer
+    assert param.(max_integer_decimal) == "{$0:Decimal(76,0)}"
+    assert inline_param.(max_integer_decimal) == max_integer
 
     assert param.(Decimal.new(1, 1, -76)) == "{$0:Decimal(76,76)}"
-    assert inline_param.(Decimal.new(1, 1, -76)) == max_scale
+    assert inline_param.(Decimal.new(1, 1, -76)) == "1E-76"
   end
 
   test "decimal literal boundaries" do
@@ -3503,10 +3503,10 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
 
     max_integer = String.duplicate("9", 76)
-    max_scale = "0." <> String.duplicate("0", 75) <> "1"
+    max_integer_decimal = Decimal.new(1, String.to_integer(max_integer), 0)
 
-    assert literal.(Decimal.new(max_integer)) == ~s[SELECT #{max_integer} FROM "schema" AS s0]
-    assert literal.(Decimal.new(1, 1, -76)) == ~s[SELECT #{max_scale} FROM "schema" AS s0]
+    assert literal.(max_integer_decimal) == ~s[SELECT #{max_integer} FROM "schema" AS s0]
+    assert literal.(Decimal.new(1, 1, -76)) == ~s[SELECT 1E-76 FROM "schema" AS s0]
   end
 
   test "decimal parameters reject over-limit values before rendering" do
@@ -3527,16 +3527,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
 
     assert_raise ArgumentError, ~r/precision exceeds maximum 76/, fn ->
-      param.(Decimal.new(String.duplicate("9", 77)))
+      param.(Decimal.new(1, String.to_integer(String.duplicate("9", 77)), 0))
     end
 
-    assert_raise ArgumentError, ~r/precision 77 exceeds maximum 76/, fn ->
-      inline_param.(Decimal.new(1, 1, 76))
-    end
-
-    assert_raise ArgumentError, ~r/scale 77 exceeds maximum 76/, fn ->
-      inline_param.(Decimal.new(1, 1, -77))
-    end
+    assert inline_param.(Decimal.new(1, 1, 76)) == "1E+76"
+    assert inline_param.(Decimal.new(1, 1, -77)) == "1E-77"
+    assert inline_param.(Decimal.new(1, 1, 1_000_000)) == "1E+1000000"
 
     assert_raise ArgumentError, ~r/ClickHouse Decimal values must be finite/, fn ->
       inline_param.(Decimal.new("NaN"))
@@ -3555,7 +3551,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
   end
 
-  test "decimal literals reject over-limit values before rendering" do
+  test "decimal literals render over-limit values without expanding" do
     literal = fn decimal ->
       {query, params} = plan("schema" |> select([], true), :all)
       query = %{query | select: %{query.select | fields: [decimal]}}
@@ -3565,12 +3561,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> IO.iodata_to_binary()
     end
 
-    assert_raise ArgumentError, ~r/precision 77 exceeds maximum 76/, fn ->
-      literal.(Decimal.new(1, 1, 76))
-    end
+    assert literal.(Decimal.new(1, 1, 76)) == ~s[SELECT 1E+76 FROM "schema" AS s0]
+    assert literal.(Decimal.new(1, 1, -77)) == ~s[SELECT 1E-77 FROM "schema" AS s0]
+    assert literal.(Decimal.new(1, 1, 1_000_000)) == ~s[SELECT 1E+1000000 FROM "schema" AS s0]
 
-    assert_raise ArgumentError, ~r/scale 77 exceeds maximum 76/, fn ->
-      literal.(Decimal.new(1, 1, -77))
+    assert_raise ArgumentError, ~r/ClickHouse Decimal values must be finite/, fn ->
+      literal.(Decimal.new("NaN"))
     end
   end
 
