@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.5 (2026-05-07)
+
+- Use scientific Decimal rendering for inline literals and require patched Ch releases
+
 ## 0.7.4 (2026-05-06)
 
 - Require patched Ch releases and move `function_exported?(Decimal, :to_string, 3)` to compile-time
