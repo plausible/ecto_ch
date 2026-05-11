@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.6.6 (2026-05-07)
+## 0.6.6 (2026-05-11)
 
-- Use scientific Decimal rendering for inline literals and require patched Ch releases
+- Use scientific Decimal rendering for inline literals and require patched Ch releases https://github.com/plausible/ecto_ch/pull/276
 
 ## 0.6.5 (2026-05-06)
 
