@@ -80,7 +80,7 @@ defmodule Ecto.Adapters.ClickHouse do
       See `Ecto.Adapters.SQL.disconnect_all/3` for more information.
       """
       def disconnect_all(interval, opts \\ []) do
-        Ecto.Adapters.SQL.disconnect_all(get_dynamic_repo(), interval, opts)
+        Ecto.Adapters.ClickHouse.disconnect_all(get_dynamic_repo(), interval, opts)
       end
 
       @doc """
@@ -147,18 +147,22 @@ defmodule Ecto.Adapters.ClickHouse do
 
   @impl Ecto.Adapter
   def init(config) do
-    Ecto.Adapters.SQL.init(@conn, @driver, config)
+    with {:ok, child_spec, meta} <- Ecto.Adapters.SQL.init(@conn, @driver, config) do
+      meta = Map.update!(meta, :opts, &(&1 ++ @conn.config_options(config)))
+      {:ok, child_spec, meta}
+    end
   end
 
   @impl Ecto.Adapter
-  def checkout(meta, opts, fun) do
-    Ecto.Adapters.SQL.checkout(meta, opts, fun)
+  def checkout(_meta, _opts, fun) do
+    fun.()
   end
 
   @impl Ecto.Adapter
-  def checked_out?(meta) do
-    Ecto.Adapters.SQL.checked_out?(meta)
-  end
+  def checked_out?(_meta), do: false
+
+  @doc false
+  def disconnect_all(_repo, _interval, _opts \\ []), do: :ok
 
   @impl Ecto.Adapter
   def dumpers(:uuid, Ecto.UUID), do: [&__MODULE__.hex_uuid/1]

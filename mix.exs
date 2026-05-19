@@ -1,16 +1,15 @@
-defmodule EctoCh.MixProject do
+defmodule Ch.Ecto.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/plausible/ecto_ch"
-  @version "0.9.3"
+  @version "0.10.0"
 
   def project do
     [
       app: :ecto_ch,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
-      test_paths: test_paths(System.get_env("INTEGRATION")),
       deps: deps(),
       name: "Ecto ClickHouse",
       description: "ClickHouse adapter for Ecto",
@@ -44,23 +43,21 @@ defmodule EctoCh.MixProject do
   defp elixirc_paths(:dev), do: ["lib", "dev"]
   defp elixirc_paths(_env), do: ["lib"]
 
-  defp test_paths(nil), do: ["test"]
-  defp test_paths(_any), do: ["integration_test"]
-
   defp extra_applications(:test), do: [:logger, :inets]
   defp extra_applications(_), do: [:logger]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, "~> 0.8.2"},
+      {:ch, github: "plausible/ch", branch: "master"},
       {:ecto_sql, "~> 3.13.0"},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :docs},
       {:rexbug, "~> 1.0", only: [:dev, :test]},
       {:tz, "~> 0.28.1", only: [:dev, :test]},
-      {:excoveralls, "~> 0.18.5", only: :test}
+      {:excoveralls, "~> 0.18.5", only: :test},
+      {:castore, "~> 1.0", only: :test}
     ]
   end
 

@@ -75,7 +75,7 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
                log: false
              )
 
-    conn = start_supervised!({Ch, opts})
+    conn = start_supervised!({Ch, ClickHouse.Connection.start_options(opts)})
 
     assert Ch.query!(
              conn,

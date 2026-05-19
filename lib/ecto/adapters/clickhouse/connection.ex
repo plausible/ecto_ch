@@ -12,24 +12,61 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @impl true
   def child_spec(opts) do
-    Ch.child_spec(opts)
+    opts
+    |> start_options()
+    |> Ch.child_spec()
+  end
+
+  @doc false
+  def start_options(opts) do
+    opts = normalize_config(opts)
+
+    []
+    |> put_if(:url, endpoint_url(opts))
+    |> put_if(:pool_size, opts[:pool_size])
+  end
+
+  @doc false
+  def config_options(opts) do
+    opts
+    |> normalize_config()
+    |> Keyword.take([:database, :headers, :password, :settings, :timeout, :username])
   end
 
   @impl true
   def prepare_execute(conn, _name, statement, params, opts) do
-    query = Ch.Query.build(statement, opts[:command])
-    DBConnection.prepare_execute(conn, query, params, opts)
+    cached = %{statement: statement}
+
+    case query(conn, statement, params, opts) do
+      {:ok, result} -> {:ok, cached, result}
+      {:error, _reason} = error -> error
+    end
   end
 
   @impl true
-  def execute(conn, query, params, opts) do
-    DBConnection.execute(conn, query, params, opts)
+  def execute(conn, %{statement: statement} = cached, params, opts) do
+    case query(conn, statement, params, opts) do
+      {:ok, result} -> {:ok, cached, result}
+      {:error, _reason} = error -> error
+    end
   end
 
   # TODO what should be done about transactions? probably will need to build custom Repo.stream
   @impl true
   def query(conn, statement, params, opts) do
-    Ch.query(conn, statement, params, opts)
+    started_at = System.monotonic_time()
+
+    result =
+      conn
+      |> Ch.query(statement, query_params(params), ch_query_options(opts))
+      |> case do
+        {:ok, result} -> {:ok, normalize_result(result)}
+        {:error, reason} -> {:error, normalize_error(reason)}
+      end
+
+    log_query(opts, statement, result, started_at)
+
+    result
   end
 
   @impl true
@@ -38,14 +75,205 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def stream(conn, statement, params, opts) do
-    Ch.stream(conn, statement, params, opts)
+  def stream(_conn, _statement, _params, _opts) do
+    raise "not implemented"
   end
 
   @impl true
   def to_constraints(_exception, _opts) do
     raise "not implemented"
   end
+
+  defp endpoint_url(opts) do
+    scheme = opts[:scheme] || "http"
+    host = opts[:hostname] || "localhost"
+    port = opts[:port] || 8123
+
+    "#{scheme}://#{host}:#{port}"
+  end
+
+  defp normalize_config(opts) do
+    {url, opts} = Keyword.pop(opts, :url)
+    Keyword.merge(opts, Ecto.Repo.Supervisor.parse_url(url || ""))
+  end
+
+  defp settings_to_list(nil), do: []
+  defp settings_to_list(settings) when is_map(settings), do: Map.to_list(settings)
+  defp settings_to_list(settings), do: Enum.to_list(settings)
+
+  defp put_database_setting(settings, nil), do: settings
+
+  defp put_database_setting(settings, database) do
+    if setting_keymember?(settings, :database) or setting_keymember?(settings, "database") do
+      settings
+    else
+      [{:database, database} | settings]
+    end
+  end
+
+  defp ch_query_options(opts) do
+    settings =
+      opts
+      |> Keyword.get_values(:settings)
+      |> merge_settings()
+      |> put_database_setting(opts[:database])
+      |> maybe_put_json_output_setting()
+
+    headers =
+      opts
+      |> Keyword.get_values(:headers)
+      |> merge_headers()
+      |> put_new_header("x-clickhouse-user", opts[:username])
+      |> put_new_header("x-clickhouse-key", opts[:password])
+
+    []
+    |> put_if(:timeout, opts[:timeout])
+    |> put_if(:settings, settings)
+    |> put_if(:headers, headers)
+  end
+
+  defp put_if(opts, _key, nil), do: opts
+  defp put_if(opts, _key, []), do: opts
+  defp put_if(opts, key, value), do: [{key, value} | opts]
+
+  defp merge_settings(settings) do
+    settings
+    |> Enum.reverse()
+    |> Enum.reduce([], fn settings, acc ->
+      Enum.reduce(settings_to_list(settings), acc, fn {name, value}, acc ->
+        [{name, value} | List.keydelete(acc, name, 0)]
+      end)
+    end)
+    |> Enum.reverse()
+  end
+
+  defp setting_keymember?(settings, key) do
+    Enum.any?(settings, fn {setting_key, _value} -> setting_key == key end)
+  end
+
+  defp maybe_put_json_output_setting(settings) do
+    if setting_keymember?(settings, :enable_json_type) or
+         setting_keymember?(settings, "enable_json_type") do
+      put_new_setting(settings, :output_format_binary_write_json_as_string, 1)
+    else
+      settings
+    end
+  end
+
+  defp put_new_setting(settings, key, value) do
+    if setting_keymember?(settings, key) or setting_keymember?(settings, to_string(key)) do
+      settings
+    else
+      [{key, value} | settings]
+    end
+  end
+
+  defp merge_headers(headers) do
+    headers
+    |> Enum.reverse()
+    |> Enum.reduce([], fn headers, acc ->
+      Enum.reduce(Enum.to_list(headers), acc, fn {name, value}, acc ->
+        [{name, value} | List.keydelete(acc, name, 0)]
+      end)
+    end)
+    |> Enum.reverse()
+  end
+
+  defp put_new_header(headers, _name, nil), do: headers
+  defp put_new_header(headers, _name, ""), do: headers
+
+  defp put_new_header(headers, name, value) do
+    if List.keymember?(headers, name, 0) do
+      headers
+    else
+      [{name, value} | headers]
+    end
+  end
+
+  defp query_params(params) when is_map(params) do
+    Map.new(params, fn {key, value} -> {to_string(key), value} end)
+  end
+
+  defp query_params(params) when is_list(params) do
+    params
+    |> Enum.with_index()
+    |> Map.new(fn {value, ix} -> {"$#{ix}", value} end)
+  end
+
+  defp normalize_result(%Ch.Result{names: names, rows: rows, headers: headers, data: data}) do
+    rows = rows || data
+
+    %{
+      columns: names,
+      rows: rows,
+      num_rows: num_rows(rows, headers),
+      headers: headers,
+      data: data
+    }
+  end
+
+  defp normalize_error(%Ch.Error{code: nil, message: message} = error) do
+    %{error | code: error_code(message)}
+  end
+
+  defp normalize_error(error), do: error
+
+  defp error_code(message) do
+    with [_, code] <- Regex.run(~r/Code: (\d+)\./, message),
+         {code, ""} <- Integer.parse(code) do
+      code
+    else
+      _ -> nil
+    end
+  end
+
+  defp num_rows(rows, _headers) when is_list(rows), do: length(rows)
+
+  defp num_rows(_rows, headers), do: summary_num_rows(headers) || 0
+
+  defp summary_num_rows(headers) do
+    with {_, summary} <- List.keyfind(headers, "x-clickhouse-summary", 0),
+         {:ok, %{} = decoded} <- JSON.decode(summary),
+         rows when is_binary(rows) <- decoded["written_rows"] || decoded["read_rows"],
+         {num_rows, ""} <- Integer.parse(rows) do
+      num_rows
+    else
+      _ -> nil
+    end
+  end
+
+  defp log_query(opts, statement, result, started_at) do
+    if log = opts[:log] do
+      query_time = System.monotonic_time() - started_at
+      statement = log_statement(statement)
+
+      log.(%{
+        connection_time: query_time,
+        decode_time: 0,
+        pool_time: 0,
+        idle_time: 0,
+        result: log_result(result, statement),
+        query: statement
+      })
+    end
+  end
+
+  defp log_result({:ok, result}, statement), do: {:ok, statement, result}
+  defp log_result({:error, reason}, _statement), do: {:error, reason}
+
+  defp log_statement([sql, format | _rest])
+       when is_binary(format) and
+              format in [" FORMAT RowBinaryWithNamesAndTypes\n", " FORMAT RowBinary\n"] do
+    IO.iodata_to_binary([sql, format])
+  end
+
+  defp log_statement([[sql | format] | _rest])
+       when is_binary(format) and
+              format in [" FORMAT RowBinaryWithNamesAndTypes\n", " FORMAT RowBinary\n"] do
+    IO.iodata_to_binary([sql, format])
+  end
+
+  defp log_statement(statement), do: statement
 
   @impl true
   def all(query, params \\ [], as_prefix \\ []) do

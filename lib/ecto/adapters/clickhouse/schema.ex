@@ -42,11 +42,12 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     names = prepare_names(header)
     types = prepare_types(schema, header, opts)
-    opts = [{:names, names}, {:types, types} | opts]
     rows = unzip_rows(rows, header)
-    sql = [@conn.insert(prefix, source, header, []) | " FORMAT RowBinaryWithNamesAndTypes"]
+    sql = row_binary_statement(@conn.insert(prefix, source, header, []), names, types, rows)
+    opts = maybe_put_json_insert_settings(types, opts)
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+    result = Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
+    %{num_rows: insert_num_rows(result, rows)}
   end
 
   defp insert_input(adapter_meta, schema_meta, query, rows, opts) do
@@ -129,17 +130,17 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
           """
       end
 
-    sql = [
-      @conn.insert(prefix, source, header, {query, dump_params})
-      | " FORMAT RowBinaryWithNamesAndTypes"
-    ]
-
     names = prepare_names(header)
     types = prepare_types(_schema = nil, header, types: types)
-    opts = [{:names, names}, {:types, types} | opts]
     rows = unzip_rows(rows, header)
+    opts = maybe_put_json_insert_settings(types, opts)
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
+    sql =
+      @conn.insert(prefix, source, header, {query, dump_params})
+      |> row_binary_statement(names, types, rows)
+
+    result = Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
+    %{num_rows: insert_num_rows(result, rows)}
   end
 
   def insert(adapter_meta, schema_meta, params, opts) do
@@ -148,10 +149,11 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
     names = prepare_names(header)
     types = prepare_types(schema, header, opts)
-    sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
-    opts = [{:command, :insert}, {:names, names}, {:types, types} | opts]
+    sql = row_binary_statement(@conn.insert(prefix, source, [], []), names, types, [row])
+    opts = [{:command, :insert} | opts]
+    opts = maybe_put_json_insert_settings(types, opts)
 
-    Ecto.Adapters.SQL.query!(adapter_meta, sql, [row], opts)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, [], opts)
     {:ok, []}
   end
 
@@ -192,24 +194,70 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   defp do_insert_stream(repo, prefix, source, header, types, rows, opts) do
     chunk_every = opts[:chunk_every] || 1000
 
-    types = Ch.RowBinary.encoding_types(types)
     names = prepare_names(header)
-    opts = [{:command, :insert}, {:encode, false} | opts]
-    sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
+    opts = [{:command, :insert} | opts]
+    opts = maybe_put_json_insert_settings(types, opts)
+    sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes\n"]
 
-    row_binary =
+    {row_binary, num_rows} =
       rows
       |> Stream.chunk_every(chunk_every)
-      |> Stream.map(fn chunk ->
-        chunk
-        |> unzip_rows(header)
-        |> Ch.RowBinary._encode_rows(types)
+      |> Enum.map_reduce(0, fn chunk, num_rows ->
+        rows = unzip_rows(chunk, header)
+        {Ch.RowBinary.encode_rows(rows, types), num_rows + length(rows)}
       end)
 
-    stream = Stream.concat([Ch.RowBinary.encode_names_and_types(names, types)], row_binary)
-    %{num_rows: num_rows} = Ecto.Adapters.SQL.query!(repo, sql, stream, opts)
+    body = [sql, Ch.RowBinary.encode_names_and_types(names, types) | row_binary]
+    result = Ecto.Adapters.SQL.query!(repo, body, [], opts)
 
-    {num_rows, nil}
+    {insert_num_rows(result, num_rows), nil}
+  end
+
+  defp insert_num_rows(%{num_rows: num_rows}, _fallback) when num_rows > 0, do: num_rows
+  defp insert_num_rows(_result, rows) when is_list(rows), do: length(rows)
+  defp insert_num_rows(_result, num_rows) when is_integer(num_rows), do: num_rows
+
+  defp maybe_put_json_insert_settings(types, opts) do
+    if Enum.any?(types, &json_type?/1) do
+      Keyword.update(opts, :settings, [input_format_binary_read_json_as_string: 1], fn settings ->
+        settings
+        |> settings_to_list()
+        |> put_new_setting(:input_format_binary_read_json_as_string, 1)
+      end)
+    else
+      opts
+    end
+  end
+
+  defp json_type?(:json), do: true
+  defp json_type?("JSON" <> _), do: true
+  defp json_type?({:array, type}), do: json_type?(type)
+  defp json_type?({:nullable, type}), do: json_type?(type)
+  defp json_type?({:low_cardinality, type}), do: json_type?(type)
+  defp json_type?({:simple_aggregate_function, _name, type}), do: json_type?(type)
+  defp json_type?(_type), do: false
+
+  defp settings_to_list(nil), do: []
+  defp settings_to_list(settings) when is_map(settings), do: Map.to_list(settings)
+  defp settings_to_list(settings), do: Enum.to_list(settings)
+
+  defp put_new_setting(settings, key, value) do
+    if Enum.any?(settings, fn {setting_key, _value} ->
+         setting_key == key or setting_key == to_string(key)
+       end) do
+      settings
+    else
+      [{key, value} | settings]
+    end
+  end
+
+  defp row_binary_statement(insert, names, types, rows) do
+    [
+      insert,
+      " FORMAT RowBinaryWithNamesAndTypes\n",
+      Ch.RowBinary.encode_names_and_types(names, types),
+      Ch.RowBinary.encode_rows(rows, types)
+    ]
   end
 
   def delete(adapter_meta, schema_meta, params, opts) do

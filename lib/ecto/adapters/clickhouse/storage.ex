@@ -1,7 +1,6 @@
 defmodule Ecto.Adapters.ClickHouse.Storage do
   @moduledoc false
-  alias Ch.{Query, Error}
-  alias Ch.Connection, as: Conn
+  alias Ch.Error
 
   @conn Ecto.Adapters.ClickHouse.Connection
 
@@ -9,18 +8,18 @@ defmodule Ecto.Adapters.ClickHouse.Storage do
     {database, opts} = Keyword.pop!(opts, :database)
     statement = "CREATE DATABASE #{@conn.quote_name(database)}"
 
-    with {:ok, conn} <- Conn.connect(opts),
-         {:ok, _result, _conn} <- exec(conn, statement),
-         do: :ok
+    with_pool(opts, fn conn, query_opts ->
+      with {:ok, _result} <- exec(conn, statement, [], query_opts), do: :ok
+    end)
   end
 
   def storage_down(opts) do
     {database, opts} = Keyword.pop!(opts, :database)
     statement = "DROP DATABASE #{@conn.quote_name(database)}"
 
-    with {:ok, conn} <- Conn.connect(opts),
-         {:ok, _result, _conn} <- exec(conn, statement),
-         do: :ok
+    with_pool(opts, fn conn, query_opts ->
+      with {:ok, _result} <- exec(conn, statement, [], query_opts), do: :ok
+    end)
   end
 
   def storage_status(opts) do
@@ -28,25 +27,36 @@ defmodule Ecto.Adapters.ClickHouse.Storage do
     statement = "SELECT 1 FROM system.databases WHERE name = {database:String}"
     params = %{"database" => database}
 
-    with {:ok, conn} <- Conn.connect(opts),
-         {:ok, %{num_rows: num_rows}, _conn} <- exec(conn, statement, params) do
-      case num_rows do
-        1 -> :up
-        0 -> :down
+    with_pool(opts, fn conn, query_opts ->
+      with {:ok, %{num_rows: num_rows}} <- exec(conn, statement, params, query_opts) do
+        case num_rows do
+          1 -> :up
+          0 -> :down
+        end
       end
+    end)
+  end
+
+  defp with_pool(opts, fun) do
+    case Ch.start_link(@conn.start_options(opts)) do
+      {:ok, conn} ->
+        try do
+          fun.(conn, @conn.config_options(opts))
+        after
+          Ch.stop(conn)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
-  defp exec(conn, sql, params \\ []) do
-    query = Query.build(sql)
-    params = DBConnection.Query.encode(query, params, [])
-
-    case Conn.handle_execute(query, params, [], conn) do
-      {:ok, query, result, conn} -> {:ok, DBConnection.Query.decode(query, result, []), conn}
-      {:disconnect, reason, _conn} -> {:error, reason}
-      {:error, %Error{code: 82}, _conn} -> {:error, :already_up}
-      {:error, %Error{code: 81}, _conn} -> {:error, :already_down}
-      {:error, reason, _conn} -> {:error, reason}
+  defp exec(conn, sql, params, opts) do
+    case @conn.query(conn, sql, params, opts) do
+      {:ok, result} -> {:ok, result}
+      {:error, %Error{code: 82}} -> {:error, :already_up}
+      {:error, %Error{code: 81}} -> {:error, :already_down}
+      {:error, reason} -> {:error, reason}
     end
   end
 end

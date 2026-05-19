@@ -16,11 +16,7 @@ jobs:
     strategy:
       matrix:
         include:
-          # some old elixir/erlang version
-          - elixir: 1.15
-            otp: 25
-
-          # some recent version and non-UTC timezone
+          # minimum supported elixir/erlang version and non-UTC timezone
           - elixir: 1.18
             otp: 27
             timezone: Europe/Berlin
