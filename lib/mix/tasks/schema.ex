@@ -9,7 +9,8 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
       $ mix ecto.ch.schema system.numbers --repo MyApp.Repo
   """
   use Mix.Task
-  alias Ch.Connection, as: Conn
+
+  @conn Ecto.Adapters.ClickHouse.Connection
 
   def run([]) do
     IO.puts(@moduledoc)
@@ -61,10 +62,8 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
 
     statement = "select database, name, type from system.columns " <> where
 
-    conn = connect(config || [])
-
-    case query(conn, statement, params) do
-      {%Ch.Result{rows: [_ | _] = rows}, _conn} ->
+    case query(config || [], statement, params) do
+      %{rows: [_ | _] = rows} ->
         ensure_single_table!(rows)
 
         schema = [
@@ -78,26 +77,25 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
 
         IO.puts(schema)
 
-      {%Ch.Result{rows: []}, _conn} ->
+      %{rows: []} ->
         raise "table not found"
     end
   end
 
-  defp connect(config) do
-    case Conn.connect(config) do
-      {:ok, conn} -> conn
-      {:error, reason} -> raise reason
-    end
-  end
+  defp query(config, statement, params) do
+    case Ch.start_link(@conn.start_options(config)) do
+      {:ok, conn} ->
+        try do
+          case @conn.query(conn, statement, params, @conn.config_options(config)) do
+            {:ok, result} -> result
+            {:error, reason} -> raise reason
+          end
+        after
+          Ch.stop(conn)
+        end
 
-  defp query(conn, statement, params, opts \\ []) do
-    query = Ch.Query.build(statement)
-    params = DBConnection.Query.encode(query, params, opts)
-
-    case Conn.handle_execute(query, params, opts, conn) do
-      {:ok, query, result, conn} -> {DBConnection.Query.decode(query, result, opts), conn}
-      {:disconnect, reason, _conn} -> raise reason
-      {:error, reason, _conn} -> raise reason
+      {:error, reason} ->
+        raise reason
     end
   end
 
