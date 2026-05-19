@@ -218,12 +218,14 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       assert Enum.at(parts, -2) == schema_migrations
 
-      conn = start_supervised!({Ch, opts})
+      conn = start_supervised!({Ch, ClickHouse.Connection.start_options(opts)})
 
       %{rows: [[1, inserted_at_1], [2, inserted_at_2]]} =
         Ch.query!(
           conn,
-          "select version, toString(inserted_at) from schema_migrations order by version"
+          "select version, toString(inserted_at) from schema_migrations order by version",
+          %{},
+          settings: [database: database]
         )
 
       assert List.last(parts) ==

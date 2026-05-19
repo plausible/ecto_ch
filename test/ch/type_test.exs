@@ -366,7 +366,7 @@ defmodule Ch.TypeTest do
       assert Strings |> order_by([s], s.ch_string) |> all() |> unstruct() == [
                %{ch_string: "", string: ""},
                %{ch_string: "", string: ""},
-               %{ch_string: "a�b", string: "a�b"},
+               %{ch_string: "\x61\xF0\x80\x80\x80b", string: "\x61\xF0\x80\x80\x80b"},
                %{ch_string: "hello", string: "world"}
              ]
     end

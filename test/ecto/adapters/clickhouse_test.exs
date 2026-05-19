@@ -29,6 +29,10 @@ defmodule Ecto.Adapters.ClickHouseTest do
         ClickHouse.storage_up([])
       end
     end
+
+    test "returns other ClickHouse errors" do
+      assert {:error, %Ch.Error{code: 62}} = ClickHouse.storage_up(database: "")
+    end
   end
 
   describe "storage_down/1" do

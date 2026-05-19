@@ -41,7 +41,12 @@ env = [
 
 env =
   if ch_version >= "25" do
-    Keyword.update!(env, :settings, fn settings -> Keyword.put(settings, :enable_json_type, 1) end)
+    Keyword.update!(env, :settings, fn settings ->
+      settings
+      |> Keyword.put(:enable_json_type, 1)
+      |> Keyword.put(:input_format_binary_read_json_as_string, 1)
+      |> Keyword.put(:output_format_binary_write_json_as_string, 1)
+    end)
   else
     env
   end
