@@ -16,11 +16,11 @@ jobs:
     strategy:
       matrix:
         include:
-          # some old elixir/clickhouse version with the minimum supported OTP
+          # some old elixir version with the minimum supported OTP
           # see https://hexdocs.pm/elixir/compatibility-and-deprecations.html#between-elixir-and-erlang-otp
           - elixir: "1.18"
             otp: "28"
-            clickhouse: "24.5.4.49"
+            clickhouse: "latest"
 
           # the latest versions with all static checks
           - elixir: ">0"
