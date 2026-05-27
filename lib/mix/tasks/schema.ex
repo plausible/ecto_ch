@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
   end
 
   def run(["-" <> _k | _] = kvs) do
-    run(_source = nil, kvs)
+    raise ArgumentError, "missing table name, got only options: #{inspect(kvs)}"
   end
 
   def run([source | kvs]) do
