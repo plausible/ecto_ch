@@ -98,7 +98,7 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
                `operating_system` LowCardinality(String), \
                `browser` LowCardinality(String), \
                `timestamp` DateTime, \
-               INDEX events_name_index name TYPE bloom_filter GRANULARITY 8192\
+               INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
                ) \
                ENGINE = MergeTree \
                PARTITION BY toYYYYMM(timestamp) \
