@@ -316,7 +316,8 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   defp column_options(type, opts) do
     default = Keyword.fetch(opts, :default)
     null = Keyword.get(opts, :null)
-    [default_expr(default, type), null_expr(null)]
+    comment = Keyword.get(opts, :comment)
+    [default_expr(default, type), null_expr(null), comment_expr(comment)]
   end
 
   defp column_change({:add, _name, %Reference{}, _opts}) do
@@ -343,8 +344,9 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       @conn.quote_name(name),
       ?\s,
       column_type(type),
-      modify_default(name, type, opts)
-      | modify_null(name, opts)
+      modify_default(name, type, opts),
+      modify_null(name, opts),
+      comment_expr(Keyword.get(opts, :comment))
     ]
   end
 
@@ -377,6 +379,9 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   defp null_expr(true), do: " NULL"
   defp null_expr(false), do: " NOT NULL"
   defp null_expr(_), do: []
+
+  defp comment_expr(nil), do: []
+  defp comment_expr(comment), do: [" COMMENT '", @conn.escape_string(comment), ?']
 
   @dialyzer {:no_improper_lists, default_expr: 2}
   defp default_expr({:ok, nil}, _type) do

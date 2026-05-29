@@ -122,6 +122,22 @@ CREATE TABLE `posts` ON CLUSTER `my-cluster` (
 ) ENGINE ReplicatedMergeTree ORDER BY tuple()
 ```
 
+Column options like `:default`, `:null`, and `:comment` are supported as well, and work in `create`, `add`, and `modify`:
+
+```elixir
+create table(:posts, primary_key: false, engine: "MergeTree", options: [order_by: "tuple()"]) do
+  add :user_id, :UInt64, comment: "ClickPipes source"
+end
+```
+
+is equivalent to
+
+```sql
+CREATE TABLE `posts` (
+  `user_id` UInt64 COMMENT 'ClickPipes source'
+) ENGINE MergeTree ORDER BY tuple()
+```
+
 ## Caveats
 
 #### [ALTER TABLE ... UPDATE](https://clickhouse.com/docs/en/sql-reference/statements/alter/update)

@@ -2891,6 +2891,66 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
+  test "create table with column comment" do
+    create =
+      {:create, table(:posts, engine: "MergeTree"),
+       [
+         {:add, :user_id, :UInt64, [comment: "ClickPipes source"]}
+       ]}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" ("user_id" UInt64 COMMENT 'ClickPipes source') ENGINE=MergeTree}
+           ]
+  end
+
+  test "create table with column comment combined with default and null" do
+    create =
+      {:create, table(:posts, engine: "MergeTree"),
+       [
+         {:add, :name, :string, [default: "Untitled", null: false, comment: "the name"]}
+       ]}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" ("name" String DEFAULT 'Untitled' NOT NULL COMMENT 'the name') ENGINE=MergeTree}
+           ]
+  end
+
+  test "alter table adds column with comment" do
+    alter =
+      {:alter, table(:posts),
+       [
+         {:add, :_key, :string, [comment: "Kinesis partition key"]}
+       ]}
+
+    assert execute_ddl(alter) == [
+             ~s{ALTER TABLE "posts" ADD COLUMN "_key" String COMMENT 'Kinesis partition key'}
+           ]
+  end
+
+  test "alter table modifies column with comment" do
+    alter =
+      {:alter, table(:posts),
+       [
+         {:modify, :_key, :string, [comment: "Kinesis partition key"]}
+       ]}
+
+    assert execute_ddl(alter) == [
+             ~s{ALTER TABLE "posts" MODIFY COLUMN "_key" String COMMENT 'Kinesis partition key'}
+           ]
+  end
+
+  test "column comment escapes single quotes" do
+    create =
+      {:create, table(:posts, engine: "MergeTree"),
+       [
+         {:add, :user_id, :UInt64, [comment: "user's id"]}
+       ]}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" ("user_id" UInt64 COMMENT 'user''s id') ENGINE=MergeTree}
+           ]
+  end
+
   test "create index" do
     create =
       {:create,
