@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Support the `:comment` column option in migrations (`create`, `add`, and `modify`), which was previously silently ignored
+- Support the `:comment` column option in migrations (`create`, `add`, and `modify`), which was previously silently ignored https://github.com/plausible/ecto_ch/pull/282
 
 ## 0.9.3 (2026-05-07)
 
