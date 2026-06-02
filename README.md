@@ -11,7 +11,7 @@ Uses [Ch](https://github.com/plausible/ch) as driver.
 ```elixir
 defp deps do
   [
-    {:ecto_ch, "~> 0.9.0"}
+    {:ecto_ch, "~> 0.10.0"}
   ]
 end
 ```
