@@ -1065,15 +1065,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       value
     else
       value
-      |> escape_quoted_identifier()
+      |> :binary.replace("\\", "\\\\", [:global])
+      |> :binary.replace("`", "\\`", [:global])
+      |> :binary.replace("\b", "\\b", [:global])
+      |> :binary.replace("\f", "\\f", [:global])
+      |> :binary.replace("\n", "\\n", [:global])
+      |> :binary.replace("\r", "\\r", [:global])
+      |> :binary.replace("\t", "\\t", [:global])
       |> quote_name(?`)
     end
-  end
-
-  defp escape_quoted_identifier(value) when is_binary(value) do
-    value
-    |> :binary.replace("\\", "\\\\", [:global])
-    |> :binary.replace("`", "\\`", [:global])
   end
 
   defp get_source(query, sources, params, ix, source) do

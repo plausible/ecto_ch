@@ -90,7 +90,25 @@ defmodule Ecto.Integration.JsonTest do
         json: %{
           "from" => "insert_all",
           "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]},
-          "not an identifier" => %{"a`b" => "escaped"}
+          "edge cases" => %{
+            "space key" => "space",
+            "dash-key" => "dash",
+            "1number" => "number",
+            "has.dot" => "dot",
+            "'single" => "single",
+            "\"double" => "double",
+            "back\\slash" => "backslash",
+            "a`b" => "backtick",
+            "backspace\bkey" => "backspace",
+            "form\fkey" => "form",
+            "tab\tkey" => "tab",
+            "line\nbreak" => "newline",
+            "carriage\rreturn" => "carriage",
+            "comma,key" => "comma",
+            "colon:key" => "colon",
+            "slash/key" => "slash",
+            "bracket[key]" => "bracket"
+          }
         },
         time: ~N[2023-10-01 13:00:00]
       }
@@ -101,11 +119,48 @@ defmodule Ecto.Integration.JsonTest do
                select: %{
                  from: json_extract_path(s.json, ["from"]),
                  name: json_extract_path(s.json, ["nested", "name"]),
-                 escaped: json_extract_path(s.json, ["not an identifier", "a`b"]),
+                 edge_space: json_extract_path(s.json, ["edge cases", "space key"]),
+                 edge_dash: json_extract_path(s.json, ["edge cases", "dash-key"]),
+                 edge_number: json_extract_path(s.json, ["edge cases", "1number"]),
+                 edge_dot: json_extract_path(s.json, ["edge cases", "has.dot"]),
+                 edge_single_quote: json_extract_path(s.json, ["edge cases", "'single"]),
+                 edge_double_quote: json_extract_path(s.json, ["edge cases", "\"double"]),
+                 edge_backslash: json_extract_path(s.json, ["edge cases", "back\\slash"]),
+                 edge_backtick: json_extract_path(s.json, ["edge cases", "a`b"]),
+                 edge_backspace: json_extract_path(s.json, ["edge cases", "backspace\bkey"]),
+                 edge_form: json_extract_path(s.json, ["edge cases", "form\fkey"]),
+                 edge_tab: json_extract_path(s.json, ["edge cases", "tab\tkey"]),
+                 edge_newline: json_extract_path(s.json, ["edge cases", "line\nbreak"]),
+                 edge_carriage: json_extract_path(s.json, ["edge cases", "carriage\rreturn"]),
+                 edge_comma: json_extract_path(s.json, ["edge cases", "comma,key"]),
+                 edge_colon: json_extract_path(s.json, ["edge cases", "colon:key"]),
+                 edge_slash: json_extract_path(s.json, ["edge cases", "slash/key"]),
+                 edge_bracket: json_extract_path(s.json, ["edge cases", "bracket[key]"]),
                  bracket_name: s.json["nested"]["name"]
                }
            ) == [
-             %{from: "insert_all", name: "Test", escaped: "escaped", bracket_name: "Test"}
+             %{
+               from: "insert_all",
+               name: "Test",
+               edge_space: "space",
+               edge_dash: "dash",
+               edge_number: "number",
+               edge_dot: "dot",
+               edge_single_quote: "single",
+               edge_double_quote: "double",
+               edge_backslash: "backslash",
+               edge_backtick: "backtick",
+               edge_backspace: "backspace",
+               edge_form: "form",
+               edge_tab: "tab",
+               edge_newline: "newline",
+               edge_carriage: "carriage",
+               edge_comma: "comma",
+               edge_colon: "colon",
+               edge_slash: "slash",
+               edge_bracket: "bracket",
+               bracket_name: "Test"
+             }
            ]
   end
 
