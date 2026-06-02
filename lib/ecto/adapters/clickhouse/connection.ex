@@ -820,11 +820,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp expr({:json_extract_path, _, [expr, path]}, sources, params, query) do
     path =
       Enum.map(path, fn
-        bin when is_binary(bin) -> [?., escape_json_key(bin)]
+        bin when is_binary(bin) -> [?., json_path_key(bin)]
         int when is_integer(int) -> [?[, Integer.to_string(int), ?]]
       end)
 
-    ["JSON_QUERY(", expr(expr, sources, params, query), ", '$", path | "')"]
+    [expr(expr, sources, params, query) | path]
   end
 
   # TODO parens?
@@ -1060,10 +1060,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     |> :binary.replace("\\", "\\\\", [:global])
   end
 
-  defp escape_json_key(value) when is_binary(value) do
-    value
-    |> escape_string()
-    |> :binary.replace("\"", "\\\"", [:global])
+  defp json_path_key(value) when is_binary(value) do
+    if Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, value) do
+      value
+    else
+      quote_name(value, ?`)
+    end
   end
 
   defp get_source(query, sources, params, ix, source) do

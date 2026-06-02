@@ -1,29 +1,35 @@
 defmodule Ecto.Integration.JsonTest do
   use Ecto.Integration.Case
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query
 
   @moduletag :json
 
   alias Ecto.Integration.TestRepo
   alias EctoClickHouse.Integration.Setting
 
-  @tag skip: true
   test "serializes json correctly" do
+    TestRepo.query!("""
+    CREATE TABLE settings (
+      properties JSON
+    ) ENGINE MergeTree ORDER BY tuple()
+    """)
+
+    on_exit(fn -> TestRepo.query!("DROP TABLE settings") end)
+
     # Insert a record purposefully with atoms as the map key. We are going to
     # verify later they were coerced into strings.
-    setting =
-      %Setting{}
-      |> Setting.changeset(%{properties: %{foo: "bar", qux: "baz"}})
-      |> TestRepo.insert!()
+    %Setting{}
+    |> Setting.changeset(%{properties: %{foo: "bar", qux: "baz"}})
+    |> TestRepo.insert!()
 
     # Read the record back using ecto and confirm it
     assert %Setting{properties: %{"foo" => "bar", "qux" => "baz"}} =
-             TestRepo.get(Setting, setting.id)
+             TestRepo.one!(Setting)
 
     assert %{num_rows: 1, rows: [["bar"]]} =
              TestRepo.query!(
-               "select json_extract(properties, '$.foo') from settings where id = ?1",
-               [setting.id]
+               "select properties.foo from settings",
+               []
              )
   end
 
@@ -66,6 +72,38 @@ defmodule Ecto.Integration.JsonTest do
              %{"from" => "insert"},
              %{"from" => "insert_all"},
              %{"from" => "another_insert_all"}
+           ]
+  end
+
+  test "json_extract_path uses native JSON paths" do
+    TestRepo.query!("""
+    CREATE TABLE semi_structured (
+      json JSON,
+      time DateTime
+    ) ENGINE MergeTree ORDER BY time
+    """)
+
+    on_exit(fn -> TestRepo.query!("DROP TABLE semi_structured") end)
+
+    TestRepo.insert_all(SemiStructured, [
+      %{
+        json: %{
+          "from" => "insert_all",
+          "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]}
+        },
+        time: ~N[2023-10-01 13:00:00]
+      }
+    ])
+
+    assert TestRepo.all(
+             from s in SemiStructured,
+               select: %{
+                 from: json_extract_path(s.json, ["from"]),
+                 name: json_extract_path(s.json, ["nested", "name"]),
+                 bracket_name: s.json["nested"]["name"]
+               }
+           ) == [
+             %{from: "insert_all", name: "Test", bracket_name: "Test"}
            ]
   end
 

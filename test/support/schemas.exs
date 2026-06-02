@@ -87,7 +87,7 @@ defmodule EctoClickHouse.Integration.Setting do
 
   @primary_key false
   schema "settings" do
-    field :properties, :map
+    field :properties, Ch, type: "JSON"
   end
 
   def changeset(struct, attrs) do

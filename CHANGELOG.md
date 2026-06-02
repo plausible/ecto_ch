@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Breaking change: compile `json_extract_path/2` and Ecto JSON access syntax to native ClickHouse JSON paths like `json.foo.bar` instead of `JSON_QUERY(json, '$.foo.bar')`.
+
 ## 0.9.4 (2026-05-30)
 
 - Support the `:comment` column option in migrations (`create`, `add`, and `modify`), which was previously silently ignored https://github.com/plausible/ecto_ch/pull/282
