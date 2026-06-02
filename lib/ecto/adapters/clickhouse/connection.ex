@@ -1067,11 +1067,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       value
       |> :binary.replace("\\", "\\\\", [:global])
       |> :binary.replace("`", "\\`", [:global])
-      |> :binary.replace("\b", "\\b", [:global])
-      |> :binary.replace("\f", "\\f", [:global])
-      |> :binary.replace("\n", "\\n", [:global])
-      |> :binary.replace("\r", "\\r", [:global])
-      |> :binary.replace("\t", "\\t", [:global])
       |> quote_name(?`)
     end
   end
