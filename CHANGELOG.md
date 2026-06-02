@@ -2,7 +2,7 @@
 
 ## 0.9.4 (2026-05-30)
 
-- Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers
+- Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers https://github.com/plausible/ecto_ch/pull/283
 - Support the `:comment` column option in migrations (`create`, `add`, and `modify`), which was previously silently ignored https://github.com/plausible/ecto_ch/pull/282
 
 ## 0.9.3 (2026-05-07)
