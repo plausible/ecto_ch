@@ -89,7 +89,8 @@ defmodule Ecto.Integration.JsonTest do
       %{
         json: %{
           "from" => "insert_all",
-          "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]}
+          "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]},
+          "not an identifier" => %{"a`b" => "escaped"}
         },
         time: ~N[2023-10-01 13:00:00]
       }
@@ -100,10 +101,11 @@ defmodule Ecto.Integration.JsonTest do
                select: %{
                  from: json_extract_path(s.json, ["from"]),
                  name: json_extract_path(s.json, ["nested", "name"]),
+                 escaped: json_extract_path(s.json, ["not an identifier", "a`b"]),
                  bracket_name: s.json["nested"]["name"]
                }
            ) == [
-             %{from: "insert_all", name: "Test", bracket_name: "Test"}
+             %{from: "insert_all", name: "Test", escaped: "escaped", bracket_name: "Test"}
            ]
   end
 

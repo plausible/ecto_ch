@@ -1064,8 +1064,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     if Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, value) do
       value
     else
-      quote_name(value, ?`)
+      value
+      |> escape_quoted_identifier()
+      |> quote_name(?`)
     end
+  end
+
+  defp escape_quoted_identifier(value) when is_binary(value) do
+    value
+    |> :binary.replace("\\", "\\\\", [:global])
+    |> :binary.replace("`", "\\`", [:global])
   end
 
   defp get_source(query, sources, params, ix, source) do
