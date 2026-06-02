@@ -1,12 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers https://github.com/plausible/ecto_ch/pull/283
+
 ## 0.10.0 (2026-06-02)
 
 - Breaking change: compile `json_extract_path/2` and Ecto JSON access syntax to native ClickHouse JSON paths like `json.foo.bar` instead of `JSON_QUERY(json, '$.foo.bar')`. https://github.com/plausible/ecto_ch/pull/284
 
 ## 0.9.4 (2026-05-30)
 
-- Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers
 - Support the `:comment` column option in migrations (`create`, `add`, and `modify`), which was previously silently ignored https://github.com/plausible/ecto_ch/pull/282
 
 ## 0.9.3 (2026-05-07)
