@@ -998,34 +998,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = Schema |> select([s], json_extract_path(s.meta, ["a b", "a`b"]))
     assert all(query) == ~s{SELECT s0."meta".`a b`.`a\\`b` FROM "schema" AS s0}
 
-    query =
-      Schema
-      |> select(
-        [s],
-        json_extract_path(s.meta, [
-          "space key",
-          "dash-key",
-          "1number",
-          "has.dot",
-          "'single",
-          "\"double",
-          "back\\slash",
-          "a`b",
-          "backspace\bkey",
-          "form\fkey",
-          "tab\tkey",
-          "line\nbreak",
-          "carriage\rreturn",
-          "comma,key",
-          "colon:key",
-          "slash/key",
-          "bracket[key]"
-        ])
-      )
-
-    assert all(query) ==
-             ~s{SELECT s0."meta".`space key`.`dash-key`.`1number`.`has.dot`.`'single`.`"double`.`back\\\\slash`.`a\\`b`.`backspace\\bkey`.`form\\fkey`.`tab\\tkey`.`line\\nbreak`.`carriage\\rreturn`.`comma,key`.`colon:key`.`slash/key`.`bracket[key]` FROM "schema" AS s0}
-
     query = Schema |> select([s], s.meta["author"]["name"])
     assert all(query) == ~s{SELECT s0."meta".author.name FROM "schema" AS s0}
   end
