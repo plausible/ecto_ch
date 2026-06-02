@@ -1024,6 +1024,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     names
     |> Enum.reject(&is_nil/1)
     |> intersperse_map(?., &quote_name(&1, nil))
+    |> escape_quoted(quoter)
     |> wrap_in(quoter)
   end
 
@@ -1032,7 +1033,9 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   def quote_name(name, quoter) do
-    wrap_in(name, quoter)
+    name
+    |> escape_quoted(quoter)
+    |> wrap_in(quoter)
   end
 
   defp quote_qualified_name(name, sources, ix) do
@@ -1051,6 +1054,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp wrap_in(value, nil), do: value
   defp wrap_in(value, wrapper), do: [wrapper, value, wrapper]
+
+  defp escape_quoted(value, nil), do: value
+  defp escape_quoted(value, ?'), do: escape_string(IO.iodata_to_binary(value))
+
+  defp escape_quoted(value, quoter) when quoter in [?\", ?`] do
+    value
+    |> IO.iodata_to_binary()
+    |> :binary.replace("\\", "\\\\", [:global])
+    |> :binary.replace(<<quoter>>, "\\" <> <<quoter>>, [:global])
+  end
 
   @doc false
   # TODO faster?
