@@ -48,7 +48,7 @@ jobs:
       MIX_ENV: test
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - id: beam
         uses: erlef/setup-beam@v1
