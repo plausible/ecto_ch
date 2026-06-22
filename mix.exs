@@ -53,8 +53,8 @@ defmodule EctoCh.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ch, "~> 0.8.2"},
-      {:ecto_sql, "~> 3.13.0"},
+      {:ch, "~> 0.9.0"},
+      {:ecto_sql, "~> 3.14.0"},
       {:benchee, "~> 1.1", only: :bench},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :docs},
