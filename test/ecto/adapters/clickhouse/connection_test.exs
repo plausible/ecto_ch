@@ -774,6 +774,24 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query = "schema" |> where(foo: "'") |> select([], true)
     assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE (s0."foo" = '''')]
+
+    query = "schema" |> select([], constant(^"let's \\ escape"))
+    assert all(query) == ~s[SELECT 'let''s \\\\ escape' FROM "schema" AS s0]
+  end
+
+  test "quoted identifier escape" do
+    assert Connection.quote_name(~s{has"quote}) |> IO.iodata_to_binary() ==
+             ~s{"has\\"quote"}
+
+    assert Connection.quote_name(~s{has\\slash}) |> IO.iodata_to_binary() ==
+             ~s{"has\\\\slash"}
+
+    assert Connection.quote_name(~s{has`tick}, ?`) |> IO.iodata_to_binary() ==
+             ~s{`has\\`tick`}
+
+    query = insert(nil, ~s{schema"quoted}, [~s{field"quoted}], [], :raise, [])
+
+    assert query == ~s{INSERT INTO "schema\\"quoted"("field\\"quoted")}
   end
 
   test "binary ops" do
@@ -2511,6 +2529,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert_raise ArgumentError, "ClickHouse does not support FOREIGN KEY", fn ->
       execute_ddl(create)
     end
+  end
+
+  test "create table with escaped table comment" do
+    create = {:create, table(:posts, comment: "owner's \\\\ table"), []}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" () ENGINE=TinyLog COMMENT 'owner''s \\\\\\\\ table'}
+           ]
   end
 
   test "create table with serial primary key" do
