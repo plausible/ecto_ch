@@ -23,7 +23,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     %{num_rows: num_rows} =
       case rows do
         {%Ecto.Query{} = _query, params} ->
-          sql = @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders)
+          sql = @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders, opts)
           Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->

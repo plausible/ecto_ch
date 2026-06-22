@@ -216,7 +216,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def insert(prefix, table, header, rows, _on_conflict, returning, _placeholders) do
+  def insert(prefix, table, header, rows, _on_conflict, returning, _placeholders, _opts) do
     unless returning == [] do
       raise ArgumentError, "ClickHouse does not support RETURNING on INSERT statements"
     end
