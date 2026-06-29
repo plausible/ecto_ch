@@ -24,7 +24,7 @@ defmodule Ecto.Adapters.ClickHouse.Queryable do
     query = Ecto.Query.Planner.attach_prefix(query, opts)
 
     {query_meta, {:nocache, {:update_all, query}}, cast_params, dump_params} =
-      Ecto.Query.Planner.query(query, :update_all, cache, adapter, 0)
+      Ecto.Query.Planner.query(query, :update_all, cache, adapter, 0, false)
 
     %{select: nil} = query_meta
     opts = [cast_params: cast_params] ++ opts
