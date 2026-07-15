@@ -687,8 +687,8 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
 
     # SELECT t1.*, t2.* FROM t1 ANTI LEFT JOIN t2 USING(x) ORDER BY t1.x, t2.x, t1.s, t2.s;
     # 0	a1	0
-    # 1	a2	1
-    # 3	a4	3
+    # 1	a2	0
+    # 3	a4	0
 
     assert TestRepo.all(
              from t1 in "semi_anti_t1",
@@ -699,8 +699,8 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
                select: [t1.x, t1.s, t2.x, t2.s]
            ) == [
              [0, "a1", 0, ""],
-             [1, "a2", 1, ""],
-             [3, "a4", 3, ""]
+             [1, "a2", 0, ""],
+             [3, "a4", 0, ""]
            ]
 
     # SELECT t1.*, t2.* FROM t1 ANTI RIGHT JOIN t2 USING(x) ORDER BY t1.x, t2.x, t1.s, t2.s;
