@@ -296,31 +296,38 @@ defmodule Ecto.Integration.TypeTest do
     assert TestRepo.all(from t in Tag, where: t.ints == [1, 2, 3], select: t.ints) == [ints]
     assert TestRepo.all(from t in "tags", where: t.ints == [1, 2, 3], select: t.ints) == [ints]
 
-    # ClickHouse doesn't support IN operator on array columns
-    # works: select 1 in [1,2,3]
-    # fails: select * from tags t where 0 in t.ints
+    if clickhouse_version() >= [26, 7] do
+      assert TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints) == []
+      assert TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints) == [ints]
+      assert TestRepo.all(from t in Tag, where: ^0 in t.ints, select: t.ints) == []
+      assert TestRepo.all(from t in Tag, where: ^1 in t.ints, select: t.ints) == [ints]
+    else
+      # ClickHouse before 26.7 doesn't support IN operator on array columns
+      # works: select 1 in [1,2,3]
+      # fails: select * from tags t where 0 in t.ints
 
-    expected_error_message =
-      cond do
-        clickhouse_version() > [26] -> ~r/ILLEGAL_TYPE_OF_ARGUMENT/
-        clickhouse_version() > [24] -> ~r/UNSUPPORTED_METHOD/
-        true -> ~r/UNKNOWN_TABLE/
+      expected_error_message =
+        cond do
+          clickhouse_version() > [26] -> ~r/ILLEGAL_TYPE_OF_ARGUMENT/
+          clickhouse_version() > [24] -> ~r/UNSUPPORTED_METHOD/
+          true -> ~r/UNKNOWN_TABLE/
+        end
+
+      assert_raise Ch.Error, expected_error_message, fn ->
+        TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
       end
 
-    assert_raise Ch.Error, expected_error_message, fn ->
-      TestRepo.all(from t in Tag, where: 0 in t.ints, select: t.ints)
-    end
+      assert_raise Ch.Error, expected_error_message, fn ->
+        TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints)
+      end
 
-    assert_raise Ch.Error, expected_error_message, fn ->
-      TestRepo.all(from t in Tag, where: 1 in t.ints, select: t.ints)
-    end
+      assert_raise Ch.Error, expected_error_message, fn ->
+        TestRepo.all(from t in Tag, where: ^0 in t.ints, select: t.ints)
+      end
 
-    assert_raise Ch.Error, expected_error_message, fn ->
-      TestRepo.all(from t in Tag, where: ^0 in t.ints, select: t.ints)
-    end
-
-    assert_raise Ch.Error, expected_error_message, fn ->
-      TestRepo.all(from t in Tag, where: ^1 in t.ints, select: t.ints)
+      assert_raise Ch.Error, expected_error_message, fn ->
+        TestRepo.all(from t in Tag, where: ^1 in t.ints, select: t.ints)
+      end
     end
 
     # has(arr, el) can be used instead
