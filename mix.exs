@@ -10,7 +10,6 @@ defmodule EctoCh.MixProject do
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
-      test_paths: test_paths(System.get_env("INTEGRATION")),
       deps: deps(),
       name: "Ecto ClickHouse",
       description: "ClickHouse adapter for Ecto",
@@ -24,7 +23,7 @@ defmodule EctoCh.MixProject do
 
   # Run "mix help compile.app" to learn about applications.
   def application do
-    [extra_applications: extra_applications(Mix.env())]
+    [extra_applications: [:logger]]
   end
 
   def cli do
@@ -42,12 +41,6 @@ defmodule EctoCh.MixProject do
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
-
-  defp test_paths(nil), do: ["test"]
-  defp test_paths(_any), do: ["integration_test"]
-
-  defp extra_applications(:test), do: [:logger, :inets]
-  defp extra_applications(_), do: [:logger]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
