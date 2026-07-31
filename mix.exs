@@ -56,7 +56,6 @@ defmodule EctoCh.MixProject do
       {:ecto_sql, "~> 3.14.0"},
       {:dialyxir, "~> 1.2", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :docs},
-      {:rexbug, "~> 1.0", only: [:dev, :test]},
       {:tz, "~> 0.28.1", only: [:dev, :test]},
       {:excoveralls, "~> 0.18.5", only: :test}
     ]
