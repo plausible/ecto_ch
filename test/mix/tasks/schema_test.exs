@@ -183,6 +183,14 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
   end
 
   describe "run/1 custom repo flags" do
+    test "requires a table name" do
+      assert_raise ArgumentError,
+                   ~s(missing table name, got only options: ["--repo", "SomeRepo"]),
+                   fn ->
+                     Mix.Tasks.Ecto.Ch.Schema.run(["--repo", "SomeRepo"])
+                   end
+    end
+
     test "-r" do
       schema =
         capture_io(fn ->
