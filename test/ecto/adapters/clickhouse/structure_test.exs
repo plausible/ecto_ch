@@ -233,6 +233,39 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
                (2,'#{inserted_at_2}');
                """
     end
+
+    test "dumps and loads an empty migration history" do
+      database = "ecto_ch_temp_structure_no_migrations"
+      opts = [database: database]
+
+      assert :ok = ClickHouse.storage_up(opts)
+      on_exit(fn -> ClickHouse.storage_down(opts) end)
+
+      Application.put_env(:structure_test, Repo,
+        database: database,
+        show_sensitive_data_on_connection_error: true
+      )
+
+      on_exit(fn -> Application.delete_env(:structure_test, Repo) end)
+
+      start_supervised!(Repo)
+
+      assert [] == Ecto.Migrator.run(Repo, [], :up, all: true, log: false)
+
+      tmp = System.tmp_dir!()
+
+      assert {:ok, path} = ClickHouse.structure_dump(tmp, opts)
+      on_exit(fn -> File.rm!(path) end)
+
+      structure = File.read!(path)
+
+      refute structure =~ "INSERT INTO"
+
+      Repo.query!("DROP TABLE schema_migrations")
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+      assert Repo.query!("SELECT * FROM schema_migrations").rows == []
+    end
   end
 
   describe "structure_load/2" do
