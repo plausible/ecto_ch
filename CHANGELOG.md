@@ -4,6 +4,7 @@
 
 - Require a table name when running `ecto.ch.schema` with repo options https://github.com/plausible/ecto_ch/pull/291
 - Fix invalid `MODIFY COLUMN` SQL when setting a column default https://github.com/plausible/ecto_ch/pull/290
+- Fix invalid structure dumps when the schema migration history is empty https://github.com/plausible/ecto_ch/pull/294
 
 ## 0.10.0 (2026-06-02)
 
