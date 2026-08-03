@@ -2867,6 +2867,18 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
+  test "alter column modifies default" do
+    alter =
+      {:alter, table(:posts),
+       [
+         {:modify, :price, :UInt64, [default: 1]}
+       ]}
+
+    assert execute_ddl(alter) == [
+             ~s{ALTER TABLE "posts" MODIFY COLUMN "price" UInt64 DEFAULT 1}
+           ]
+  end
+
   test "alter table removes column" do
     alteration = {
       :alter,

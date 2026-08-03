@@ -344,7 +344,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
       @conn.quote_name(name),
       ?\s,
       column_type(type),
-      modify_default(name, type, opts),
+      modify_default(type, opts),
       modify_null(name, opts),
       comment_expr(Keyword.get(opts, :comment))
     ]
@@ -366,10 +366,10 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     end
   end
 
-  defp modify_default(name, type, opts) do
+  defp modify_default(type, opts) do
     case Keyword.fetch(opts, :default) do
       {:ok, _val} = ok ->
-        [" ADD ", default_expr(ok, type), " FOR ", @conn.quote_name(name)]
+        default_expr(ok, type)
 
       :error ->
         []

@@ -53,6 +53,27 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
     end
   end
 
+  defmodule CreateProducts do
+    use Ecto.Migration
+
+    def change do
+      create table(:products, primary_key: false, engine: "Memory") do
+        add :name, :string
+        add :price, :UInt64
+      end
+    end
+  end
+
+  defmodule AddPriceDefault do
+    use Ecto.Migration
+
+    def change do
+      alter table(:products) do
+        modify :price, :UInt64, default: 1
+      end
+    end
+  end
+
   test "events (table+index)" do
     database = "ecto_ch_migration_test_events"
     opts = [database: database]
@@ -143,5 +164,35 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
                """
              ]
            ]
+  end
+
+  test "modify column default" do
+    database = "ecto_ch_migration_test_modify_default"
+    opts = [database: database]
+
+    assert :ok = ClickHouse.storage_up(opts)
+    on_exit(fn -> ClickHouse.storage_down(opts) end)
+
+    Application.put_env(:migration_test, MigrationRepo,
+      database: database,
+      show_sensitive_data_on_connection_error: true
+    )
+
+    on_exit(fn -> Application.delete_env(:migration_test, MigrationRepo) end)
+
+    start_supervised!(MigrationRepo)
+
+    assert [1, 2] ==
+             Ecto.Migrator.run(MigrationRepo, [{1, CreateProducts}, {2, AddPriceDefault}], :up,
+               all: true,
+               log: false
+             )
+
+    conn = start_supervised!({Ch, opts})
+
+    assert %{num_rows: 1} =
+             Ch.query!(conn, "INSERT INTO products (name) VALUES ('book')")
+
+    assert [[1]] == Ch.query!(conn, "SELECT price FROM products").rows
   end
 end

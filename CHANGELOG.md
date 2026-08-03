@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Require a table name when running `ecto.ch.schema` with repo options https://github.com/plausible/ecto_ch/pull/291
+- Fix invalid `MODIFY COLUMN` SQL when setting a column default https://github.com/plausible/ecto_ch/pull/290
 
 ## 0.10.0 (2026-06-02)
 
