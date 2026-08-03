@@ -386,6 +386,33 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
              """
     end
 
+    test "loads statements with semicolons in strings and comments", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      File.write!(path, """
+      -- A line comment containing a semicolon;
+      CREATE TABLE string_default
+      (
+          `value` String DEFAULT 'one;two'
+      )
+      ENGINE = TinyLog;
+
+      /* A block comment containing a semicolon; */
+      CREATE TABLE after_comments
+      (
+          `value` UInt8
+      )
+      ENGINE = TinyLog;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+
+      assert show_create_table("string_default") =~ "DEFAULT 'one;two'"
+      assert show_create_table("after_comments") =~ "CREATE TABLE"
+    end
+
     defp show_create_table(table) do
       IO.iodata_to_binary(Repo.query!("SHOW CREATE TABLE #{table}").rows)
     end
