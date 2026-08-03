@@ -97,7 +97,16 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   defp insert(prefix, table, header, rows, on_conflict, returning, placeholders \\ []) do
-    Connection.insert(prefix, table, header, rows, on_conflict, returning, placeholders)
+    apply(Connection, :insert, [
+      prefix,
+      table,
+      header,
+      rows,
+      on_conflict,
+      returning,
+      placeholders,
+      []
+    ])
     |> IO.iodata_to_binary()
   end
 
@@ -113,6 +122,102 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query
     |> Connection.execute_ddl()
     |> Enum.map(&IO.iodata_to_binary/1)
+  end
+
+  describe "configuration" do
+    test "builds Ch start options only from endpoint and pool size" do
+      assert Connection.start_options(
+               scheme: "https",
+               hostname: "clickhouse.example",
+               port: 9440,
+               pool_size: 7,
+               headers: [{"x-clickhouse-role", "readonly"}],
+               settings: %{max_threads: 1}
+             ) == [pool_size: 7, url: "https://clickhouse.example:9440"]
+    end
+
+    test "keeps repo config in adapter metadata" do
+      config = [
+        repo: __MODULE__,
+        telemetry_prefix: [:ecto_ch, :test],
+        scheme: "https",
+        hostname: "clickhouse.example",
+        port: 9440,
+        pool_size: 7,
+        database: "analytics",
+        headers: [{"x-clickhouse-role", "readonly"}],
+        settings: %{"max_threads" => 1}
+      ]
+
+      assert {:ok, %{start: {Ch, :start_link, [start_opts]}}, meta} = ClickHouse.init(config)
+      assert start_opts == [pool_size: 7, url: "https://clickhouse.example:9440"]
+      assert meta.opts[:database] == "analytics"
+      assert meta.opts[:headers] == [{"x-clickhouse-role", "readonly"}]
+      assert meta.opts[:settings] == %{"max_threads" => 1}
+    end
+  end
+
+  describe "SQL connection callbacks" do
+    test "prepare_execute returns a reusable cached query" do
+      conn = start_supervised!({Ch, Connection.start_options([])})
+      opts = Connection.config_options([])
+
+      assert {:ok, cached, result} =
+               Connection.prepare_execute(conn, "ecto_1", "SELECT {$0:UInt8}", [1], opts)
+
+      assert cached == %{statement: "SELECT {$0:UInt8}"}
+      assert result.rows == [[1]]
+      assert result.num_rows == 1
+
+      assert {:ok, ^cached, result} = Connection.execute(conn, cached, [2], opts)
+      assert result.rows == [[2]]
+      assert result.num_rows == 1
+    end
+
+    test "prepare_execute and execute return query errors" do
+      conn = start_supervised!({Ch, Connection.start_options([])})
+
+      assert {:error, %Ch.Error{code: prepare_code}} =
+               Connection.prepare_execute(conn, "ecto_1", "invalid query", [], [])
+
+      assert is_integer(prepare_code)
+
+      assert {:error, %Ch.Error{code: execute_code}} =
+               Connection.execute(conn, %{statement: "invalid query"}, [], [])
+
+      assert is_integer(execute_code)
+    end
+
+    test "unsupported callbacks raise" do
+      assert_raise RuntimeError, "not implemented", fn ->
+        Connection.query_many(:conn, "SELECT 1", [], [])
+      end
+
+      assert_raise RuntimeError, "not implemented", fn ->
+        Connection.stream(:conn, "SELECT 1", [], [])
+      end
+
+      assert_raise RuntimeError, "not implemented", fn ->
+        Connection.to_constraints(%RuntimeError{}, [])
+      end
+    end
+
+    test "query accepts adapter options from repo config and callbacks" do
+      conn = start_supervised!({Ch, Connection.start_options([])})
+
+      opts = [
+        database: "system",
+        headers: [{"x-clickhouse-user", "default"}],
+        password: "",
+        settings: %{"max_threads" => 1},
+        timeout: 10_000,
+        username: "default"
+      ]
+
+      assert {:ok, result} = Connection.query(conn, "SELECT {value:UInt8}", %{"value" => 3}, opts)
+      assert result.rows == [[3]]
+      assert result.num_rows == 1
+    end
   end
 
   test "from" do
