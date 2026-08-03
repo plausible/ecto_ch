@@ -121,10 +121,6 @@ defmodule EctoCh.Test do
     {IO.iodata_to_binary(f.(query, dump_params)), dump_params}
   end
 
-  def i(query) do
-    IO.inspect(Map.from_struct(query), limit: :infinity)
-  end
-
   test "to_sql" do
     user_id = 1
     query = "example" |> where([e], e.user_id == ^user_id) |> select([e], e.name)

@@ -106,7 +106,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         %Ecto.Query.SelectExpr{expr: {:merge, _, [{:&, _, [_]}, {:%{}, _, args}]}} ->
           fields = Keyword.keys(types)
           merged = Enum.map(args, &elem(&1, 0))
-          Enum.uniq(fields ++ merged) |> IO.inspect()
+          Enum.uniq(fields ++ merged)
 
         _ ->
           raise ArgumentError, """
