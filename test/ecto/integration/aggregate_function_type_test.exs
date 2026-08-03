@@ -139,9 +139,6 @@ defmodule Ecto.Integration.AggregateFunctionTypeTest do
         [uid: 1231, updated: ~N[2020-01-01 00:00:00], name: "John"]
       ]
 
-      # Rexbug.start("Ch :: return", msgs: 10000)
-      # on_exit(fn -> :timer.sleep(100) end)
-
       assert {2, _} = TestRepo.insert_all(UserInput, rows, input: input)
 
       assert "agg_test_users"
