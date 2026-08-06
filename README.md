@@ -11,7 +11,7 @@ Uses [Ch](https://github.com/plausible/ch) as driver.
 ```elixir
 defp deps do
   [
-    {:ecto_ch, "~> 0.10.0"}
+    {:ecto_ch, "~> 0.11.0"}
   ]
 end
 ```
@@ -80,8 +80,8 @@ For schemaless inserts `:types` option with a mapping of `field->type` needs to 
 ```elixir
 types = [
   number: "UInt32",
-  # or `number: :u32`
-  # or `number: Ch.Types.u32()`
+  name: :string,
+  maybe_name: "Nullable(String)",
   # etc.
 ]
 
@@ -93,9 +93,9 @@ MyApp.Repo.insert_all("example", rows, types: types)
 `:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweight [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) global [FINAL](https://clickhouse.com/docs/en/operations/settings/settings#final) modifier, and [more:](https://clickhouse.com/docs/en/operations/settings/settings)
 
 ```elixir
-MyApp.Repo.insert_all(MyApp.Example, rows, settings: [async_insert: 1])
-MyApp.Repo.delete_all("example", settings: [allow_experimental_lightweight_delete: 1])
-MyApp.Repo.all(MyApp.AggregatedExample, settings: [final: 1])
+MyApp.Repo.insert_all(MyApp.Example, rows, settings: %{"async_insert" => 1})
+MyApp.Repo.delete_all("example", settings: %{"allow_experimental_lightweight_delete" => 1})
+MyApp.Repo.all(MyApp.AggregatedExample, settings: %{"final" => 1})
 ```
 
 #### Migrations
@@ -157,7 +157,3 @@ For `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [c
 `DEFAULT` expressions on columns are ignored when inserting RowBinary.
 
 [See Ch for more details and an example.](https://github.com/plausible/ch#null-in-rowbinary)
-
-## Benchmarks
-
-[See Ch for benchmarks.](https://github.com/plausible/ch#benchmarks)

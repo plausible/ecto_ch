@@ -9,44 +9,42 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   @parent_as __MODULE__
 
-  @impl true
-  def child_spec(opts) do
-    Ch.child_spec(opts)
+  @impl Ecto.Adapters.SQL.Connection
+  def child_spec(options) do
+    Ch.child_spec(options)
   end
 
-  @impl true
-  def prepare_execute(conn, _name, statement, params, opts) do
-    query = Ch.Query.build(statement, opts[:command])
-    DBConnection.prepare_execute(conn, query, params, opts)
+  @impl Ecto.Adapters.SQL.Connection
+  def prepare_execute(_conn, _name, _statement, _params, _opts) do
+    raise "not implemented"
   end
 
-  @impl true
-  def execute(conn, query, params, opts) do
-    DBConnection.execute(conn, query, params, opts)
+  @impl Ecto.Adapters.SQL.Connection
+  def execute(_conn, _query, _params, _opts) do
+    raise "not implemented"
   end
 
-  # TODO what should be done about transactions? probably will need to build custom Repo.stream
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def query(conn, statement, params, opts) do
     Ch.query(conn, statement, params, opts)
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def query_many(_conn, _statement, _params, _opts) do
     raise "not implemented"
   end
 
-  @impl true
-  def stream(conn, statement, params, opts) do
-    Ch.stream(conn, statement, params, opts)
+  @impl Ecto.Adapters.SQL.Connection
+  def stream(_conn, _statement, _params, _opts) do
+    raise "not implemented"
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def to_constraints(_exception, _opts) do
     raise "not implemented"
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def all(query, params \\ [], as_prefix \\ []) do
     if Map.get(query, :lock) do
       raise ArgumentError, "ClickHouse does not support locks"
@@ -84,12 +82,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @dialyzer {:no_return, update_all: 1, update_all: 2}
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def update_all(query, _prefix \\ nil) do
     raise Ecto.QueryError,
       query: query,
-      message:
-        "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
+      message: "ClickHouse does not support UPDATE statements"
   end
 
   # https://clickhouse.com/docs/en/sql-reference/statements/alter/update
@@ -99,22 +96,19 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     unless query.joins == [] do
       raise Ecto.QueryError,
         query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements"
+        message: "ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements"
     end
 
     if query.select do
       raise Ecto.QueryError,
         query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements"
+        message: "ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements"
     end
 
     if query.with_ctes do
       raise Ecto.QueryError,
         query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support CTEs in ALTER TABLE ... UPDATE statements"
+        message: "ClickHouse does not support CTEs in ALTER TABLE ... UPDATE statements"
     end
 
     %{sources: sources} = query
@@ -166,10 +160,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp update_op(command, _quoted_key, _value, _sources, _params, query) do
     raise Ecto.QueryError,
       query: query,
-      message: "Ecto.Adapters.ClickHouse does not support update operation #{inspect(command)}"
+      message: "ClickHouse does not support update operation #{inspect(command)}"
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def delete_all(query, params \\ []) do
     unless query.joins == [] do
       raise Ecto.QueryError,
@@ -201,21 +195,21 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["DELETE FROM ", quote_table(prefix, table) | where]
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def ddl_logs(_), do: []
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def table_exists_query(table) do
-    {"SELECT name FROM system.tables WHERE name={$0:String} AND database=currentDatabase() LIMIT 1",
-     [table]}
+    {"SELECT name FROM system.tables WHERE name = {table:String} AND database = currentDatabase() LIMIT 1",
+     %{"table" => table}}
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def execute_ddl(command) do
     Ecto.Adapters.ClickHouse.Migration.execute_ddl(command)
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def insert(prefix, table, header, rows, _on_conflict, returning, _placeholders) do
     unless returning == [] do
       raise ArgumentError, "ClickHouse does not support RETURNING on INSERT statements"
@@ -241,13 +235,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def update(_prefix, _table, _fields, _filters, _returning) do
     raise ArgumentError,
           "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   # https://clickhouse.com/docs/en/sql-reference/statements/delete
   def delete(prefix, table, filters, returning) do
     unless returning == [] do
@@ -268,7 +262,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["DELETE FROM ", quote_table(prefix, table), " WHERE ", filters]
   end
 
-  @impl true
+  @impl Ecto.Adapters.SQL.Connection
   def explain_query(conn, query, params, opts) do
     explain =
       case Keyword.get(opts, :type, :plan) do
