@@ -97,7 +97,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   defp insert(prefix, table, header, rows, on_conflict, returning, placeholders \\ []) do
-    Connection.insert(prefix, table, header, rows, on_conflict, returning, placeholders)
+    Connection.insert(prefix, table, header, rows, on_conflict, returning, placeholders, [])
     |> IO.iodata_to_binary()
   end
 
