@@ -105,6 +105,8 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
         %{"database" => database, "table" => "events"}
       ).rows
 
+    # ClickHouse 24.5 omits parentheses around single-column index expressions.
+    # Remove this normalization when 24.5 is dropped from the CI matrix.
     create_table_query =
       String.replace(
         create_table_query,
