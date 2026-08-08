@@ -16,11 +16,11 @@ jobs:
     strategy:
       matrix:
         include:
-          # some old elixir version with the minimum supported OTP
-          # see https://hexdocs.pm/elixir/compatibility-and-deprecations.html#between-elixir-and-erlang-otp
-          - elixir: "1.18"
-            otp: "28"
-            clickhouse: "latest"
+          # some old elixir/erlang and pre-JSON ClickHouse versions
+          # https://github.com/plausible/ch/issues/273
+          - elixir: "1.15"
+            otp: "25"
+            clickhouse: "24.5.4.49"
 
           # the latest versions with all static checks
           - elixir: ">0"
@@ -29,6 +29,13 @@ jobs:
             dialyzer: true
             lint: true
             coverage: true
+
+          # Plausible versions
+          # - https://github.com/plausible/analytics/blob/master/.tool-versions
+          # - https://github.com/plausible/analytics/blob/master/.github/workflows/elixir.yml
+          - elixir: "1.20.2"
+            otp: "28.5.0.3"
+            clickhouse: "25.11.5.8"
 
     services:
       clickhouse:
