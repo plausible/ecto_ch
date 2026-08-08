@@ -690,6 +690,9 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
     # 1	a2	0
     # 3	a4	0
 
+    # Before https://github.com/ClickHouse/ClickHouse/commit/8b56afcc05fd95cac083fb64f055c65883075547,
+    # ClickHouse copied unmatched left keys into the right key column. Newer versions return
+    # the right column's type default, so accept both results while CI covers both behaviors.
     assert TestRepo.all(
              from t1 in "semi_anti_t1",
                left_join: t2 in "semi_anti_t2",
