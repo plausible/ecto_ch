@@ -12,9 +12,7 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
          {:ok, queries} <- File.read(path) do
       multiquery_result =
         queries
-        |> String.split(";", trim: true)
-        |> Enum.map(&String.trim/1)
-        |> Enum.reject(&(&1 == ""))
+        |> split_statements()
         |> Enum.reduce_while({:ok, _prev_result = nil, conn}, fn
           query, {:ok, _prev_result, conn} -> {:cont, exec(conn, query)}
           _query, {:error, _reason} = error -> {:halt, error}
@@ -24,6 +22,78 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
         {:ok, _last_result, _conn} -> {:ok, path}
         {:error, reason} -> {:error, Exception.message(reason)}
       end
+    end
+  end
+
+  defp split_statements(sql) do
+    sql
+    |> split_statements(:sql, [], [])
+    |> Enum.reverse()
+  end
+
+  defp split_statements(<<>>, _state, statement, statements) do
+    add_statement(statements, statement)
+  end
+
+  defp split_statements(<<?;, rest::binary>>, :sql, statement, statements) do
+    split_statements(rest, :sql, [], add_statement(statements, statement))
+  end
+
+  defp split_statements(<<"--", rest::binary>>, :sql, statement, statements) do
+    split_statements(rest, :line_comment, ["--" | statement], statements)
+  end
+
+  defp split_statements(<<?#, rest::binary>>, :sql, statement, statements) do
+    split_statements(rest, :line_comment, [?# | statement], statements)
+  end
+
+  defp split_statements(<<"/*", rest::binary>>, :sql, statement, statements) do
+    split_statements(rest, :block_comment, ["/*" | statement], statements)
+  end
+
+  defp split_statements(<<quote, rest::binary>>, :sql, statement, statements)
+       when quote in [?\', ?\", ?`] do
+    split_statements(rest, {:quoted, quote}, [quote | statement], statements)
+  end
+
+  defp split_statements(
+         <<?\\, char, rest::binary>>,
+         {:quoted, _quote} = state,
+         statement,
+         statements
+       ) do
+    split_statements(rest, state, [char, ?\\ | statement], statements)
+  end
+
+  defp split_statements(
+         <<quote, quote, rest::binary>>,
+         {:quoted, quote} = state,
+         statement,
+         statements
+       ) do
+    split_statements(rest, state, [quote, quote | statement], statements)
+  end
+
+  defp split_statements(<<quote, rest::binary>>, {:quoted, quote}, statement, statements) do
+    split_statements(rest, :sql, [quote | statement], statements)
+  end
+
+  defp split_statements(<<?\n, rest::binary>>, :line_comment, statement, statements) do
+    split_statements(rest, :sql, [?\n | statement], statements)
+  end
+
+  defp split_statements(<<"*/", rest::binary>>, :block_comment, statement, statements) do
+    split_statements(rest, :sql, ["*/" | statement], statements)
+  end
+
+  defp split_statements(<<char, rest::binary>>, state, statement, statements) do
+    split_statements(rest, state, [char | statement], statements)
+  end
+
+  defp add_statement(statements, statement) do
+    case statement |> Enum.reverse() |> IO.iodata_to_binary() |> String.trim() do
+      "" -> statements
+      statement -> [statement | statements]
     end
   end
 
