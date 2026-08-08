@@ -28,7 +28,6 @@ jobs:
             clickhouse: "latest"
             dialyzer: true
             lint: true
-            coverage: true
 
     services:
       clickhouse:
@@ -82,12 +81,6 @@ jobs:
         if: ${{ matrix.lint }}
 
       - run: mix test
-        if: ${{ !matrix.coverage || github.event_name == 'schedule' }}
-
-      - run: mix coveralls.github
-        if: ${{ matrix.coverage && github.event_name != 'schedule' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore PLTs cache
         if: ${{ matrix.dialyzer }}
