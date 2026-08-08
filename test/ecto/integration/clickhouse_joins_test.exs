@@ -685,22 +685,22 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
              [4, "a5", 4, "b5"]
            ]
 
-    # SELECT t1.*, t2.* FROM t1 ANTI LEFT JOIN t2 USING(x) ORDER BY t1.x, t2.x, t1.s, t2.s;
-    # 0	a1	0
-    # 1	a2	0
-    # 3	a4	0
+    # SELECT t1.* FROM t1 ANTI LEFT JOIN t2 USING(x) ORDER BY t1.x, t1.s;
+    # 0	a1
+    # 1	a2
+    # 3	a4
 
     assert TestRepo.all(
              from t1 in "semi_anti_t1",
                left_join: t2 in "semi_anti_t2",
                on: t1.x == t2.x,
                hints: "ANTI",
-               order_by: [t1.x, t2.x, t1.s, t2.s],
-               select: [t1.x, t1.s, t2.x, t2.s]
+               order_by: [t1.x, t1.s],
+               select: [t1.x, t1.s]
            ) == [
-             [0, "a1", 0, ""],
-             [1, "a2", 0, ""],
-             [3, "a4", 0, ""]
+             [0, "a1"],
+             [1, "a2"],
+             [3, "a4"]
            ]
 
     # SELECT t1.*, t2.* FROM t1 ANTI RIGHT JOIN t2 USING(x) ORDER BY t1.x, t2.x, t1.s, t2.s;

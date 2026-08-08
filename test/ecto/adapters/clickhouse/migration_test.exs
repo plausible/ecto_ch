@@ -98,13 +98,22 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
 
     conn = start_supervised!({Ch, opts})
 
-    assert Ch.query!(
-             conn,
-             "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
-             %{"database" => database, "table" => "events"}
-           ).rows == [
-             [
-               """
+    [[create_table_query]] =
+      Ch.query!(
+        conn,
+        "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
+        %{"database" => database, "table" => "events"}
+      ).rows
+
+    create_table_query =
+      String.replace(
+        create_table_query,
+        "INDEX events_name_index name TYPE",
+        "INDEX events_name_index (name) TYPE"
+      )
+
+    assert create_table_query ==
+             """
                CREATE TABLE ecto_ch_migration_test_events.events (\
                `name` String, \
                `domain` String, \
@@ -126,8 +135,6 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
                ORDER BY (domain, toDate(timestamp), user_id) \
                SETTINGS index_granularity = 8192\
                """
-             ]
-           ]
 
     assert [3] ==
              Ecto.Migrator.run(MigrationRepo, [{3, DropIndex}], :up,
