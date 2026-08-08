@@ -114,27 +114,27 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
 
     assert create_table_query ==
              """
-               CREATE TABLE ecto_ch_migration_test_events.events (\
-               `name` String, \
-               `domain` String, \
-               `user_id` UInt64, \
-               `session_id` UInt64, \
-               `hostname` String, \
-               `pathname` String, \
-               `referrer` String, \
-               `referrer_source` String, \
-               `country_code` LowCardinality(FixedString(2)), \
-               `screen_size` LowCardinality(String), \
-               `operating_system` LowCardinality(String), \
-               `browser` LowCardinality(String), \
-               `timestamp` DateTime, \
-               INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
-               ) \
-               ENGINE = MergeTree \
-               PARTITION BY toYYYYMM(timestamp) \
-               ORDER BY (domain, toDate(timestamp), user_id) \
-               SETTINGS index_granularity = 8192\
-               """
+             CREATE TABLE ecto_ch_migration_test_events.events (\
+             `name` String, \
+             `domain` String, \
+             `user_id` UInt64, \
+             `session_id` UInt64, \
+             `hostname` String, \
+             `pathname` String, \
+             `referrer` String, \
+             `referrer_source` String, \
+             `country_code` LowCardinality(FixedString(2)), \
+             `screen_size` LowCardinality(String), \
+             `operating_system` LowCardinality(String), \
+             `browser` LowCardinality(String), \
+             `timestamp` DateTime, \
+             INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
+             ) \
+             ENGINE = MergeTree \
+             PARTITION BY toYYYYMM(timestamp) \
+             ORDER BY (domain, toDate(timestamp), user_id) \
+             SETTINGS index_granularity = 8192\
+             """
 
     assert [3] ==
              Ecto.Migrator.run(MigrationRepo, [{3, DropIndex}], :up,
