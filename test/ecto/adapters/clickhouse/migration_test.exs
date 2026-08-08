@@ -98,36 +98,45 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
 
     conn = start_supervised!({Ch, opts})
 
-    assert Ch.query!(
-             conn,
-             "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
-             %{"database" => database, "table" => "events"}
-           ).rows == [
-             [
-               """
-               CREATE TABLE ecto_ch_migration_test_events.events (\
-               `name` String, \
-               `domain` String, \
-               `user_id` UInt64, \
-               `session_id` UInt64, \
-               `hostname` String, \
-               `pathname` String, \
-               `referrer` String, \
-               `referrer_source` String, \
-               `country_code` LowCardinality(FixedString(2)), \
-               `screen_size` LowCardinality(String), \
-               `operating_system` LowCardinality(String), \
-               `browser` LowCardinality(String), \
-               `timestamp` DateTime, \
-               INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
-               ) \
-               ENGINE = MergeTree \
-               PARTITION BY toYYYYMM(timestamp) \
-               ORDER BY (domain, toDate(timestamp), user_id) \
-               SETTINGS index_granularity = 8192\
-               """
-             ]
-           ]
+    [[create_table_query]] =
+      Ch.query!(
+        conn,
+        "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
+        %{"database" => database, "table" => "events"}
+      ).rows
+
+    # ClickHouse 24.5 omits parentheses around single-column index expressions.
+    # Remove this normalization when 24.5 is dropped from the CI matrix.
+    create_table_query =
+      String.replace(
+        create_table_query,
+        "INDEX events_name_index name TYPE",
+        "INDEX events_name_index (name) TYPE"
+      )
+
+    assert create_table_query ==
+             """
+             CREATE TABLE ecto_ch_migration_test_events.events (\
+             `name` String, \
+             `domain` String, \
+             `user_id` UInt64, \
+             `session_id` UInt64, \
+             `hostname` String, \
+             `pathname` String, \
+             `referrer` String, \
+             `referrer_source` String, \
+             `country_code` LowCardinality(FixedString(2)), \
+             `screen_size` LowCardinality(String), \
+             `operating_system` LowCardinality(String), \
+             `browser` LowCardinality(String), \
+             `timestamp` DateTime, \
+             INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
+             ) \
+             ENGINE = MergeTree \
+             PARTITION BY toYYYYMM(timestamp) \
+             ORDER BY (domain, toDate(timestamp), user_id) \
+             SETTINGS index_granularity = 8192\
+             """
 
     assert [3] ==
              Ecto.Migrator.run(MigrationRepo, [{3, DropIndex}], :up,
