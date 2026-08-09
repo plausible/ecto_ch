@@ -48,7 +48,17 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   end
 
   defp split_statements(<<"/*", rest::binary>>, :sql, statement, statements) do
-    split_statements(rest, :block_comment, ["/*" | statement], statements)
+    split_statements(rest, {:block_comment, 1}, ["/*" | statement], statements)
+  end
+
+  defp split_statements(<<?$, rest::binary>>, :sql, statement, statements) do
+    case heredoc_delimiter(rest) do
+      {:ok, delimiter, rest} ->
+        split_statements(rest, {:heredoc, delimiter}, [delimiter | statement], statements)
+
+      :error ->
+        split_statements(rest, :sql, [?$ | statement], statements)
+    end
   end
 
   defp split_statements(<<quote, rest::binary>>, :sql, statement, statements)
@@ -82,13 +92,73 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     split_statements(rest, :sql, [?\n | statement], statements)
   end
 
-  defp split_statements(<<"*/", rest::binary>>, :block_comment, statement, statements) do
+  defp split_statements(
+         <<"/*", rest::binary>>,
+         {:block_comment, depth},
+         statement,
+         statements
+       ) do
+    split_statements(rest, {:block_comment, depth + 1}, ["/*" | statement], statements)
+  end
+
+  defp split_statements(
+         <<"*/", rest::binary>>,
+         {:block_comment, 1},
+         statement,
+         statements
+       ) do
     split_statements(rest, :sql, ["*/" | statement], statements)
+  end
+
+  defp split_statements(
+         <<"*/", rest::binary>>,
+         {:block_comment, depth},
+         statement,
+         statements
+       ) do
+    split_statements(rest, {:block_comment, depth - 1}, ["*/" | statement], statements)
+  end
+
+  defp split_statements(sql, {:heredoc, delimiter} = state, statement, statements) do
+    delimiter_size = byte_size(delimiter)
+
+    case sql do
+      <<^delimiter::binary-size(^delimiter_size), rest::binary>> ->
+        split_statements(rest, :sql, [delimiter | statement], statements)
+
+      <<char, rest::binary>> ->
+        split_statements(rest, state, [char | statement], statements)
+    end
   end
 
   defp split_statements(<<char, rest::binary>>, state, statement, statements) do
     split_statements(rest, state, [char | statement], statements)
   end
+
+  defp heredoc_delimiter(rest) do
+    case :binary.match(rest, "$") do
+      {tag_size, 1} ->
+        <<tag::binary-size(^tag_size), ?$, rest::binary>> = rest
+
+        if valid_heredoc_tag?(tag) do
+          {:ok, "$" <> tag <> "$", rest}
+        else
+          :error
+        end
+
+      :nomatch ->
+        :error
+    end
+  end
+
+  defp valid_heredoc_tag?(<<>>), do: true
+
+  defp valid_heredoc_tag?(<<char, rest::binary>>)
+       when char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char == ?_ do
+    valid_heredoc_tag?(rest)
+  end
+
+  defp valid_heredoc_tag?(_tag), do: false
 
   defp add_statement(statements, statement) do
     case statement |> Enum.reverse() |> IO.iodata_to_binary() |> String.trim() do

@@ -413,6 +413,54 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       assert show_create_table("after_comments") =~ "CREATE TABLE"
     end
 
+    test "loads statements with semicolons in heredoc strings", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      File.write!(path, """
+      CREATE TABLE heredoc_defaults
+      (
+          `empty_tag` String DEFAULT $$one;two$$,
+          `named_tag` String DEFAULT $tag$three;four$tag$
+      )
+      ENGINE = TinyLog;
+
+      CREATE TABLE after_heredoc
+      (
+          `value` UInt8
+      )
+      ENGINE = TinyLog;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+
+      assert show_create_table("heredoc_defaults") =~ "DEFAULT 'one;two'"
+      assert show_create_table("heredoc_defaults") =~ "DEFAULT 'three;four'"
+      assert show_create_table("after_heredoc") =~ "CREATE TABLE"
+    end
+
+    test "loads statements with semicolons in nested block comments", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      File.write!(path, """
+      /* An outer block comment
+         /* containing a nested block comment */
+         and a semicolon;
+      */
+      CREATE TABLE after_nested_comment
+      (
+          `value` UInt8
+      )
+      ENGINE = TinyLog;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+      assert show_create_table("after_nested_comment") =~ "CREATE TABLE"
+    end
+
     defp show_create_table(table) do
       IO.iodata_to_binary(Repo.query!("SHOW CREATE TABLE #{table}").rows)
     end
