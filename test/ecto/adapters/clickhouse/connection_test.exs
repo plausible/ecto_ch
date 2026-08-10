@@ -776,6 +776,21 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT true FROM `schema` AS s0 WHERE (s0.`foo` = '''')]
   end
 
+  test "quoted identifier escape" do
+    assert Connection.quote_name(~s{has`tick}) |> IO.iodata_to_binary() ==
+             ~s{`has\\`tick`}
+
+    assert Connection.quote_name(~s{has\\slash}) |> IO.iodata_to_binary() ==
+             ~s{`has\\\\slash`}
+
+    assert Connection.quote_name(~s{has"quote}, ?") |> IO.iodata_to_binary() ==
+             ~s{"has\\"quote"}
+
+    query = insert(nil, ~s{schema`quoted}, [~s{field`quoted}], [], :raise, [])
+
+    assert query == ~s{INSERT INTO `schema\\`quoted`(`field\\`quoted`)}
+  end
+
   test "binary ops" do
     query = Schema |> select([r], r.x == 2)
     assert all(query) == ~s[SELECT s0.`x` = 2 FROM `schema` AS s0]
