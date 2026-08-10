@@ -1017,7 +1017,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
-  def quote_name(name, quoter \\ ?")
+  def quote_name(name, quoter \\ ?`)
   def quote_name(nil, _), do: []
 
   def quote_name(names, quoter) when is_list(names) do

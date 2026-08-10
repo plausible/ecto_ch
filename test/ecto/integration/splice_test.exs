@@ -11,11 +11,11 @@ defmodule Ecto.Integration.SpliceTest do
       from e in fragment("VALUES(?)", splice(^values)), select: e.c1
 
     assert TestRepo.to_sql(:all, query) ==
-             {~s[SELECT f0."c1" FROM VALUES({$0:String},{$1:String},{$2:String},{$3:String}) AS f0],
+             {~s[SELECT f0.`c1` FROM VALUES({$0:String},{$1:String},{$2:String},{$3:String}) AS f0],
               ["one", "two", "three", "four"]}
 
     assert TestRepo.to_inline_sql(:all, query) ==
-             ~s[SELECT f0."c1" FROM VALUES('one','two','three','four') AS f0]
+             ~s[SELECT f0.`c1` FROM VALUES('one','two','three','four') AS f0]
 
     assert TestRepo.all(query) == ["one", "two", "three", "four"]
 
@@ -24,11 +24,11 @@ defmodule Ecto.Integration.SpliceTest do
         select: %{hash: fragment("cityHash64(?)", e.c1)}
 
     assert TestRepo.to_sql(:all, query) ==
-             {~s[SELECT cityHash64(f0."c1") FROM VALUES({$0:String},{$1:String},{$2:String},{$3:String}) AS f0],
+             {~s[SELECT cityHash64(f0.`c1`) FROM VALUES({$0:String},{$1:String},{$2:String},{$3:String}) AS f0],
               ["one", "two", "three", "four"]}
 
     assert TestRepo.to_inline_sql(:all, query) ==
-             ~s[SELECT cityHash64(f0."c1") FROM VALUES('one','two','three','four') AS f0]
+             ~s[SELECT cityHash64(f0.`c1`) FROM VALUES('one','two','three','four') AS f0]
 
     assert TestRepo.all(query) == [
              %{hash: 16_212_992_072_136_093_800},

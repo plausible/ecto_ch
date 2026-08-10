@@ -228,7 +228,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       assert List.last(parts) ==
                """
-               INSERT INTO "ecto_ch_temp_structure_migrated"."schema_migrations" (version, inserted_at) VALUES
+               INSERT INTO `ecto_ch_temp_structure_migrated`.`schema_migrations` (version, inserted_at) VALUES
                (1,'#{inserted_at_1}'),
                (2,'#{inserted_at_2}');
                """

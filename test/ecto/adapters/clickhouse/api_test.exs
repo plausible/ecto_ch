@@ -38,7 +38,7 @@ defmodule Ecto.Adapters.ClickHouse.APITest do
           select: %{a: i.a, b: fragment("arrayReduce('argMaxState', [?], [?])", i.b, i.a)}
 
       assert all(query) == """
-             SELECT f0."a",arrayReduce('argMaxState', [f0."b"], [f0."a"]) FROM input("a Int16, b String") AS f0\
+             SELECT f0.`a`,arrayReduce('argMaxState', [f0.`b`], [f0.`a`]) FROM input(`a Int16, b String`) AS f0\
              """
     end
 
@@ -48,7 +48,7 @@ defmodule Ecto.Adapters.ClickHouse.APITest do
           select: %{a: i.a, b: fragment("arrayReduce('argMaxState', [?], [?])", i.b, i.a)}
 
       assert all(query) == """
-             SELECT f0."a",arrayReduce('argMaxState', [f0."b"], [f0."a"]) FROM input("a Int16, b String") AS f0\
+             SELECT f0.`a`,arrayReduce('argMaxState', [f0.`b`], [f0.`a`]) FROM input(`a Int16, b String`) AS f0\
              """
     end
   end

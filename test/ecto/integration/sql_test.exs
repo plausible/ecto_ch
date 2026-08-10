@@ -63,7 +63,7 @@ defmodule Ecto.Integration.SQLTest do
 
   test "to_sql/3" do
     {sql, []} = TestRepo.to_sql(:all, Barebone)
-    assert sql == ~s[SELECT b0."num" FROM "barebones" AS b0]
+    assert sql == ~s[SELECT b0.`num` FROM `barebones` AS b0]
 
     # {sql, [0]} = TestRepo.to_sql(:update_all, from(b in Barebone, update: [set: [num: ^0]]))
     # assert sql =~ "UPDATE"
@@ -71,7 +71,7 @@ defmodule Ecto.Integration.SQLTest do
     # assert sql =~ "SET"
 
     {sql, []} = TestRepo.to_sql(:delete_all, Barebone)
-    assert sql == ~s[DELETE FROM "barebones" WHERE 1]
+    assert sql == ~s[DELETE FROM `barebones` WHERE 1]
   end
 
   @tag skip: true

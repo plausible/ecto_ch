@@ -79,29 +79,29 @@ defmodule Ecto.Integration.UnionTest do
     assert Enum.at(params, 8) == 2
 
     assert sql == """
-           SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$0:Bool}) \
-           ORDER BY p0."counter" \
+           SELECT p0.`title` FROM `posts` AS p0 \
+           WHERE (p0.`public` = {$0:Bool}) \
+           ORDER BY p0.`counter` \
            LIMIT {$8:Int64} \
            UNION ALL \
            (\
-           SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$1:Bool}) \
-           ORDER BY p0."counter" DESC \
+           SELECT p0.`title` FROM `posts` AS p0 \
+           WHERE (p0.`public` = {$1:Bool}) \
+           ORDER BY p0.`counter` DESC \
            LIMIT {$2:Int64}\
            ) \
            UNION ALL \
            (\
-           SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$3:Bool}) \
-           ORDER BY p0."counter" \
+           SELECT p0.`title` FROM `posts` AS p0 \
+           WHERE (p0.`public` = {$3:Bool}) \
+           ORDER BY p0.`counter` \
            LIMIT {$4:Int64}\
            ) \
            UNION ALL \
            (\
-           SELECT p0."title" FROM "posts" AS p0 \
-           WHERE (p0."public" = {$5:Bool}) \
-           ORDER BY p0."counter" \
+           SELECT p0.`title` FROM `posts` AS p0 \
+           WHERE (p0.`public` = {$5:Bool}) \
+           ORDER BY p0.`counter` \
            LIMIT {$6:Int64} \
            OFFSET {$7:Int64}\
            )\

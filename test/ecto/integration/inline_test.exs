@@ -52,16 +52,16 @@ defmodule Ecto.Integration.InlineSQLTest do
       assert TestRepo.to_inline_sql(:all, query) ==
                """
                WITH \
-               "cte1" AS (\
-               SELECT ss0."id" AS "id",true AS "smth" FROM "schema1" AS ss0 \
+               `cte1` AS (\
+               SELECT ss0.`id` AS `id`,true AS `smth` FROM `schema1` AS ss0 \
                WHERE (1)\
                ),\
-               "cte2" AS (\
+               `cte2` AS (\
                SELECT * FROM schema WHERE 2\
                ) \
-               SELECT s0."id",0 FROM "schema" AS s0 \
-               INNER JOIN "schema2" AS s1 ON true \
-               INNER JOIN "schema2" AS s2 ON false \
+               SELECT s0.`id`,0 FROM `schema` AS s0 \
+               INNER JOIN `schema2` AS s1 ON true \
+               INNER JOIN `schema2` AS s2 ON false \
                WHERE (true) AND (false) \
                GROUP BY 3,4 \
                HAVING (true) AND (false) \
@@ -69,17 +69,17 @@ defmodule Ecto.Integration.InlineSQLTest do
                LIMIT 8 \
                OFFSET 9 \
                UNION DISTINCT \
-               (SELECT s0."id",true FROM "schema1" AS s0 \
+               (SELECT s0.`id`,true FROM `schema1` AS s0 \
                WHERE (5)) \
                UNION ALL \
-               (SELECT s0."id",false FROM "schema2" AS s0 \
+               (SELECT s0.`id`,false FROM `schema2` AS s0 \
                WHERE (6))\
                """
     end
 
     test "delete all" do
       assert TestRepo.to_inline_sql(:delete_all, from(e in "schema", where: e.x == ^123)) ==
-               ~s[DELETE FROM "schema" WHERE ("x" = 123)]
+               ~s[DELETE FROM `schema` WHERE (`x` = 123)]
     end
   end
 
