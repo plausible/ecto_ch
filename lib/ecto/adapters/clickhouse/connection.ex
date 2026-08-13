@@ -1071,6 +1071,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp escape_quoted(value, ?'), do: escape_string(IO.iodata_to_binary(value))
 
   defp escape_quoted(value, quoter) when quoter in [?\", ?`] do
+    # Neutralize existing escape sequences before escaping the active delimiter.
     value
     |> IO.iodata_to_binary()
     |> :binary.replace("\\", "\\\\", [:global])
@@ -1089,10 +1090,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     if Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, value) do
       value
     else
-      value
-      |> :binary.replace("\\", "\\\\", [:global])
-      |> :binary.replace("`", "\\`", [:global])
-      |> quote_name(?`)
+      quote_name(value, ?`)
     end
   end
 

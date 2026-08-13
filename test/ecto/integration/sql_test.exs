@@ -1,6 +1,7 @@
 defmodule Ecto.Integration.SQLTest do
   use Ecto.Integration.Case
 
+  alias Ecto.Adapters.ClickHouse.Connection
   alias Ecto.Integration.{TestRepo, Barebone}
   alias Ecto.Integration.{Post, Tag}
 
@@ -54,6 +55,23 @@ defmodule Ecto.Integration.SQLTest do
   test "query!/4 with iodata" do
     result = TestRepo.query!(["SELECT", ?\s, ?1])
     assert result.rows == [[1]]
+  end
+
+  test "quoted strings and identifiers cannot break out into ClickHouse syntax" do
+    string = ~S|value' FROM numbers(10) -- \ $tag$body$tag$ /* comment */|
+    result = TestRepo.query!(["SELECT ", Connection.quote_name(string, ?')])
+
+    assert result.rows == [[string]]
+
+    for {quoter, name} <- [
+          {?\", ~S|alias" FROM numbers(10) -- \ $tag$body$tag$ /* comment */|},
+          {?`, ~S|alias` FROM numbers(10) -- \ $tag$body$tag$ /* comment */|}
+        ] do
+      result = TestRepo.query!(["SELECT 1 AS ", Connection.quote_name(name, quoter)])
+
+      assert result.columns == [name]
+      assert result.rows == [[1]]
+    end
   end
 
   test "disconnect_all/2" do

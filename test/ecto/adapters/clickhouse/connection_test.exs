@@ -805,7 +805,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = "schema" |> where(foo: "'") |> select([], true)
     assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE (s0."foo" = '''')]
 
-    query = "schema" |> select([], constant(^"let's \\ escape"))
+    value = "let's \\ escape"
+    query = "schema" |> select([], fragment("?", constant(^value)))
     assert all(query) == ~s[SELECT 'let''s \\\\ escape' FROM "schema" AS s0]
   end
 
@@ -824,7 +825,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert query == ~s{INSERT INTO "schema\\"quoted"("field\\"quoted")}
   end
 
-  test "quoted identifier escape preserves every other byte" do
+  test "quoted identifier escape matches the byte-wise oracle for every byte pair" do
     value = for left <- 0..255, right <- 0..255, into: <<>>, do: <<left, right>>
 
     for quoter <- [?", ?`] do
@@ -1059,6 +1060,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query = Schema |> select([s], json_extract_path(s.meta, ["a b", "a`b"]))
     assert all(query) == ~s{SELECT s0."meta".`a b`.`a\\`b` FROM "schema" AS s0}
+
+    query = Schema |> select([s], json_extract_path(s.meta, ["a\\b"]))
+    assert all(query) == ~S|SELECT s0."meta".`a\\b` FROM "schema" AS s0|
 
     query = Schema |> select([s], s.meta["author"]["name"])
     assert all(query) == ~s{SELECT s0."meta".author.name FROM "schema" AS s0}
