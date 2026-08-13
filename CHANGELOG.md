@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix explicit `type/2` casts for `:naive_datetime`, `:utc_datetime`, their microsecond variants, and `:binary_id`
+- Fix explicit `type/2` casts for `:naive_datetime`, `:utc_datetime`, their microsecond variants, and `:binary_id` https://github.com/plausible/ecto_ch/pull/306
 - Preserve semicolons inside literals, quoted identifiers, heredocs, and comments when loading structure dumps https://github.com/plausible/ecto_ch/pull/293
 - Raise when combination queries have a parent `LIMIT` or `OFFSET` and direct callers to wrap the combination in `subquery/1` https://github.com/plausible/ecto_ch/pull/301
 - Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers https://github.com/plausible/ecto_ch/pull/283
