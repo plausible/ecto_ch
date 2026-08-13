@@ -88,6 +88,7 @@ defmodule Ecto.Integration.JsonTest do
     TestRepo.insert_all(SemiStructured, [
       %{
         json: %{
+          "FROM" => "keyword",
           "from" => "insert_all",
           "nested" => %{"name" => "Test", "arr" => ["abc", "b=deb"]},
           "edge cases" => %{
@@ -112,6 +113,7 @@ defmodule Ecto.Integration.JsonTest do
     assert TestRepo.all(
              from s in SemiStructured,
                select: %{
+                 keyword: json_extract_path(s.json, ["FROM"]),
                  from: json_extract_path(s.json, ["from"]),
                  name: json_extract_path(s.json, ["nested", "name"]),
                  edge_space: json_extract_path(s.json, ["edge cases", "space key"]),
@@ -130,6 +132,7 @@ defmodule Ecto.Integration.JsonTest do
                }
            ) == [
              %{
+               keyword: "keyword",
                from: "insert_all",
                name: "Test",
                edge_space: "space",

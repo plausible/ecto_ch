@@ -59,7 +59,7 @@ defmodule Ecto.Integration.SQLTest do
 
   test "quoted strings and identifiers cannot break out into ClickHouse syntax" do
     string = ~S|value' FROM numbers(10) -- \ $tag$body$tag$ /* comment */|
-    result = TestRepo.query!(["SELECT ", Connection.quote_name(string, ?')])
+    result = TestRepo.query!(["SELECT ", Connection.quote_string(string)])
 
     assert result.rows == [[string]]
 
