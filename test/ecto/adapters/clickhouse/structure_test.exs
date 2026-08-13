@@ -434,7 +434,8 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
           `named_heredoc` String DEFAULT $tag$nine;ten$tag$,
           `unicode_quote` String DEFAULT ‘eleven;twelve’,
           `backtick;identifier` UInt8,
-          "double;identifier" UInt8
+          "double;identifier" UInt8,
+          bare$dollar$identifier UInt8
       )
       ENGINE = TinyLog;
 
@@ -471,6 +472,7 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
 
       assert show_create_table("literal_defaults") =~ "`backtick;identifier` UInt8"
       assert show_create_table("literal_defaults") =~ "`double;identifier` UInt8"
+      assert show_create_table("literal_defaults") =~ "`bare$dollar$identifier` UInt8"
       assert show_create_table("after_literals") =~ "CREATE TABLE"
     end
 
