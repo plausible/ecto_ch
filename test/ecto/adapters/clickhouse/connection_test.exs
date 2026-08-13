@@ -804,6 +804,39 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query = "schema" |> where(foo: "'") |> select([], true)
     assert all(query) == ~s[SELECT true FROM "schema" AS s0 WHERE (s0."foo" = '''')]
+
+    value = "let's \\ escape"
+    query = "schema" |> select([], fragment("?", constant(^value)))
+    assert all(query) == ~s[SELECT 'let''s \\\\ escape' FROM "schema" AS s0]
+  end
+
+  test "quoted identifier escape" do
+    assert Connection.quote_name(~s{has"quote}) |> IO.iodata_to_binary() ==
+             ~s{"has\\"quote"}
+
+    assert Connection.quote_name(~s{has\\slash}) |> IO.iodata_to_binary() ==
+             ~s{"has\\\\slash"}
+
+    assert Connection.quote_name(~s{has`tick}, ?`) |> IO.iodata_to_binary() ==
+             ~s{`has\\`tick`}
+
+    query = insert(nil, ~s{schema"quoted}, [~s{field"quoted}], [], :raise, [])
+
+    assert query == ~s{INSERT INTO "schema\\"quoted"("field\\"quoted")}
+  end
+
+  test "quoted identifier escape matches the byte-wise oracle for every byte pair" do
+    value = for left <- 0..255, right <- 0..255, into: <<>>, do: <<left, right>>
+
+    for quoter <- [?", ?`] do
+      expected =
+        for <<byte <- value>>, into: <<>> do
+          if byte in [?\\, quoter], do: <<?\\, byte>>, else: <<byte>>
+        end
+
+      assert Connection.quote_name(value, quoter) |> IO.iodata_to_binary() ==
+               <<quoter, expected::binary, quoter>>
+    end
   end
 
   test "binary ops" do
@@ -931,13 +964,22 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         where: v1.num == ^2
       )
 
-    assert all(query) ==
+    # Ecto derives the fields from a MapSet, whose enumeration order is unspecified.
+    # In either order, the VALUES structure and parameter types must stay aligned.
+    assert all(query) in [
              """
              SELECT v1."bid",v1."num" \
              FROM VALUES('bid UUID,num Int64',({$0:String},{$1:Int64}),({$2:String},{$3:Int64})) AS v0 \
              INNER JOIN VALUES('bid UUID,num Int64',({$4:String},{$5:Int64}),({$6:String},{$7:Int64})) AS v1 ON v0."bid" = v1."bid" \
              WHERE (v0."num" = {$8:Int64})\
+             """,
              """
+             SELECT v1."num",v1."bid" \
+             FROM VALUES('num Int64,bid UUID',({$0:Int64},{$1:String}),({$2:Int64},{$3:String})) AS v0 \
+             INNER JOIN VALUES('num Int64,bid UUID',({$4:Int64},{$5:String}),({$6:Int64},{$7:String})) AS v1 ON v0."bid" = v1."bid" \
+             WHERE (v0."num" = {$8:Int64})\
+             """
+           ]
   end
 
   test "literals" do
@@ -1027,6 +1069,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     query = Schema |> select([s], json_extract_path(s.meta, ["a b", "a`b"]))
     assert all(query) == ~s{SELECT s0."meta".`a b`.`a\\`b` FROM "schema" AS s0}
+
+    query = Schema |> select([s], json_extract_path(s.meta, ["a\\b"]))
+    assert all(query) == ~S|SELECT s0."meta".`a\\b` FROM "schema" AS s0|
 
     query = Schema |> select([s], s.meta["author"]["name"])
     assert all(query) == ~s{SELECT s0."meta".author.name FROM "schema" AS s0}
@@ -2537,6 +2582,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert_raise ArgumentError, "ClickHouse does not support FOREIGN KEY", fn ->
       execute_ddl(create)
     end
+  end
+
+  test "create table with escaped table comment" do
+    create = {:create, table(:posts, comment: "owner's \\\\ table"), []}
+
+    assert execute_ddl(create) == [
+             ~s{CREATE TABLE "posts" () ENGINE=TinyLog COMMENT 'owner''s \\\\\\\\ table'}
+           ]
   end
 
   test "create table with serial primary key" do
