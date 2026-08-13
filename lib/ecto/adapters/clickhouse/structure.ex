@@ -27,127 +27,127 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   defp split_statements(sql) do
     sql
-    |> split_statements(:sql, [], [])
+    |> split_statements(sql, false, [])
     |> Enum.reverse()
   end
 
-  defp split_statements(<<>>, _state, statement, statements) do
-    add_statement(statements, statement)
+  # `statement` stays at the start of the current query while the first argument advances.
+  # This lets us slice complete queries without rebuilding the input byte by byte.
+  defp split_statements(<<>>, statement, significant?, statements) do
+    add_statement(statements, statement, significant?)
   end
 
-  defp split_statements(<<?;, rest::binary>>, :sql, statement, statements) do
-    split_statements(rest, :sql, [], add_statement(statements, statement))
+  defp split_statements(<<?;, rest::binary>>, statement, significant?, statements) do
+    statement_size = byte_size(statement) - byte_size(rest) - 1
+    <<query::binary-size(^statement_size), _rest::binary>> = statement
+    split_statements(rest, rest, false, add_statement(statements, query, significant?))
   end
 
-  defp split_statements(<<"--", rest::binary>>, :sql, statement, statements) do
-    split_statements(rest, :line_comment, ["--" | statement], statements)
+  defp split_statements(<<"--", rest::binary>>, statement, significant?, statements) do
+    split_statements(skip_until(rest, "\n"), statement, significant?, statements)
   end
 
-  defp split_statements(<<?#, rest::binary>>, :sql, statement, statements) do
-    split_statements(rest, :line_comment, [?# | statement], statements)
+  defp split_statements(<<"//", rest::binary>>, statement, significant?, statements) do
+    split_statements(skip_until(rest, "\n"), statement, significant?, statements)
   end
 
-  defp split_statements(<<"/*", rest::binary>>, :sql, statement, statements) do
-    split_statements(rest, {:block_comment, 1}, ["/*" | statement], statements)
+  defp split_statements(<<"#", next, rest::binary>>, statement, significant?, statements)
+       when next in [?\s, ?!] do
+    split_statements(skip_until(rest, "\n"), statement, significant?, statements)
   end
 
-  defp split_statements(<<?$, rest::binary>>, :sql, statement, statements) do
-    case heredoc_delimiter(rest) do
-      {:ok, delimiter, rest} ->
-        split_statements(rest, {:heredoc, delimiter}, [delimiter | statement], statements)
-
-      :error ->
-        split_statements(rest, :sql, [?$ | statement], statements)
+  defp split_statements(<<"/*", rest::binary>>, statement, significant?, statements) do
+    case skip_block_comment(rest, 1) do
+      {:ok, rest} -> split_statements(rest, statement, significant?, statements)
+      :error -> split_statements(<<>>, statement, true, statements)
     end
   end
 
-  defp split_statements(<<quote, rest::binary>>, :sql, statement, statements)
+  defp split_statements(<<quote, rest::binary>>, statement, _significant?, statements)
        when quote in [?\', ?\", ?`] do
-    split_statements(rest, {:quoted, quote}, [quote | statement], statements)
+    split_statements(skip_quoted(rest, quote), statement, true, statements)
   end
 
-  defp split_statements(
-         <<?\\, char, rest::binary>>,
-         {:quoted, _quote} = state,
-         statement,
-         statements
-       ) do
-    split_statements(rest, state, [char, ?\\ | statement], statements)
+  defp split_statements(<<"‘", rest::binary>>, statement, _significant?, statements) do
+    split_statements(skip_until(rest, "’"), statement, true, statements)
   end
 
-  defp split_statements(
-         <<quote, quote, rest::binary>>,
-         {:quoted, quote} = state,
-         statement,
-         statements
-       ) do
-    split_statements(rest, state, [quote, quote | statement], statements)
+  defp split_statements(<<"“", rest::binary>>, statement, _significant?, statements) do
+    split_statements(skip_until(rest, "”"), statement, true, statements)
   end
 
-  defp split_statements(<<quote, rest::binary>>, {:quoted, quote}, statement, statements) do
-    split_statements(rest, :sql, [quote | statement], statements)
-  end
-
-  defp split_statements(<<?\n, rest::binary>>, :line_comment, statement, statements) do
-    split_statements(rest, :sql, [?\n | statement], statements)
-  end
-
-  defp split_statements(
-         <<"/*", rest::binary>>,
-         {:block_comment, depth},
-         statement,
-         statements
-       ) do
-    split_statements(rest, {:block_comment, depth + 1}, ["/*" | statement], statements)
-  end
-
-  defp split_statements(
-         <<"*/", rest::binary>>,
-         {:block_comment, 1},
-         statement,
-         statements
-       ) do
-    split_statements(rest, :sql, ["*/" | statement], statements)
-  end
-
-  defp split_statements(
-         <<"*/", rest::binary>>,
-         {:block_comment, depth},
-         statement,
-         statements
-       ) do
-    split_statements(rest, {:block_comment, depth - 1}, ["*/" | statement], statements)
-  end
-
-  defp split_statements(sql, {:heredoc, delimiter} = state, statement, statements) do
-    delimiter_size = byte_size(delimiter)
-
-    case sql do
-      <<^delimiter::binary-size(^delimiter_size), rest::binary>> ->
-        split_statements(rest, :sql, [delimiter | statement], statements)
-
-      <<char, rest::binary>> ->
-        split_statements(rest, state, [char | statement], statements)
+  defp split_statements(<<?$, rest::binary>>, statement, _significant?, statements) do
+    case skip_heredoc(rest) do
+      {:ok, rest} -> split_statements(rest, statement, true, statements)
+      :error -> split_statements(skip_word(rest), statement, true, statements)
     end
   end
 
-  defp split_statements(<<char, rest::binary>>, state, statement, statements) do
-    split_statements(rest, state, [char | statement], statements)
+  defp split_statements(<<char, rest::binary>>, statement, _significant?, statements)
+       when char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char == ?_ do
+    split_statements(skip_word(rest), statement, true, statements)
   end
 
-  defp heredoc_delimiter(rest) do
-    case :binary.match(rest, "$") do
-      {tag_size, 1} ->
-        <<tag::binary-size(^tag_size), ?$, rest::binary>> = rest
+  defp split_statements(<<char, rest::binary>>, statement, significant?, statements)
+       when char in [?\s, ?\t, ?\n, ?\r, ?\f, ?\v] do
+    split_statements(rest, statement, significant?, statements)
+  end
 
-        if valid_heredoc_tag?(tag) do
-          {:ok, "$" <> tag <> "$", rest}
-        else
-          :error
-        end
+  defp split_statements(<<_char, rest::binary>>, statement, _significant?, statements) do
+    split_statements(rest, statement, true, statements)
+  end
+
+  defp skip_quoted(<<>>, _quote), do: <<>>
+
+  defp skip_quoted(<<?\\, _char, rest::binary>>, quote) do
+    skip_quoted(rest, quote)
+  end
+
+  defp skip_quoted(<<quote, quote, rest::binary>>, quote) do
+    skip_quoted(rest, quote)
+  end
+
+  defp skip_quoted(<<quote, rest::binary>>, quote), do: rest
+  defp skip_quoted(<<_char, rest::binary>>, quote), do: skip_quoted(rest, quote)
+
+  defp skip_block_comment(<<>>, _depth), do: :error
+
+  defp skip_block_comment(<<"/*", rest::binary>>, depth) do
+    skip_block_comment(rest, depth + 1)
+  end
+
+  defp skip_block_comment(<<"*/", rest::binary>>, 1), do: {:ok, rest}
+
+  defp skip_block_comment(<<"*/", rest::binary>>, depth) do
+    skip_block_comment(rest, depth - 1)
+  end
+
+  defp skip_block_comment(<<_char, rest::binary>>, depth) do
+    skip_block_comment(rest, depth)
+  end
+
+  defp skip_heredoc(sql) do
+    with {tag_size, 1} <- :binary.match(sql, "$"),
+         <<tag::binary-size(^tag_size), ?$, contents::binary>> <- sql,
+         true <- valid_heredoc_tag?(tag),
+         delimiter = "$" <> tag <> "$",
+         {position, size} <- :binary.match(contents, delimiter),
+         rest_position = position + size,
+         rest = binary_part(contents, rest_position, byte_size(contents) - rest_position) do
+      {:ok, rest}
+    else
+      _ -> :error
+    end
+  end
+
+  defp skip_until(sql, delimiter) do
+    case :binary.match(sql, delimiter) do
+      {position, size} ->
+        rest_position = position + size
+        binary_part(sql, rest_position, byte_size(sql) - rest_position)
 
       :nomatch ->
-        :error
+        <<>>
     end
   end
 
@@ -160,8 +160,17 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   defp valid_heredoc_tag?(_tag), do: false
 
-  defp add_statement(statements, statement) do
-    case statement |> Enum.reverse() |> IO.iodata_to_binary() |> String.trim() do
+  defp skip_word(<<char, rest::binary>>)
+       when char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char in [?_, ?$] do
+    skip_word(rest)
+  end
+
+  defp skip_word(rest), do: rest
+
+  defp add_statement(statements, _statement, false), do: statements
+
+  defp add_statement(statements, statement, true) do
+    case String.trim(statement) do
       "" -> statements
       statement -> [statement | statements]
     end

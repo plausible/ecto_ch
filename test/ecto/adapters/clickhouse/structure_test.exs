@@ -386,79 +386,87 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
              """
     end
 
-    test "loads statements with semicolons in strings and comments", %{
+    test "loads statements with semicolons in literals and quoted identifiers", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      File.write!(path, ~S"""
+      CREATE TABLE literal_defaults
+      (
+          `single_quote` String DEFAULT 'one;two',
+          `escaped_quote` String DEFAULT 'three\';four',
+          `doubled_quote` String DEFAULT 'five'';six',
+          `empty_heredoc` String DEFAULT $$seven;eight$$,
+          `named_heredoc` String DEFAULT $tag$nine;ten$tag$,
+          `unicode_quote` String DEFAULT ‘eleven;twelve’,
+          `backtick;identifier` UInt8,
+          "double;identifier" UInt8
+      )
+      ENGINE = TinyLog;
+
+      CREATE TABLE after_literals
+      (
+          `value` UInt8
+      )
+      ENGINE = TinyLog;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+
+      Repo.query!("""
+      INSERT INTO literal_defaults (`backtick;identifier`, "double;identifier") VALUES (1, 2)
+      """)
+
+      assert %{
+               rows: [
+                 [
+                   "one;two",
+                   "three';four",
+                   "five';six",
+                   "seven;eight",
+                   "nine;ten",
+                   "eleven;twelve"
+                 ]
+               ]
+             } =
+               Repo.query!("""
+               SELECT single_quote, escaped_quote, doubled_quote,
+                      empty_heredoc, named_heredoc, unicode_quote
+               FROM literal_defaults
+               """)
+
+      assert show_create_table("literal_defaults") =~ "`backtick;identifier` UInt8"
+      assert show_create_table("literal_defaults") =~ "`double;identifier` UInt8"
+      assert show_create_table("after_literals") =~ "CREATE TABLE"
+    end
+
+    test "loads statements with semicolons in comments", %{
       path: path,
       tmp: tmp,
       opts: opts
     } do
       File.write!(path, """
-      -- A line comment containing a semicolon;
-      CREATE TABLE string_default
-      (
-          `value` String DEFAULT 'one;two'
-      )
-      ENGINE = TinyLog;
-
-      /* A block comment containing a semicolon; */
+      -- A SQL-style comment containing a semicolon;
+      // A C-style line comment containing a semicolon;
+      # A MySQL-style comment containing a semicolon;
+      #! A shebang-style comment containing a semicolon;
+      /* An outer block comment
+         /* containing a nested block comment */
+         and a semicolon;
+      */
       CREATE TABLE after_comments
       (
           `value` UInt8
       )
       ENGINE = TinyLog;
+
+      // A trailing comment containing a semicolon;
+      # A comment-only tail is not a query;
       """)
 
       assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
-
-      assert show_create_table("string_default") =~ "DEFAULT 'one;two'"
       assert show_create_table("after_comments") =~ "CREATE TABLE"
-    end
-
-    test "loads statements with semicolons in heredoc strings", %{
-      path: path,
-      tmp: tmp,
-      opts: opts
-    } do
-      File.write!(path, """
-      CREATE TABLE heredoc_defaults
-      (
-          `empty_tag` String DEFAULT $$one;two$$,
-          `named_tag` String DEFAULT $tag$three;four$tag$
-      )
-      ENGINE = TinyLog;
-
-      CREATE TABLE after_heredoc
-      (
-          `value` UInt8
-      )
-      ENGINE = TinyLog;
-      """)
-
-      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
-
-      assert show_create_table("heredoc_defaults") =~ "DEFAULT 'one;two'"
-      assert show_create_table("heredoc_defaults") =~ "DEFAULT 'three;four'"
-      assert show_create_table("after_heredoc") =~ "CREATE TABLE"
-    end
-
-    test "loads statements with semicolons in nested block comments", %{
-      path: path,
-      tmp: tmp,
-      opts: opts
-    } do
-      File.write!(path, """
-      /* An outer block comment
-         /* containing a nested block comment */
-         and a semicolon;
-      */
-      CREATE TABLE after_nested_comment
-      (
-          `value` UInt8
-      )
-      ENGINE = TinyLog;
-      """)
-
-      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
-      assert show_create_table("after_nested_comment") =~ "CREATE TABLE"
     end
 
     defp show_create_table(table) do
