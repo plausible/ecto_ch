@@ -511,6 +511,82 @@ defmodule Ch.TypeTest do
     end
   end
 
+  describe "Time / Time64" do
+    @describetag :time
+
+    setup do
+      query!("""
+      create table ch_times (
+        ch_time Time,
+        ch_time64 Time64(3),
+        time Time,
+        time_usec Time64(6)
+      ) engine Memory
+      """)
+
+      on_exit(fn -> query!("truncate ch_times") end)
+    end
+
+    defmodule Times do
+      use Ecto.Schema
+
+      @primary_key false
+      schema "ch_times" do
+        field(:ch_time, Ch, type: "Time")
+        field(:ch_time64, Ch, type: "Time64(3)")
+        field(:time, :time)
+        field(:time_usec, :time_usec)
+      end
+    end
+
+    test "insert_all" do
+      assert {2, _} =
+               insert_all(Times, [
+                 Enum.map(Times.__schema__(:fields), fn field -> {field, nil} end),
+                 [
+                   ch_time: ~T[12:34:56],
+                   ch_time64: ~T[12:34:56.987654],
+                   time: ~T[12:34:56],
+                   time_usec: ~T[12:34:56.987654]
+                 ]
+               ])
+
+      assert Times |> order_by([t], t.ch_time) |> all() |> unstruct() == [
+               %{
+                 ch_time: ~T[00:00:00],
+                 ch_time64: ~T[00:00:00.000],
+                 time: ~T[00:00:00],
+                 time_usec: ~T[00:00:00.000000]
+               },
+               %{
+                 ch_time: ~T[12:34:56],
+                 ch_time64: ~T[12:34:56.987],
+                 time: ~T[12:34:56],
+                 time_usec: ~T[12:34:56.987654]
+               }
+             ]
+    end
+  end
+
+  @tag :time
+  test "Ecto query params round-trip at every supported precision" do
+    for time <- [
+          ~T[12:34:56],
+          ~T[12:34:56.1],
+          ~T[12:34:56.12],
+          ~T[12:34:56.123],
+          ~T[12:34:56.1234],
+          ~T[12:34:56.12345],
+          ~T[12:34:56.123456]
+        ] do
+      query = from _ in fragment("system.one"), select: fragment("?", ^time)
+      assert all(query) == [time]
+
+      sql = Ecto.Adapters.ClickHouse.to_inline_sql(:all, query)
+      assert query!(sql).rows == [[time]]
+    end
+  end
+
   describe "DateTime" do
     setup do
       query!("""

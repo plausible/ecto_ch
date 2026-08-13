@@ -419,6 +419,113 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
              """
     end
 
+    test "loads statements with semicolons in literals and quoted identifiers", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      Repo.query!("""
+      CREATE TABLE generated_literals
+      (
+          `generated;identifier` String DEFAULT 'generated;default'
+      )
+      ENGINE = TinyLog
+      """)
+
+      generated_statement = show_create_table("generated_literals")
+      Repo.query!("DROP TABLE generated_literals")
+
+      File.write!(path, [
+        generated_statement,
+        ";\n\n",
+        ~S"""
+        CREATE TABLE literal_defaults
+        (
+            `single_quote` String DEFAULT 'one;two',
+            `escaped_quote` String DEFAULT 'three\';four',
+            `escaped_backslash` String DEFAULT 'five\\',
+            `doubled_quote` String DEFAULT 'five'';six',
+            `comment_markers` String DEFAULT '/*;*/ --; //; #; $tag$',
+            `empty_heredoc` String DEFAULT $$seven;eight$$,
+            `named_heredoc` String DEFAULT $tag$nine;ten$tag$,
+            `unicode_quote` String DEFAULT ‘eleven;twelve’,
+            `backtick;identifier` UInt8,
+            "double;identifier" UInt8,
+            “unicode;identifier” UInt8,
+            bare$dollar$identifier UInt8
+        )
+        ENGINE = TinyLog;
+
+        CREATE TABLE after_literals
+        (
+            `value` UInt8
+        )
+        ENGINE = TinyLog;
+        """
+      ])
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+
+      Repo.query!("""
+      INSERT INTO literal_defaults (`backtick;identifier`, "double;identifier") VALUES (1, 2)
+      """)
+
+      assert %{
+               rows: [
+                 [
+                   "one;two",
+                   "three';four",
+                   "five\\",
+                   "five';six",
+                   "/*;*/ --; //; #; $tag$",
+                   "seven;eight",
+                   "nine;ten",
+                   "eleven;twelve"
+                 ]
+               ]
+             } =
+               Repo.query!("""
+               SELECT single_quote, escaped_quote, escaped_backslash, doubled_quote,
+                      comment_markers, empty_heredoc, named_heredoc, unicode_quote
+               FROM literal_defaults
+               """)
+
+      assert show_create_table("literal_defaults") =~ "`backtick;identifier` UInt8"
+      assert show_create_table("literal_defaults") =~ "`double;identifier` UInt8"
+      assert show_create_table("literal_defaults") =~ "`unicode;identifier` UInt8"
+      assert show_create_table("literal_defaults") =~ "`bare$dollar$identifier` UInt8"
+      assert show_create_table("generated_literals") =~ "'generated;default'"
+      assert show_create_table("after_literals") =~ "CREATE TABLE"
+    end
+
+    test "loads statements with semicolons in comments", %{
+      path: path,
+      tmp: tmp,
+      opts: opts
+    } do
+      File.write!(path, """
+      -- A SQL-style comment containing a semicolon;
+      // A C-style line comment containing a semicolon;
+      # A MySQL-style comment containing a semicolon;
+      #! A shebang-style comment containing a semicolon;
+      /* An outer block comment
+         /* containing a nested block comment */
+         and a semicolon;
+      */
+      CREATE /* A mid-statement comment containing a semicolon; */ TABLE after_comments
+      (
+          `value` UInt8 -- An inline comment containing a semicolon;
+      )
+      ENGINE = TinyLog;
+
+      // A trailing comment containing a semicolon;
+      # A comment-only tail is not a query;
+      """)
+
+      assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
+      assert show_create_table("after_comments") =~ "CREATE TABLE"
+    end
+
     defp show_create_table(table) do
       IO.iodata_to_binary(Repo.query!("SHOW CREATE TABLE #{table}").rows)
     end

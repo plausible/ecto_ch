@@ -1067,12 +1067,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp wrap_in(value, nil), do: value
   defp wrap_in(value, wrapper), do: [wrapper, value, wrapper]
 
+  defp escape_quoted(value, nil), do: value
+  defp escape_quoted(value, ?'), do: escape_string(IO.iodata_to_binary(value))
+
   defp escape_quoted(value, quoter) when quoter in [?\", ?`] do
     value = IO.iodata_to_binary(value)
     intersperse_escaped(value, :binary.matches(value, ["\\", <<quoter>>]), 0)
   end
-
-  defp escape_quoted(value, _quoter), do: value
 
   defp intersperse_escaped(value, [], 0), do: value
 
@@ -1140,9 +1141,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp ecto_to_db({:parameterized, {Ch, type}}, _query), do: Ch.Types.encode(type)
   defp ecto_to_db({:array, type}, query), do: ["Array(", ecto_to_db(type, query), ?)]
 
-  defp ecto_to_db(type, _query) when type in [:uuid, :string, :date, :boolean] do
+  defp ecto_to_db(type, _query) when type in [:uuid, :string, :date, :time, :boolean] do
     Ch.Types.encode(type)
   end
+
+  defp ecto_to_db(:time_usec, _query), do: Ch.Types.encode({:time64, 6})
 
   defp ecto_to_db(type, query) do
     raise Ecto.QueryError,
@@ -1207,6 +1210,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [?', Date.to_string(date), suffix]
   end
 
+  defp inline_param(%Time{microsecond: {_value, precision}} = time) do
+    type = if precision > 0, do: ["Time64(", Integer.to_string(precision), ?)], else: "Time"
+    [?', Time.to_string(time), "'::", type]
+  end
+
   defp inline_param(%Decimal{} = dec), do: decimal_to_string(dec)
 
   defp inline_param(a) when is_list(a) do
@@ -1261,6 +1269,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   # TODO Date32
   defp param_type(%Date{}), do: "Date"
+
+  defp param_type(%Time{microsecond: {_value, precision}}) when precision > 0 do
+    ["Time64(", Integer.to_string(precision), ?)]
+  end
+
+  defp param_type(%Time{}), do: "Time"
 
   defp param_type(%Decimal{} = decimal) do
     {precision, scale} = decimal_precision_and_scale!(decimal)

@@ -41,7 +41,9 @@ env = [
 
 env =
   if ch_version >= "25" do
-    Keyword.update!(env, :settings, fn settings -> Keyword.put(settings, :enable_json_type, 1) end)
+    Keyword.update!(env, :settings, fn settings ->
+      Keyword.merge(settings, enable_json_type: 1, enable_time_time64_type: 1)
+    end)
   else
     env
   end
