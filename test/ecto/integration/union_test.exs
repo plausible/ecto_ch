@@ -33,6 +33,33 @@ defmodule Ecto.Integration.UnionTest do
     assert Enum.sort(data) == Enum.sort(["bye", "hello"])
   end
 
+  test "limit and offset a union through a subquery" do
+    TestRepo.insert!(%Post{title: "hello", counter: 1, public: true})
+    TestRepo.insert!(%Post{title: "morning", counter: 2, public: true})
+    TestRepo.insert!(%Post{title: "bye", counter: 3, public: false})
+
+    public =
+      from p in Post,
+        where: p.public,
+        select: %{title: p.title, counter: p.counter}
+
+    private =
+      from p in Post,
+        where: not p.public,
+        select: %{title: p.title, counter: p.counter}
+
+    query =
+      public
+      |> union_all(^private)
+      |> subquery()
+      |> order_by([p], p.counter)
+      |> limit(1)
+      |> offset(1)
+      |> select([p], p.title)
+
+    assert TestRepo.all(query) == ["morning"]
+  end
+
   test "union & params" do
     TestRepo.insert!(%Post{title: "hello", counter: 1, public: true})
     TestRepo.insert!(%Post{title: "morning", counter: 2, public: true})
@@ -63,38 +90,34 @@ defmodule Ecto.Integration.UnionTest do
     bye =
       from p in Post,
         where: p.public == ^false,
-        order_by: :counter,
-        limit: ^1,
         select: p.title
 
     query =
-      hello_and_morning
+      bye
+      |> union_all(^hello_and_morning)
       |> union_all(^morning_1)
-      |> union_all(^bye)
       |> union_all(^morning_2)
 
     {sql, params} = TestRepo.to_sql(:all, query)
 
-    # ensures param idx=8 is 2 (from limit: ^2 above)
-    assert Enum.at(params, 8) == 2
+    # ensures param idx=2 is 2 (from limit: ^2 above)
+    assert Enum.at(params, 2) == 2
 
     assert sql == """
            SELECT p0."title" FROM "posts" AS p0 \
            WHERE (p0."public" = {$0:Bool}) \
-           ORDER BY p0."counter" \
-           LIMIT {$8:Int64} \
            UNION ALL \
            (\
            SELECT p0."title" FROM "posts" AS p0 \
            WHERE (p0."public" = {$1:Bool}) \
-           ORDER BY p0."counter" DESC \
+           ORDER BY p0."counter" \
            LIMIT {$2:Int64}\
            ) \
            UNION ALL \
            (\
            SELECT p0."title" FROM "posts" AS p0 \
            WHERE (p0."public" = {$3:Bool}) \
-           ORDER BY p0."counter" \
+           ORDER BY p0."counter" DESC \
            LIMIT {$4:Int64}\
            ) \
            UNION ALL \

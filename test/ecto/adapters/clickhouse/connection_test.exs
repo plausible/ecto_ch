@@ -611,8 +611,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       Schema
       |> select([r], r.x)
       |> order_by(fragment("rand()"))
-      |> offset(10)
-      |> limit(5)
 
     union_query1 =
       Schema
@@ -635,7 +633,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() \
              UNION DISTINCT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
              UNION DISTINCT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
@@ -647,10 +645,46 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() \
              UNION ALL (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
              UNION ALL (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
+  end
+
+  test "limit and offset on combination queries" do
+    other_query = Schema |> select([r], r.y)
+    base_query = Schema |> select([r], r.x)
+
+    combination_queries = [
+      union(base_query, ^other_query),
+      union_all(base_query, ^other_query),
+      except(base_query, ^other_query),
+      intersect(base_query, ^other_query)
+    ]
+
+    error_message =
+      ~r/ClickHouse applies LIMIT and OFFSET.*combination result.*subquery\/1/
+
+    for combination_query <- combination_queries do
+      assert_raise Ecto.QueryError, error_message, fn ->
+        combination_query |> limit(5) |> all()
+      end
+
+      assert_raise Ecto.QueryError, error_message, fn ->
+        combination_query |> offset(10) |> all()
+      end
+    end
+
+    query =
+      base_query
+      |> union_all(^other_query)
+      |> subquery()
+      |> select([r], r.x)
+      |> limit(5)
+      |> offset(10)
+
+    assert all(query) ==
+             ~s[SELECT s0."x" FROM (SELECT ss0."x" AS "x" FROM "schema" AS ss0 UNION ALL (SELECT s0."y" FROM "schema" AS s0)) AS s0 LIMIT 5 OFFSET 10]
   end
 
   test "except and except all" do
@@ -658,8 +692,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       Schema
       |> select([r], r.x)
       |> order_by(fragment("rand()"))
-      |> offset(10)
-      |> limit(5)
 
     except_query1 =
       Schema
@@ -682,7 +714,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() \
              EXCEPT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
              EXCEPT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
@@ -700,8 +732,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       Schema
       |> select([r], r.x)
       |> order_by(fragment("rand()"))
-      |> offset(10)
-      |> limit(5)
 
     intersect_query1 =
       Schema
@@ -724,7 +754,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert all(query) ==
              """
-             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() LIMIT 5 OFFSET 10 \
+             SELECT s0."x" FROM "schema" AS s0 ORDER BY rand() \
              INTERSECT (SELECT s0."y" FROM "schema" AS s0 ORDER BY s0."y" LIMIT 40 OFFSET 20) \
              INTERSECT (SELECT s0."z" FROM "schema" AS s0 ORDER BY s0."z" LIMIT 60 OFFSET 30)\
              """
@@ -1183,8 +1213,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> union(^union)
       |> union_all(^union_all)
       |> order_by([], fragment("?", ^7))
-      |> limit([], ^8)
-      |> offset([], ^9)
 
     assert all(query) ==
              """
@@ -1203,8 +1231,6 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              GROUP BY {$8:Int64},{$9:Int64} \
              HAVING ({$10:Bool}) AND ({$11:Bool}) \
              ORDER BY {$16:Int64} \
-             LIMIT {$17:Int64} \
-             OFFSET {$18:Int64} \
              UNION DISTINCT \
              (SELECT s0."id",{$12:Bool} FROM "schema1" AS s0 \
              WHERE ({$13:Int64})) \
