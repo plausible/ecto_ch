@@ -1034,13 +1034,17 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT CAST(s0."x" + 1 AS UInt16) FROM "schema" AS s0]
   end
 
-  test "tagged unknown type" do
+  test "tagged time types" do
     query = from e in "events", select: type(e.count + 1, :time)
+    assert all(query) == ~s[SELECT CAST(e0."count" + CAST(1 AS Time) AS Time) FROM "events" AS e0]
 
-    assert_raise Ecto.QueryError,
-                 ~r/unknown or ambiguous \(for ClickHouse\) Ecto type :time in query/,
-                 fn -> all(query) end
+    query = from e in "events", select: type(e.count + 1, :time_usec)
 
+    assert all(query) ==
+             ~s[SELECT CAST(e0."count" + CAST(1 AS Time64(6)) AS Time64(6)) FROM "events" AS e0]
+  end
+
+  test "tagged unknown type" do
     query = from e in "events", select: type(e.count + 1, :decimal)
 
     assert_raise Ecto.QueryError,
@@ -2750,11 +2754,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   test "create table with time columns" do
     create =
       {:create, table(:posts),
-       [{:add, :published_at, :time, []}, {:add, :submitted_at, :time, []}]}
+       [{:add, :published_at, :time, []}, {:add, :submitted_at, :time_usec, []}]}
 
-    assert_raise ArgumentError, "type :time is not supported", fn ->
-      execute_ddl(create)
-    end
+    assert execute_ddl(create) == [
+             ~s[CREATE TABLE "posts" ("published_at" Time,"submitted_at" Time64(6)) ENGINE=TinyLog]
+           ]
   end
 
   test "create table with utc_datetime columns" do
@@ -3566,6 +3570,24 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            """
   end
 
+  test "Time and Time64 params" do
+    assert all(
+             from e in "events",
+               where: e.time == ^~T[12:34:56],
+               select: e.time
+           ) == """
+           SELECT e0."time" FROM "events" AS e0 WHERE (e0."time" = {$0:Time})\
+           """
+
+    assert all(
+             from e in "events",
+               where: e.time == ^~T[12:34:56.123456],
+               select: e.time
+           ) == """
+           SELECT e0."time" FROM "events" AS e0 WHERE (e0."time" = {$0:Time64(6)})\
+           """
+  end
+
   test "build_params/3" do
     params =
       [
@@ -3619,6 +3641,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              )
            ) ==
              "1,'a',true,'2024-04-12'::date,'2024-04-12 09:55:54.329788'::DateTime64(6,'Etc/UTC'),'2024-04-12 09:55:54'::DateTime('Etc/UTC')"
+
+    assert to_string(
+             Connection.build_params(_ix = 0, _len = 2, [
+               Connection.mark_inline(~T[12:34:56]),
+               Connection.mark_inline(~T[12:34:56.123456])
+             ])
+           ) == "'12:34:56'::Time,'12:34:56.123456'::Time64(6)"
   end
 
   test "decimal parameter boundaries" do

@@ -4,6 +4,7 @@
 
 - Raise when combination queries have a parent `LIMIT` or `OFFSET` and direct callers to wrap the combination in `subquery/1` https://github.com/plausible/ecto_ch/pull/301
 - Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers https://github.com/plausible/ecto_ch/pull/283
+- Support Ecto `:time` and `:time_usec` types as ClickHouse `Time` and `Time64(6)` https://github.com/plausible/ecto_ch/pull/242
 
 ## 0.11.0 (2026-08-08)
 
