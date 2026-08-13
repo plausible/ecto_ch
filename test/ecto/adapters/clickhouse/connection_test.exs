@@ -308,7 +308,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> update(set: [x: 123])
 
     assert_raise Ecto.QueryError,
-                 ~r/ClickHouse does not support UPDATE statements/,
+                 ~r/does not support JOIN in UPDATE statements/,
                  fn -> Connection.update_all(query) end
   end
 
@@ -1297,47 +1297,36 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "update_all" do
-    error_message =
-      ~r/ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead/
-
     query =
       (m in Schema)
       |> from(update: [set: [x: 0]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == ~s[UPDATE "schema" SET "x"=0 WHERE 1]
 
     query =
       (m in Schema)
       |> from(update: [set: [x: 0], inc: [y: 1, z: -3]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == ~s[UPDATE "schema" SET "x"=0,"y"="y"+1,"z"="z"+-3 WHERE 1]
 
     query =
       (e in Schema)
       |> from(where: e.x == 123, update: [set: [x: 0]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == ~s[UPDATE "schema" SET "x"=0 WHERE ("x" = 123)]
 
     query =
       (m in Schema)
       |> from(update: [set: [x: ^0]])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == ~s[UPDATE "schema" SET "x"={$0:Int64} WHERE 1]
 
     query =
       Schema
       |> join(:inner, [p], q in Schema2, on: p.x == q.z)
       |> update([_], set: [x: 0])
 
-    assert_raise Ecto.QueryError, error_message, fn ->
+    assert_raise Ecto.QueryError, ~r/does not support JOIN in UPDATE statements/, fn ->
       update_all(query)
     end
 
@@ -1350,7 +1339,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         on: e.x == q.z
       )
 
-    assert_raise Ecto.QueryError, error_message, fn ->
+    assert_raise Ecto.QueryError, ~r/does not support JOIN in UPDATE statements/, fn ->
       update_all(query)
     end
 
@@ -1362,7 +1351,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
         update: [set: [title: "bar"]]
       )
 
-    assert_raise Ecto.QueryError, error_message, fn ->
+    assert_raise Ecto.QueryError, ~r/does not support RETURNING in UPDATE statements/, fn ->
       update_all(query)
     end
   end
@@ -1373,18 +1362,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
       |> from(update: [set: [x: 0]])
       |> Map.put(:prefix, "prefix")
 
-    assert_raise Ecto.QueryError, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == ~s[UPDATE "prefix"."schema" SET "x"=0 WHERE 1]
 
     query =
       (m in Schema)
       |> from(prefix: "first", update: [set: [x: 0]])
       |> Map.put(:prefix, "prefix")
 
-    assert_raise Ecto.QueryError, fn ->
-      update_all(query)
-    end
+    assert update_all(query) == ~s[UPDATE "first"."schema" SET "x"=0 WHERE 1]
   end
 
   test "update all with returning" do
@@ -1404,6 +1389,19 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert_raise Ecto.QueryError, fn ->
       update_all(query)
     end
+  end
+
+  test "update_all with CTE" do
+    cte_query = from(x in Schema, order_by: [asc: :id], limit: 10, select: %{id: x.id})
+
+    query =
+      Schema
+      |> with_cte("target_rows", as: ^cte_query)
+      |> update(set: [x: 123])
+
+    assert_raise Ecto.QueryError,
+                 ~r/does not support CTEs in UPDATE statements/,
+                 fn -> update_all(query) end
   end
 
   test "alter_update_all" do
@@ -2418,18 +2416,17 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "update" do
-    error_message = ~r/ClickHouse does not support UPDATE statements/
+    assert update(nil, "schema", [x: 1], [id: 2], []) ==
+             ~s[UPDATE "schema" SET "x"={$0:Int64} WHERE "id"={$1:Int64}]
 
-    assert_raise ArgumentError, error_message, fn ->
-      update(nil, "schema", [:x, :y], [id: 1], [])
-    end
+    assert update("prefix", "schema", [x: 1, y: "two", z: nil], [id: 2], []) ==
+             ~s[UPDATE "prefix"."schema" SET "x"={$0:Int64},"y"={$1:String},"z"={$2:Nullable(Nothing)} WHERE "id"={$3:Int64}]
 
-    assert_raise ArgumentError, error_message, fn ->
-      update(nil, "schema", [:x, :y], [id: 1], [])
-    end
+    assert update(nil, "schema", [x: 1], [deleted_at: nil, id: 2], []) ==
+             ~s[UPDATE "schema" SET "x"={$0:Int64} WHERE isNull("deleted_at") AND "id"={$2:Int64}]
 
-    assert_raise ArgumentError, error_message, fn ->
-      update("prefix", "schema", [:x, :y], [id: 1], [])
+    assert_raise ArgumentError, ~r/does not support RETURNING on UPDATE statements/, fn ->
+      apply(Connection, :update, [nil, "schema", [x: 1], [id: 2], [:x]])
     end
   end
 
