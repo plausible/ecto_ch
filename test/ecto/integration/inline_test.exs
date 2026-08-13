@@ -46,8 +46,6 @@ defmodule Ecto.Integration.InlineSQLTest do
         |> union(^union)
         |> union_all(^union_all)
         |> order_by([], fragment("?", ^7))
-        |> limit([], ^8)
-        |> offset([], ^9)
 
       assert TestRepo.to_inline_sql(:all, query) ==
                """
@@ -66,8 +64,6 @@ defmodule Ecto.Integration.InlineSQLTest do
                GROUP BY 3,4 \
                HAVING (true) AND (false) \
                ORDER BY 7 \
-               LIMIT 8 \
-               OFFSET 9 \
                UNION DISTINCT \
                (SELECT s0.`id`,true FROM `schema1` AS s0 \
                WHERE (5)) \

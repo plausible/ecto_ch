@@ -555,6 +555,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [" OFFSET ", expr(expr, sources, params, query)]
   end
 
+  defp combinations(
+         %{combinations: [_ | _], limit: limit, offset: offset} = query,
+         _params
+       )
+       when not is_nil(limit) or not is_nil(offset) do
+    raise Ecto.QueryError,
+      query: query,
+      message:
+        "ClickHouse applies LIMIT and OFFSET to individual SELECT queries, " <>
+          "not the combination result -- wrap the combination in subquery/1 before applying them"
+  end
+
   defp combinations(%{combinations: combinations}, params) do
     Enum.map(combinations, &combination(&1, params))
   end
