@@ -824,6 +824,20 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert query == ~s{INSERT INTO "schema\\"quoted"("field\\"quoted")}
   end
 
+  test "quoted identifier escape preserves every other byte" do
+    value = for left <- 0..255, right <- 0..255, into: <<>>, do: <<left, right>>
+
+    for quoter <- [?", ?`] do
+      expected =
+        for <<byte <- value>>, into: <<>> do
+          if byte in [?\\, quoter], do: <<?\\, byte>>, else: <<byte>>
+        end
+
+      assert Connection.quote_name(value, quoter) |> IO.iodata_to_binary() ==
+               <<quoter, expected::binary, quoter>>
+    end
+  end
+
   test "binary ops" do
     query = Schema |> select([r], r.x == 2)
     assert all(query) == ~s[SELECT s0."x" = 2 FROM "schema" AS s0]
