@@ -1044,6 +1044,41 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ~s[SELECT CAST(e0."count" + CAST(1 AS Time64(6)) AS Time64(6)) FROM "events" AS e0]
   end
 
+  test "tagged datetime types" do
+    naive_datetime = ~N[2024-04-12 09:55:54]
+    naive_datetime_usec = ~N[2024-04-12 09:55:54.123456]
+    utc_datetime = ~U[2024-04-12 09:55:54Z]
+    utc_datetime_usec = ~U[2024-04-12 09:55:54.123456Z]
+
+    query = from e in "events", select: type(^naive_datetime, :naive_datetime)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime} AS DateTime) FROM "events" AS e0]
+
+    query = from e in "events", select: type(^naive_datetime_usec, :naive_datetime_usec)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime64(6)} AS DateTime64(6)) FROM "events" AS e0]
+
+    query = from e in "events", select: type(^utc_datetime, :utc_datetime)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime} AS DateTime) FROM "events" AS e0]
+
+    query = from e in "events", select: type(^utc_datetime_usec, :utc_datetime_usec)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime64(6)} AS DateTime64(6)) FROM "events" AS e0]
+  end
+
+  test "tagged binary_id type" do
+    binary_id = Ecto.UUID.generate()
+    query = from e in "events", select: type(^binary_id, :binary_id)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:String} AS String) FROM "events" AS e0]
+  end
+
   test "tagged unknown type" do
     query = from e in "events", select: type(e.count + 1, :decimal)
 

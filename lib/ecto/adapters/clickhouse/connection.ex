@@ -1128,7 +1128,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # so we need :integer to be the same as :bigint which is used for schema_versions table definition
   # this is why :integer is Int64 and not Int32
   defp ecto_to_db(:integer, _query), do: "Int64"
-  defp ecto_to_db(:binary, _query), do: "String"
+  defp ecto_to_db(type, _query) when type in [:binary, :binary_id], do: "String"
   defp ecto_to_db({:parameterized, {Ch, type}}, _query), do: Ch.Types.encode(type)
   defp ecto_to_db({:array, type}, query), do: ["Array(", ecto_to_db(type, query), ?)]
 
@@ -1137,6 +1137,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp ecto_to_db(:time_usec, _query), do: Ch.Types.encode({:time64, 6})
+
+  defp ecto_to_db(type, _query) when type in [:naive_datetime, :utc_datetime] do
+    Ch.Types.encode(:datetime)
+  end
+
+  defp ecto_to_db(type, _query)
+       when type in [:naive_datetime_usec, :utc_datetime_usec] do
+    Ch.Types.encode({:datetime64, 6})
+  end
 
   defp ecto_to_db(type, query) do
     raise Ecto.QueryError,
