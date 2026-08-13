@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Support lightweight `UPDATE` statements through `Repo.update/2` and `Repo.update_all/3` https://github.com/plausible/ecto_ch/pull/234
 - Raise when combination queries have a parent `LIMIT` or `OFFSET` and direct callers to wrap the combination in `subquery/1` https://github.com/plausible/ecto_ch/pull/301
 
 ## 0.11.0 (2026-08-08)

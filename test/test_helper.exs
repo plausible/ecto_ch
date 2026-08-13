@@ -56,6 +56,18 @@ exclude =
     [:time, :variant, :json, :dynamic, :lightweight_delete]
   end
 
+[ch_major, ch_minor | _] =
+  ch_version
+  |> String.split(".")
+  |> Enum.map(&String.to_integer/1)
+
+exclude =
+  if {ch_major, ch_minor} < {25, 7} do
+    [:update | exclude]
+  else
+    exclude
+  end
+
 {:ok, _} = Ecto.Adapters.ClickHouse.ensure_all_started(TestRepo.config(), :temporary)
 
 _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())

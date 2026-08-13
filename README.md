@@ -139,13 +139,19 @@ CREATE TABLE `posts` (
 
 ## Caveats
 
-#### [ALTER TABLE ... UPDATE](https://clickhouse.com/docs/en/sql-reference/statements/alter/update)
+#### [UPDATE](https://clickhouse.com/docs/sql-reference/statements/update)
 
-ClickHouse doesn't support `UPDATE` statements as of now, so `Repo.update/2` and `Repo.update_all/3` raise when called. But `Repo.alter_update_all/3` -- which executes `ALTER TABLE ... UPDATE` -- can be used instead.
+`Repo.update/2` and `Repo.update_all/3` use ClickHouse lightweight updates. They require ClickHouse 25.7 or later, a supported `MergeTree`-family table engine, and the following table settings:
 
-Note that `ALTER TABLE ... UPDATE` is considered an admin operation and comes with a performance cost. Please read https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse for more information.
+```sql
+SETTINGS enable_block_number_column = true, enable_block_offset_column = true
+```
 
-For examples, please see [clickhouse_alter_update_test.exs.](./test/ecto/integration/clickhouse_alter_update_test.exs)
+On ClickHouse releases where lightweight updates are disabled by default, pass `settings: [allow_experimental_lightweight_update: 1]` in the Repo call or connection configuration.
+
+Lightweight updates are intended for small updates. For large, infrequent updates, `Repo.alter_update_all/3` executes the heavyweight `ALTER TABLE ... UPDATE` mutation instead. ClickHouse does not report an affected-row count for either form, so this adapter returns `{0, nil}` from update-all operations and cannot detect stale rows in `Repo.update/2`.
+
+For examples, see [update_test.exs](./test/ecto/integration/update_test.exs) and [clickhouse_alter_update_test.exs](./test/ecto/integration/clickhouse_alter_update_test.exs).
 
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)
 
