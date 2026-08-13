@@ -439,6 +439,10 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
     raise ArgumentError, "type :numeric is not supported"
   end
 
+  defp column_type(:bitstring) do
+    raise ArgumentError, "type :bitstring is not supported"
+  end
+
   defp column_type(:map) do
     raise ArgumentError,
           ~s[type :map is ambiguous, use a literal (e.g. :JSON or :"Map(String, UInt8)") instead]
