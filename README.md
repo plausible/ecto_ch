@@ -2,7 +2,6 @@
 
 [![Documentation badge](https://img.shields.io/badge/Documentation-ff69b4)](https://hexdocs.pm/ecto_ch)
 [![Hex.pm badge](https://img.shields.io/badge/Package%20on%20hex.pm-informational)](https://hex.pm/packages/ecto_ch)
-[![Coveralls](https://img.shields.io/coverallsCoverage/github/plausible/ecto_ch?branch=master&style=flat&label=Coverage)](https://coveralls.io/github/plausible/ecto_ch?branch=master)
 
 Uses [Ch](https://github.com/plausible/ch) as driver.
 
@@ -11,7 +10,7 @@ Uses [Ch](https://github.com/plausible/ch) as driver.
 ```elixir
 defp deps do
   [
-    {:ecto_ch, "~> 0.10.0"}
+    {:ecto_ch, "~> 0.11.0"}
   ]
 end
 ```

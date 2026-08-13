@@ -216,7 +216,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def insert(prefix, table, header, rows, _on_conflict, returning, _placeholders) do
+  def insert(prefix, table, header, rows, _on_conflict, returning, _placeholders, _opts) do
     unless returning == [] do
       raise ArgumentError, "ClickHouse does not support RETURNING on INSERT statements"
     end
@@ -553,6 +553,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp offset(%{offset: %{expr: expr}} = query, sources, params) do
     [" OFFSET ", expr(expr, sources, params, query)]
+  end
+
+  defp combinations(
+         %{combinations: [_ | _], limit: limit, offset: offset} = query,
+         _params
+       )
+       when not is_nil(limit) or not is_nil(offset) do
+    raise Ecto.QueryError,
+      query: query,
+      message:
+        "ClickHouse applies LIMIT and OFFSET to individual SELECT queries, " <>
+          "not the combination result -- wrap the combination in subquery/1 before applying them"
   end
 
   defp combinations(%{combinations: combinations}, params) do

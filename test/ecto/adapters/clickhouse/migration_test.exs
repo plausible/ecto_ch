@@ -53,6 +53,27 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
     end
   end
 
+  defmodule CreateProducts do
+    use Ecto.Migration
+
+    def change do
+      create table(:products, primary_key: false, engine: "Memory") do
+        add :name, :string
+        add :price, :UInt64
+      end
+    end
+  end
+
+  defmodule AddPriceDefault do
+    use Ecto.Migration
+
+    def change do
+      alter table(:products) do
+        modify :price, :UInt64, default: 1
+      end
+    end
+  end
+
   test "events (table+index)" do
     database = "ecto_ch_migration_test_events"
     opts = [database: database]
@@ -77,36 +98,45 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
 
     conn = start_supervised!({Ch, opts})
 
-    assert Ch.query!(
-             conn,
-             "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
-             %{"database" => database, "table" => "events"}
-           ).rows == [
-             [
-               """
-               CREATE TABLE ecto_ch_migration_test_events.events (\
-               `name` String, \
-               `domain` String, \
-               `user_id` UInt64, \
-               `session_id` UInt64, \
-               `hostname` String, \
-               `pathname` String, \
-               `referrer` String, \
-               `referrer_source` String, \
-               `country_code` LowCardinality(FixedString(2)), \
-               `screen_size` LowCardinality(String), \
-               `operating_system` LowCardinality(String), \
-               `browser` LowCardinality(String), \
-               `timestamp` DateTime, \
-               INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
-               ) \
-               ENGINE = MergeTree \
-               PARTITION BY toYYYYMM(timestamp) \
-               ORDER BY (domain, toDate(timestamp), user_id) \
-               SETTINGS index_granularity = 8192\
-               """
-             ]
-           ]
+    [[create_table_query]] =
+      Ch.query!(
+        conn,
+        "select create_table_query from system.tables where database = {database:String} and table = {table:String}",
+        %{"database" => database, "table" => "events"}
+      ).rows
+
+    # ClickHouse 24.5 omits parentheses around single-column index expressions.
+    # Remove this normalization when 24.5 is dropped from the CI matrix.
+    create_table_query =
+      String.replace(
+        create_table_query,
+        "INDEX events_name_index name TYPE",
+        "INDEX events_name_index (name) TYPE"
+      )
+
+    assert create_table_query ==
+             """
+             CREATE TABLE ecto_ch_migration_test_events.events (\
+             `name` String, \
+             `domain` String, \
+             `user_id` UInt64, \
+             `session_id` UInt64, \
+             `hostname` String, \
+             `pathname` String, \
+             `referrer` String, \
+             `referrer_source` String, \
+             `country_code` LowCardinality(FixedString(2)), \
+             `screen_size` LowCardinality(String), \
+             `operating_system` LowCardinality(String), \
+             `browser` LowCardinality(String), \
+             `timestamp` DateTime, \
+             INDEX events_name_index (name) TYPE bloom_filter GRANULARITY 8192\
+             ) \
+             ENGINE = MergeTree \
+             PARTITION BY toYYYYMM(timestamp) \
+             ORDER BY (domain, toDate(timestamp), user_id) \
+             SETTINGS index_granularity = 8192\
+             """
 
     assert [3] ==
              Ecto.Migrator.run(MigrationRepo, [{3, DropIndex}], :up,
@@ -143,5 +173,35 @@ defmodule Ecto.Adapters.ClickHouse.MigrationTest do
                """
              ]
            ]
+  end
+
+  test "modify column default" do
+    database = "ecto_ch_migration_test_modify_default"
+    opts = [database: database]
+
+    assert :ok = ClickHouse.storage_up(opts)
+    on_exit(fn -> ClickHouse.storage_down(opts) end)
+
+    Application.put_env(:migration_test, MigrationRepo,
+      database: database,
+      show_sensitive_data_on_connection_error: true
+    )
+
+    on_exit(fn -> Application.delete_env(:migration_test, MigrationRepo) end)
+
+    start_supervised!(MigrationRepo)
+
+    assert [1, 2] ==
+             Ecto.Migrator.run(MigrationRepo, [{1, CreateProducts}, {2, AddPriceDefault}], :up,
+               all: true,
+               log: false
+             )
+
+    conn = start_supervised!({Ch, opts})
+
+    assert %{num_rows: 1} =
+             Ch.query!(conn, "INSERT INTO products (name) VALUES ('book')")
+
+    assert [[1]] == Ch.query!(conn, "SELECT price FROM products").rows
   end
 end

@@ -690,6 +690,10 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
     # 1	a2	0
     # 3	a4	0
 
+    # ClickHouse 24.5 in CI predates
+    # https://github.com/ClickHouse/ClickHouse/commit/8b56afcc05fd95cac083fb64f055c65883075547
+    # and copies unmatched left keys into the right key column. Accept both results until the
+    # minimum ClickHouse version in CI includes the fix, then remove the old result.
     assert TestRepo.all(
              from t1 in "semi_anti_t1",
                left_join: t2 in "semi_anti_t2",
@@ -697,10 +701,9 @@ defmodule Ecto.Integration.ClickHouseJoinsTest do
                hints: "ANTI",
                order_by: [t1.x, t2.x, t1.s, t2.s],
                select: [t1.x, t1.s, t2.x, t2.s]
-           ) == [
-             [0, "a1", 0, ""],
-             [1, "a2", 0, ""],
-             [3, "a4", 0, ""]
+           ) in [
+             [[0, "a1", 0, ""], [1, "a2", 0, ""], [3, "a4", 0, ""]],
+             [[0, "a1", 0, ""], [1, "a2", 1, ""], [3, "a4", 3, ""]]
            ]
 
     # SELECT t1.*, t2.* FROM t1 ANTI RIGHT JOIN t2 USING(x) ORDER BY t1.x, t2.x, t1.s, t2.s;

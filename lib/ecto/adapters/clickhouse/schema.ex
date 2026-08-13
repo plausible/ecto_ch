@@ -23,7 +23,9 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     %{num_rows: num_rows} =
       case rows do
         {%Ecto.Query{} = _query, params} ->
-          sql = @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders)
+          sql =
+            @conn.insert(prefix, source, header, rows, on_conflict, returning, placeholders, opts)
+
           Ecto.Adapters.SQL.query!(adapter_meta, sql, params, opts)
 
         rows when is_list(rows) ->
@@ -106,7 +108,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
         %Ecto.Query.SelectExpr{expr: {:merge, _, [{:&, _, [_]}, {:%{}, _, args}]}} ->
           fields = Keyword.keys(types)
           merged = Enum.map(args, &elem(&1, 0))
-          Enum.uniq(fields ++ merged) |> IO.inspect()
+          Enum.uniq(fields ++ merged)
 
         _ ->
           raise ArgumentError, """

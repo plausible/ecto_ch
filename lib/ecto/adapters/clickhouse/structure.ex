@@ -225,8 +225,16 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     stmt = "SELECT * FROM #{table} FORMAT Values"
 
     with {:ok, %{rows: rows}, conn} <- exec(conn, stmt) do
-      rows = rows |> IO.iodata_to_binary() |> String.replace("),(", "),\n(")
-      versions = ["INSERT INTO ", table, " (version, inserted_at) VALUES\n", rows, ";\n"]
+      versions =
+        case IO.iodata_to_binary(rows) do
+          "" ->
+            []
+
+          rows ->
+            rows = String.replace(rows, "),(", "),\n(")
+            ["INSERT INTO ", table, " (version, inserted_at) VALUES\n", rows, ";\n"]
+        end
+
       {:ok, versions, conn}
     end
   end

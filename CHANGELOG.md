@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Raise when combination queries have a parent `LIMIT` or `OFFSET` and direct callers to wrap the combination in `subquery/1` https://github.com/plausible/ecto_ch/pull/301
+
+## 0.11.0 (2026-08-08)
+
+- Support Ecto 3.14 and require Ch `~> 0.9.0` https://github.com/plausible/ecto_ch/pull/286 https://github.com/plausible/ecto_ch/pull/295
+- Require a table name when running `ecto.ch.schema` with repo options https://github.com/plausible/ecto_ch/pull/291
+- Fix invalid `MODIFY COLUMN` SQL when setting a column default https://github.com/plausible/ecto_ch/pull/290
+- Fix invalid structure dumps when the schema migration history is empty https://github.com/plausible/ecto_ch/pull/294
+
 ## 0.10.0 (2026-06-02)
 
 - Breaking change: compile `json_extract_path/2` and Ecto JSON access syntax to native ClickHouse JSON paths like `json.foo.bar` instead of `JSON_QUERY(json, '$.foo.bar')`. https://github.com/plausible/ecto_ch/pull/284
