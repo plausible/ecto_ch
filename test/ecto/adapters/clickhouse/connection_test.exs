@@ -1044,6 +1044,41 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ~s[SELECT CAST(e0."count" + CAST(1 AS Time64(6)) AS Time64(6)) FROM "events" AS e0]
   end
 
+  test "tagged datetime types" do
+    naive_datetime = ~N[2024-04-12 09:55:54]
+    naive_datetime_usec = ~N[2024-04-12 09:55:54.123456]
+    utc_datetime = ~U[2024-04-12 09:55:54Z]
+    utc_datetime_usec = ~U[2024-04-12 09:55:54.123456Z]
+
+    query = from e in "events", select: type(^naive_datetime, :naive_datetime)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime} AS DateTime) FROM "events" AS e0]
+
+    query = from e in "events", select: type(^naive_datetime_usec, :naive_datetime_usec)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime64(6)} AS DateTime64(6)) FROM "events" AS e0]
+
+    query = from e in "events", select: type(^utc_datetime, :utc_datetime)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime} AS DateTime) FROM "events" AS e0]
+
+    query = from e in "events", select: type(^utc_datetime_usec, :utc_datetime_usec)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:DateTime64(6)} AS DateTime64(6)) FROM "events" AS e0]
+  end
+
+  test "tagged binary_id type" do
+    binary_id = Ecto.UUID.generate()
+    query = from e in "events", select: type(^binary_id, :binary_id)
+
+    assert all(query) ==
+             ~s[SELECT CAST({$0:String} AS String) FROM "events" AS e0]
+  end
+
   test "tagged unknown type" do
     query = from e in "events", select: type(e.count + 1, :decimal)
 
@@ -3474,6 +3509,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert execute_ddl(integer) == [
              ~s/CREATE TABLE "posts" ("id" Int32,PRIMARY KEY ("id")) ENGINE=MergeTree/
            ]
+  end
+
+  test "Date and Date32 params" do
+    params = [~D[1969-12-31], ~D[1970-01-01], ~D[2148-12-31], ~D[2149-01-01]]
+
+    assert Connection.build_params(_ix = 0, _len = 4, params) |> IO.iodata_to_binary() ==
+             "{$0:Date32},{$1:Date},{$2:Date},{$3:Date32}"
   end
 
   # https://github.com/plausible/ecto_ch/issues/178
