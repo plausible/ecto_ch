@@ -286,6 +286,10 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp remap_type(:time_usec, _original, _schema, _field), do: {:time64, _precision = 6}
 
+  defp remap_type(:bitstring, _original, _schema, _field) do
+    raise ArgumentError, "type :bitstring is not supported"
+  end
+
   # TODO remove
   defp remap_type(t, _original, _schema, _field)
        when t in [:binary, :binary_id],

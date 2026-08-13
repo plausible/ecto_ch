@@ -16,6 +16,15 @@ defmodule Ecto.Adapters.ClickHouse.APITest do
     end
   end
 
+  defmodule BitstringSchema do
+    use Ecto.Schema
+
+    @primary_key false
+    schema "bitstrings" do
+      field :bits, :bitstring
+    end
+  end
+
   defp plan(query, operation) do
     {query, _cast_params, dump_params} =
       Ecto.Adapter.Queryable.plan_query(operation, ClickHouse, query)
@@ -50,6 +59,12 @@ defmodule Ecto.Adapters.ClickHouse.APITest do
       assert all(query) == """
              SELECT f0."a",arrayReduce('argMaxState', [f0."b"], [f0."a"]) FROM input("a Int16, b String") AS f0\
              """
+    end
+
+    test "schema with unsupported bitstring type" do
+      assert_raise ArgumentError, "type :bitstring is not supported", fn ->
+        API.input(BitstringSchema)
+      end
     end
   end
 end

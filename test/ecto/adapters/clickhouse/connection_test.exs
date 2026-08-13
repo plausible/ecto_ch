@@ -2842,6 +2842,14 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
   end
 
+  test "create table with a bitstring column" do
+    create = {:create, table(:posts), [{:add, :bits, :bitstring, []}]}
+
+    assert_raise ArgumentError, "type :bitstring is not supported", fn ->
+      execute_ddl(create)
+    end
+  end
+
   test "drop table" do
     drop = {:drop, table(:posts), :restrict}
     assert execute_ddl(drop) == [~s|DROP TABLE "posts"|]
