@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Raise an explicit error for the unsupported Ecto `:bitstring` type
+- Raise an explicit error for the unsupported Ecto `:bitstring` type https://github.com/plausible/ecto_ch/pull/305
 - Preserve semicolons inside literals, quoted identifiers, heredocs, and comments when loading structure dumps https://github.com/plausible/ecto_ch/pull/293
 - Raise when combination queries have a parent `LIMIT` or `OFFSET` and direct callers to wrap the combination in `subquery/1` https://github.com/plausible/ecto_ch/pull/301
 - Escape double quotes, backticks, and backslashes in quoted ClickHouse identifiers https://github.com/plausible/ecto_ch/pull/283
