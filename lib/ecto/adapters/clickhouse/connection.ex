@@ -1267,7 +1267,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     end
   end
 
-  # TODO Date32
+  defp param_type(%Date{year: year}) when year < 1970 or year > 2148, do: "Date32"
   defp param_type(%Date{}), do: "Date"
 
   defp param_type(%Time{microsecond: {_value, precision}}) when precision > 0 do
