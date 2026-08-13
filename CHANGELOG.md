@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Raise when combination queries have a parent `LIMIT` or `OFFSET` and direct callers to wrap the combination in `subquery/1` https://github.com/plausible/ecto_ch/pull/301
+
 ## 0.11.0 (2026-08-08)
 
 - Support Ecto 3.14 and require Ch `~> 0.9.0` https://github.com/plausible/ecto_ch/pull/286 https://github.com/plausible/ecto_ch/pull/295
