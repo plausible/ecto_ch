@@ -268,7 +268,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
 
   defp comment(%Table{} = table) do
     if comment = table.comment do
-      [" COMMENT ", @conn.quote_name(comment, ?')]
+      [" COMMENT ", @conn.quote_string(comment)]
     else
       []
     end
@@ -381,7 +381,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   defp null_expr(_), do: []
 
   defp comment_expr(nil), do: []
-  defp comment_expr(comment), do: [" COMMENT '", @conn.escape_string(comment), ?']
+  defp comment_expr(comment), do: [" COMMENT ", @conn.quote_string(comment)]
 
   @dialyzer {:no_improper_lists, default_expr: 2}
   defp default_expr({:ok, nil}, _type) do
@@ -389,7 +389,7 @@ defmodule Ecto.Adapters.ClickHouse.Migration do
   end
 
   defp default_expr({:ok, literal}, _type) when is_binary(literal) do
-    [" DEFAULT '", @conn.escape_string(literal), ?']
+    [" DEFAULT ", @conn.quote_string(literal)]
   end
 
   defp default_expr({:ok, literal}, _type) when is_number(literal) do
