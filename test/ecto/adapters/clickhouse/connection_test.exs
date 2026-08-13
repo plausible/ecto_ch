@@ -3468,6 +3468,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
+  test "Date and Date32 params" do
+    params = [~D[1969-12-31], ~D[1970-01-01], ~D[2148-12-31], ~D[2149-01-01]]
+
+    assert Connection.build_params(_ix = 0, _len = 4, params) |> IO.iodata_to_binary() ==
+             "{$0:Date32},{$1:Date},{$2:Date},{$3:Date32}"
+  end
+
   # https://github.com/plausible/ecto_ch/issues/178
   test "DateTime64 params" do
     assert all(
