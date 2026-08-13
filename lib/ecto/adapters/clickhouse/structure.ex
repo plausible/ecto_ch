@@ -4,7 +4,10 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   alias Ch.Connection, as: Conn
 
   @conn Ecto.Adapters.ClickHouse.Connection
+  @statement_markers [";", "--", "//", "/*", "# ", "#!", "'", "\"", "`", "$", "‘", "“"]
   @heredoc_tag ~r/\A[A-Za-z0-9_]*\z/
+  @bare_word ~r/\A[A-Za-z0-9_$]+/
+  @bare_word_before_dollar ~r/(?:\A|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*\z/
 
   def structure_load(default, config) do
     path = config[:dump_path] || Path.join(default, "structure.sql")
@@ -27,80 +30,116 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   end
 
   defp split_statements(sql) do
+    markers = :binary.compile_pattern(@statement_markers)
+
     sql
-    |> split_statements(sql, false, [])
+    |> split_statements(sql, false, [], markers)
     |> Enum.reverse()
   end
 
   # `statement` stays at the start of the current query while the first argument advances.
-  # This lets us slice complete queries without rebuilding the input byte by byte.
-  defp split_statements(sql, statement, significant?, statements) do
-    case sql do
-      <<>> ->
-        add_statement(statements, statement, significant?)
+  # Complete queries can therefore be sliced without rebuilding the input.
+  defp split_statements(sql, statement, significant?, statements, markers) do
+    case :binary.match(sql, markers) do
+      :nomatch ->
+        add_statement(statements, statement, significant? or has_sql?(sql))
 
-      <<?;, rest::binary>> ->
-        query_size = byte_size(statement) - byte_size(rest) - 1
-        query = binary_part(statement, 0, query_size)
-        split_statements(rest, rest, false, add_statement(statements, query, significant?))
+      {offset, size} ->
+        <<prefix::binary-size(^offset), marker::binary-size(^size), rest::binary>> = sql
+        significant? = significant? or has_sql?(prefix)
 
-      <<comment::binary-size(2), rest::binary>> when comment in ["--", "//"] ->
-        split_statements(skip_through(rest, "\n"), statement, significant?, statements)
-
-      <<"#", next, rest::binary>> when next in [?\s, ?!] ->
-        split_statements(skip_through(rest, "\n"), statement, significant?, statements)
-
-      <<"/*", rest::binary>> ->
-        case skip_block_comment(rest, 1) do
-          {:ok, rest} -> split_statements(rest, statement, significant?, statements)
-          :error -> split_statements(<<>>, statement, true, statements)
-        end
-
-      <<quote, rest::binary>> when quote in [?\', ?\", ?`] ->
-        split_statements(skip_quoted(rest, quote), statement, true, statements)
-
-      <<opening::binary-size(3), rest::binary>> when opening in ["‘", "“"] ->
-        closing = if opening == "‘", do: "’", else: "”"
-        split_statements(skip_through(rest, closing), statement, true, statements)
-
-      <<?$, rest::binary>> ->
-        rest =
-          case skip_heredoc(rest) do
-            {:ok, rest} -> rest
-            :error -> skip_word(rest)
-          end
-
-        split_statements(rest, statement, true, statements)
-
-      <<char, rest::binary>>
-      when char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char == ?_ ->
-        split_statements(skip_word(rest), statement, true, statements)
-
-      <<char, rest::binary>> when char in [?\s, ?\t, ?\n, ?\r, ?\f, ?\v] ->
-        split_statements(rest, statement, significant?, statements)
-
-      <<_char, rest::binary>> ->
-        split_statements(rest, statement, true, statements)
+        split_at(marker, rest, prefix, statement, significant?, statements, markers)
     end
+  end
+
+  defp split_at(";", rest, _prefix, statement, significant?, statements, markers) do
+    query_size = byte_size(statement) - byte_size(rest) - 1
+    query = binary_part(statement, 0, query_size)
+    statements = add_statement(statements, query, significant?)
+    split_statements(rest, rest, false, statements, markers)
+  end
+
+  defp split_at(comment, rest, _prefix, statement, significant?, statements, markers)
+       when comment in ["--", "//", "# ", "#!"] do
+    rest = skip_through(rest, "\n")
+    split_statements(rest, statement, significant?, statements, markers)
+  end
+
+  defp split_at("/*", rest, _prefix, statement, significant?, statements, markers) do
+    case skip_block_comment(rest) do
+      {:ok, rest} -> split_statements(rest, statement, significant?, statements, markers)
+      :error -> split_statements(<<>>, statement, true, statements, markers)
+    end
+  end
+
+  defp split_at(quote, rest, _prefix, statement, _significant?, statements, markers)
+       when quote in ["'", "\"", "`"] do
+    rest = skip_quoted(rest, :binary.first(quote))
+    split_statements(rest, statement, true, statements, markers)
+  end
+
+  defp split_at(opening, rest, _prefix, statement, _significant?, statements, markers)
+       when opening in ["‘", "“"] do
+    closing = if opening == "‘", do: "’", else: "”"
+    rest = skip_through(rest, closing)
+    split_statements(rest, statement, true, statements, markers)
+  end
+
+  defp split_at("$", rest, prefix, statement, _significant?, statements, markers) do
+    # A dollar starts a heredoc only at a token boundary; otherwise it belongs to a bare word.
+    rest =
+      if Regex.match?(@bare_word_before_dollar, prefix) do
+        skip_bare_word(rest)
+      else
+        case skip_heredoc(rest) do
+          {:ok, rest} -> rest
+          :error -> skip_bare_word(rest)
+        end
+      end
+
+    split_statements(rest, statement, true, statements, markers)
   end
 
   defp skip_quoted(sql, quote) do
-    case sql do
-      <<>> -> <<>>
-      <<?\\, _char, rest::binary>> -> skip_quoted(rest, quote)
-      <<^quote, ^quote, rest::binary>> -> skip_quoted(rest, quote)
-      <<^quote, rest::binary>> -> rest
-      <<_char, rest::binary>> -> skip_quoted(rest, quote)
+    pattern = :binary.compile_pattern([<<quote>>, "\\"])
+    skip_quoted(sql, quote, pattern)
+  end
+
+  defp skip_quoted(sql, quote, pattern) do
+    case :binary.match(sql, pattern) do
+      :nomatch ->
+        <<>>
+
+      {offset, 1} ->
+        <<_::binary-size(^offset), marker, rest::binary>> = sql
+
+        case {marker, rest} do
+          {?\\, <<_escaped, rest::binary>>} -> skip_quoted(rest, quote, pattern)
+          {?\\, <<>>} -> <<>>
+          {^quote, <<^quote, rest::binary>>} -> skip_quoted(rest, quote, pattern)
+          {^quote, rest} -> rest
+        end
     end
   end
 
-  defp skip_block_comment(sql, depth) do
-    case sql do
-      <<>> -> :error
-      <<"/*", rest::binary>> -> skip_block_comment(rest, depth + 1)
-      <<"*/", rest::binary>> when depth == 1 -> {:ok, rest}
-      <<"*/", rest::binary>> -> skip_block_comment(rest, depth - 1)
-      <<_char, rest::binary>> -> skip_block_comment(rest, depth)
+  defp skip_block_comment(sql) do
+    pattern = :binary.compile_pattern(["/*", "*/"])
+    skip_block_comment(sql, 1, pattern)
+  end
+
+  defp skip_block_comment(sql, depth, pattern) do
+    case :binary.match(sql, pattern) do
+      :nomatch ->
+        :error
+
+      {offset, 2} ->
+        <<_::binary-size(^offset), marker::binary-size(2), rest::binary>> = sql
+
+        case marker do
+          "/*" -> skip_block_comment(rest, depth + 1, pattern)
+          "*/" when depth == 1 -> {:ok, rest}
+          "*/" -> skip_block_comment(rest, depth - 1, pattern)
+        end
     end
   end
 
@@ -121,12 +160,14 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
     end
   end
 
-  defp skip_word(<<char, rest::binary>>)
-       when char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char in [?_, ?$] do
-    skip_word(rest)
+  defp skip_bare_word(sql) do
+    case Regex.run(@bare_word, sql, return: :index) do
+      [{0, size}] -> binary_part(sql, size, byte_size(sql) - size)
+      nil -> sql
+    end
   end
 
-  defp skip_word(rest), do: rest
+  defp has_sql?(sql), do: String.trim(sql) != ""
 
   defp add_statement(statements, _statement, false), do: statements
 

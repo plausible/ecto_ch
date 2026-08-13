@@ -424,27 +424,45 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
       tmp: tmp,
       opts: opts
     } do
-      File.write!(path, ~S"""
-      CREATE TABLE literal_defaults
+      Repo.query!("""
+      CREATE TABLE generated_literals
       (
-          `single_quote` String DEFAULT 'one;two',
-          `escaped_quote` String DEFAULT 'three\';four',
-          `doubled_quote` String DEFAULT 'five'';six',
-          `empty_heredoc` String DEFAULT $$seven;eight$$,
-          `named_heredoc` String DEFAULT $tag$nine;ten$tag$,
-          `unicode_quote` String DEFAULT ‘eleven;twelve’,
-          `backtick;identifier` UInt8,
-          "double;identifier" UInt8,
-          bare$dollar$identifier UInt8
+          `generated;identifier` String DEFAULT 'generated;default'
       )
-      ENGINE = TinyLog;
-
-      CREATE TABLE after_literals
-      (
-          `value` UInt8
-      )
-      ENGINE = TinyLog;
+      ENGINE = TinyLog
       """)
+
+      generated_statement = show_create_table("generated_literals")
+      Repo.query!("DROP TABLE generated_literals")
+
+      File.write!(path, [
+        generated_statement,
+        ";\n\n",
+        ~S"""
+        CREATE TABLE literal_defaults
+        (
+            `single_quote` String DEFAULT 'one;two',
+            `escaped_quote` String DEFAULT 'three\';four',
+            `escaped_backslash` String DEFAULT 'five\\',
+            `doubled_quote` String DEFAULT 'five'';six',
+            `comment_markers` String DEFAULT '/*;*/ --; //; #; $tag$',
+            `empty_heredoc` String DEFAULT $$seven;eight$$,
+            `named_heredoc` String DEFAULT $tag$nine;ten$tag$,
+            `unicode_quote` String DEFAULT ‘eleven;twelve’,
+            `backtick;identifier` UInt8,
+            "double;identifier" UInt8,
+            “unicode;identifier” UInt8,
+            bare$dollar$identifier UInt8
+        )
+        ENGINE = TinyLog;
+
+        CREATE TABLE after_literals
+        (
+            `value` UInt8
+        )
+        ENGINE = TinyLog;
+        """
+      ])
 
       assert {:ok, ^path} = ClickHouse.structure_load(tmp, opts)
 
@@ -457,7 +475,9 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
                  [
                    "one;two",
                    "three';four",
+                   "five\\",
                    "five';six",
+                   "/*;*/ --; //; #; $tag$",
                    "seven;eight",
                    "nine;ten",
                    "eleven;twelve"
@@ -465,14 +485,16 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
                ]
              } =
                Repo.query!("""
-               SELECT single_quote, escaped_quote, doubled_quote,
-                      empty_heredoc, named_heredoc, unicode_quote
+               SELECT single_quote, escaped_quote, escaped_backslash, doubled_quote,
+                      comment_markers, empty_heredoc, named_heredoc, unicode_quote
                FROM literal_defaults
                """)
 
       assert show_create_table("literal_defaults") =~ "`backtick;identifier` UInt8"
       assert show_create_table("literal_defaults") =~ "`double;identifier` UInt8"
+      assert show_create_table("literal_defaults") =~ "`unicode;identifier` UInt8"
       assert show_create_table("literal_defaults") =~ "`bare$dollar$identifier` UInt8"
+      assert show_create_table("generated_literals") =~ "'generated;default'"
       assert show_create_table("after_literals") =~ "CREATE TABLE"
     end
 
@@ -490,9 +512,9 @@ defmodule Ecto.Adapters.ClickHouse.StructureTest do
          /* containing a nested block comment */
          and a semicolon;
       */
-      CREATE TABLE after_comments
+      CREATE /* A mid-statement comment containing a semicolon; */ TABLE after_comments
       (
-          `value` UInt8
+          `value` UInt8 -- An inline comment containing a semicolon;
       )
       ENGINE = TinyLog;
 
