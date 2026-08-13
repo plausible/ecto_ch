@@ -807,6 +807,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   end
 
   test "quoted identifier escape" do
+    assert Connection.quote_name("") |> IO.iodata_to_binary() == "``"
+
+    assert Connection.quote_name("unicode-🐈") |> IO.iodata_to_binary() ==
+             "`unicode-🐈`"
+
     assert Connection.quote_name(~s{has`tick}) |> IO.iodata_to_binary() ==
              ~s{`has\\`tick`}
 
@@ -815,6 +820,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert Connection.quote_name(~s{has"quote}, ?") |> IO.iodata_to_binary() ==
              ~s{"has\\"quote"}
+
+    assert Connection.quote_name([~s{has`tick}, :"has\\slash"]) |> IO.iodata_to_binary() ==
+             ~s{`has\\`tick.has\\\\slash`}
+
+    input = :binary.list_to_bin([?a, ?\\, ?`, ?`, ?b, ?\\])
+    expected = :binary.list_to_bin([?`, ?a, ?\\, ?\\, ?\\, ?`, ?\\, ?`, ?b, ?\\, ?\\, ?`])
+    assert Connection.quote_name(input) |> IO.iodata_to_binary() == expected
 
     query = insert(nil, ~s{schema`quoted}, [~s{field`quoted}], [], :raise, [])
 

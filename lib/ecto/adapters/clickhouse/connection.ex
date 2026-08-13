@@ -1068,13 +1068,23 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp wrap_in(value, wrapper), do: [wrapper, value, wrapper]
 
   defp escape_quoted(value, quoter) when quoter in [?\", ?`] do
-    value
-    |> IO.iodata_to_binary()
-    |> :binary.replace("\\", "\\\\", [:global])
-    |> :binary.replace(<<quoter>>, <<?\\, quoter>>, [:global])
+    value = IO.iodata_to_binary(value)
+    intersperse_escaped(value, :binary.matches(value, ["\\", <<quoter>>]), 0)
   end
 
   defp escape_quoted(value, _quoter), do: value
+
+  defp intersperse_escaped(value, [], 0), do: value
+
+  defp intersperse_escaped(value, [{position, 1} | matches], offset) do
+    plain = binary_part(value, offset, position - offset)
+    escaped = :binary.at(value, position)
+    [plain, ?\\, escaped | intersperse_escaped(value, matches, position + 1)]
+  end
+
+  defp intersperse_escaped(value, [], offset) do
+    binary_part(value, offset, byte_size(value) - offset)
+  end
 
   @doc false
   # TODO faster?
