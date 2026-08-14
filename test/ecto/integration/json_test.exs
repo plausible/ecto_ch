@@ -103,7 +103,12 @@ defmodule Ecto.Integration.JsonTest do
             "comma,key" => "comma",
             "colon:key" => "colon",
             "slash/key" => "slash",
-            "bracket[key]" => "bracket"
+            "bracket[key]" => "bracket",
+            "trailing\\" => "trailing_backslash",
+            "backslash\\`backtick" => "backslash_backtick",
+            "all'\"`\\quotes" => "all_quotes",
+            "line\nbreak" => "newline",
+            "; -- /* comment */ $tag$ body $tag$" => "syntax"
           }
         },
         time: ~N[2023-10-01 13:00:00]
@@ -128,6 +133,16 @@ defmodule Ecto.Integration.JsonTest do
                  edge_colon: json_extract_path(s.json, ["edge cases", "colon:key"]),
                  edge_slash: json_extract_path(s.json, ["edge cases", "slash/key"]),
                  edge_bracket: json_extract_path(s.json, ["edge cases", "bracket[key]"]),
+                 edge_trailing_backslash: json_extract_path(s.json, ["edge cases", "trailing\\"]),
+                 edge_backslash_backtick:
+                   json_extract_path(s.json, ["edge cases", "backslash\\`backtick"]),
+                 edge_all_quotes: json_extract_path(s.json, ["edge cases", "all'\"`\\quotes"]),
+                 edge_newline: json_extract_path(s.json, ["edge cases", "line\nbreak"]),
+                 edge_syntax:
+                   json_extract_path(s.json, [
+                     "edge cases",
+                     "; -- /* comment */ $tag$ body $tag$"
+                   ]),
                  bracket_name: s.json["nested"]["name"]
                }
            ) == [
@@ -147,6 +162,11 @@ defmodule Ecto.Integration.JsonTest do
                edge_colon: "colon",
                edge_slash: "slash",
                edge_bracket: "bracket",
+               edge_trailing_backslash: "trailing_backslash",
+               edge_backslash_backtick: "backslash_backtick",
+               edge_all_quotes: "all_quotes",
+               edge_newline: "newline",
+               edge_syntax: "syntax",
                bracket_name: "Test"
              }
            ]

@@ -7,6 +7,21 @@ defmodule Ecto.Integration.SQLTest do
 
   import Ecto.Query
 
+  defmodule QuotedNames do
+    use Ecto.Schema
+
+    @primary_key false
+    @table_name "ecto_ch quoted ' \" ` \\ ; -- /* */ $tag$ table \\"
+    @column_name String.to_atom("value ' \" ` \\ ; -- /* */ $tag$ column \\")
+
+    schema @table_name do
+      field :value, :string, source: @column_name
+    end
+
+    def table_name, do: @table_name
+    def column_name, do: Atom.to_string(@column_name)
+  end
+
   test "fragmented types" do
     datetime = ~N[2014-01-16 20:26:51]
 
@@ -72,6 +87,67 @@ defmodule Ecto.Integration.SQLTest do
       assert result.columns == [name]
       assert result.rows == [[1]]
     end
+  end
+
+  test "bound parameters and inline literals round-trip escaping edge cases" do
+    values = [
+      "",
+      "'",
+      "\\",
+      ~S|\'|,
+      "'\\",
+      "\\\\'",
+      "single ' double \" backtick ` backslash \\ middle",
+      "ends with \\",
+      "; SELECT 2; -- /* comment */ $tag$ heredoc $tag$",
+      "line one\nline two\r\n\t",
+      "\u00E9\u0416\u4E2D\u6587",
+      :binary.list_to_bin(Enum.to_list(0..127))
+    ]
+
+    for value <- values do
+      query =
+        from _ in "one",
+          select: {type(^value, :string), fragment("?", constant(^value))}
+
+      assert TestRepo.one(query, database: "system") == {value, value}
+    end
+  end
+
+  test "quoted table, column, and alias names round-trip through ClickHouse" do
+    table = QuotedNames.table_name()
+    column = QuotedNames.column_name()
+    quoted_table = Connection.quote_name(table)
+    quoted_column = Connection.quote_name(column)
+
+    TestRepo.query!([
+      "CREATE TABLE ",
+      quoted_table,
+      " (",
+      quoted_column,
+      " String) ENGINE Memory"
+    ])
+
+    on_exit(fn -> TestRepo.query!(["DROP TABLE IF EXISTS ", quoted_table]) end)
+
+    value = "value with ' \" ` \\ and \\' adjacent"
+    assert %QuotedNames{value: ^value} = TestRepo.insert!(%QuotedNames{value: value})
+    assert [^value] = TestRepo.all(from row in QuotedNames, select: row.value)
+
+    alias_name = "alias ' \" ` \\ ; -- /* */ $tag$ \\"
+
+    result =
+      TestRepo.query!([
+        "SELECT ",
+        quoted_column,
+        " AS ",
+        Connection.quote_name(alias_name, ?`),
+        " FROM ",
+        quoted_table
+      ])
+
+    assert result.columns == [alias_name]
+    assert result.rows == [[value]]
   end
 
   test "disconnect_all/2" do
