@@ -1033,7 +1033,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   def quote_name(name) do
     name
-    |> unquoted_name()
+    |> name_to_iodata()
     |> quote_with(?")
   end
 
@@ -1042,14 +1042,14 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     quote_with(value, ?')
   end
 
-  defp unquoted_name(names) when is_list(names) do
+  defp name_to_iodata(names) when is_list(names) do
     names
     |> Enum.reject(&is_nil/1)
-    |> intersperse_map(?., &unquoted_name/1)
+    |> intersperse_map(?., &name_to_iodata/1)
   end
 
-  defp unquoted_name(name) when is_atom(name), do: Atom.to_string(name)
-  defp unquoted_name(name) when is_binary(name), do: name
+  defp name_to_iodata(name) when is_atom(name), do: Atom.to_string(name)
+  defp name_to_iodata(name) when is_binary(name), do: name
 
   defp quote_qualified_name(name, sources, ix) do
     {_, source, _} = elem(sources, ix)
