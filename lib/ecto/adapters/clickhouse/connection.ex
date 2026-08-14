@@ -753,9 +753,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     rows = :lists.seq(1, num_rows, 1)
 
     structure =
-      Enum.map_intersperse(types, ?,, fn {field, type} ->
+      types
+      |> Enum.map_intersperse(?,, fn {field, type} ->
         [Atom.to_string(field), ?\s, ecto_to_db(type, query)]
       end)
+      |> IO.iodata_to_binary()
 
     {rows, _idx} =
       intersperse_reduce(rows, ?,, idx, fn _, idx ->
@@ -1034,11 +1036,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def quote_name(name) do
     name
     |> name_to_iodata()
+    |> IO.iodata_to_binary()
     |> quote_with(?")
   end
 
   @doc false
-  def quote_string(value) do
+  def quote_string(value) when is_binary(value) do
     quote_with(value, ?')
   end
 
@@ -1065,17 +1068,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def quote_table(nil, name), do: quote_name(name)
   def quote_table(prefix, name), do: [quote_name(prefix), ?., quote_name(name)]
 
-  defp quote_with(value, quoter) do
+  defp quote_with(value, quoter) when is_binary(value) and quoter in [?', ?\"] do
     [quoter, escape_quoted(value, quoter), quoter]
   end
 
-  defp escape_quoted(value, quoter) when quoter in [?', ?\"] do
+  defp escape_quoted(value, quoter) when is_binary(value) and quoter in [?', ?\"] do
     # Neutralize existing escape sequences before escaping the active delimiter.
     # ClickHouse accepts both '' and \'; emit SQL-style doubling canonically.
     escaped_quoter = if quoter == ?', do: "''", else: <<?\\, quoter>>
 
     value
-    |> IO.iodata_to_binary()
     |> :binary.replace("\\", "\\\\", [:global])
     |> :binary.replace(<<quoter>>, escaped_quoter, [:global])
   end

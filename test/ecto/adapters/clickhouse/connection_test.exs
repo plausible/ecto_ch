@@ -811,6 +811,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert Connection.quote_string(~S|has\'quote|) |> IO.iodata_to_binary() ==
              ~S|'has\\''quote'|
+
+    assert_raise FunctionClauseError, fn -> apply(Connection, :quote_string, [1]) end
   end
 
   test "quoted identifier escape" do
