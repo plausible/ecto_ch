@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Standardize escaping for single-quoted strings, double-quoted and backtick-quoted identifiers, and JSON path keys https://github.com/plausible/ecto_ch/pull/304
 - Use `Date32` for bound date parameters before 1970 or after 2148 https://github.com/plausible/ecto_ch/pull/307
 - Fix explicit `type/2` casts for `:naive_datetime`, `:utc_datetime`, their microsecond variants, and `:binary_id` https://github.com/plausible/ecto_ch/pull/306
 - Raise an explicit error for the unsupported Ecto `:bitstring` type https://github.com/plausible/ecto_ch/pull/305

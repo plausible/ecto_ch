@@ -1050,7 +1050,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp unquoted_name(name) when is_atom(name), do: Atom.to_string(name)
-  defp unquoted_name(name), do: name
+  defp unquoted_name(name) when is_binary(name), do: name
 
   defp quote_qualified_name(name, sources, ix) do
     {_, source, _} = elem(sources, ix)
@@ -1072,6 +1072,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp escape_quoted(value, quoter) when quoter in [?', ?\", ?`] do
     # Neutralize existing escape sequences before escaping the active delimiter.
+    # ClickHouse accepts both '' and \'; emit SQL-style doubling canonically.
     escaped_quoter = if quoter == ?', do: "''", else: <<?\\, quoter>>
 
     value

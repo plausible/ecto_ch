@@ -808,6 +808,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     value = "let's \\ escape"
     query = "schema" |> select([], fragment("?", constant(^value)))
     assert all(query) == ~s[SELECT 'let''s \\\\ escape' FROM "schema" AS s0]
+
+    assert Connection.quote_string(~S|has\'quote|) |> IO.iodata_to_binary() ==
+             ~S|'has\\''quote'|
   end
 
   test "quoted identifier escape" do
@@ -819,6 +822,11 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
     assert Connection.quote_name(~s{has`tick}, ?`) |> IO.iodata_to_binary() ==
              ~s{`has\\`tick`}
+
+    assert Connection.quote_name(["nested", nil, :name]) |> IO.iodata_to_binary() ==
+             ~s{"nested.name"}
+
+    assert_raise FunctionClauseError, fn -> apply(Connection, :quote_name, [1]) end
 
     query = insert(nil, ~s{schema"quoted}, [~s{field"quoted}], [], :raise, [])
 
