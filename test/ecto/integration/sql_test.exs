@@ -78,15 +78,11 @@ defmodule Ecto.Integration.SQLTest do
 
     assert result.rows == [[string]]
 
-    for {quoter, name} <- [
-          {?\", ~S|alias" FROM numbers(10) -- \ $tag$body$tag$ /* comment */|},
-          {?`, ~S|alias` FROM numbers(10) -- \ $tag$body$tag$ /* comment */|}
-        ] do
-      result = TestRepo.query!(["SELECT 1 AS ", Connection.quote_name(name, quoter)])
+    name = ~S|alias"` FROM numbers(10) -- \ $tag$body$tag$ /* comment */|
+    result = TestRepo.query!(["SELECT 1 AS ", Connection.quote_name(name)])
 
-      assert result.columns == [name]
-      assert result.rows == [[1]]
-    end
+    assert result.columns == [name]
+    assert result.rows == [[1]]
   end
 
   test "bound parameters and inline literals round-trip escaping edge cases" do
@@ -141,7 +137,7 @@ defmodule Ecto.Integration.SQLTest do
         "SELECT ",
         quoted_column,
         " AS ",
-        Connection.quote_name(alias_name, ?`),
+        Connection.quote_name(alias_name),
         " FROM ",
         quoted_table
       ])

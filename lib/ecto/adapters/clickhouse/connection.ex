@@ -832,7 +832,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp expr({:json_extract_path, _, [expr, path]}, sources, params, query) do
     path =
       Enum.map(path, fn
-        bin when is_binary(bin) -> [?., quote_name(bin, ?`)]
+        bin when is_binary(bin) -> [?., quote_name(bin)]
         int when is_integer(int) -> [?[, Integer.to_string(int), ?]]
       end)
 
@@ -1029,13 +1029,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
-  def quote_name(name, quoter \\ ?")
-  def quote_name(nil, quoter) when quoter in [?\", ?`], do: []
+  def quote_name(nil), do: []
 
-  def quote_name(name, quoter) when quoter in [?\", ?`] do
+  def quote_name(name) do
     name
     |> unquoted_name()
-    |> quote_with(quoter)
+    |> quote_with(?")
   end
 
   @doc false
@@ -1070,7 +1069,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     [quoter, escape_quoted(value, quoter), quoter]
   end
 
-  defp escape_quoted(value, quoter) when quoter in [?', ?\", ?`] do
+  defp escape_quoted(value, quoter) when quoter in [?', ?\"] do
     # Neutralize existing escape sequences before escaping the active delimiter.
     # ClickHouse accepts both '' and \'; emit SQL-style doubling canonically.
     escaped_quoter = if quoter == ?', do: "''", else: <<?\\, quoter>>
