@@ -753,9 +753,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     rows = :lists.seq(1, num_rows, 1)
 
     structure =
-      Enum.map_intersperse(types, ?,, fn {field, type} ->
-        [escape_string(Atom.to_string(field)), ?\s, ecto_to_db(type, query)]
+      types
+      |> Enum.map_intersperse(?,, fn {field, type} ->
+        [Atom.to_string(field), ?\s, ecto_to_db(type, query)]
       end)
+      |> IO.iodata_to_binary()
 
     {rows, _idx} =
       intersperse_reduce(rows, ?,, idx, fn _, idx ->
@@ -763,7 +765,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         {[?(, value, ?)], idx}
       end)
 
-    ["VALUES('", structure, ?', ?,, rows, ?)]
+    ["VALUES(", quote_string(structure), ?,, rows, ?)]
   end
 
   defp expr({:identifier, _, [name]}, _sources, _params, _query) do
@@ -771,7 +773,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp expr({:constant, _, [literal]}, _sources, _params, _query) when is_binary(literal) do
-    [?', escape_string(literal), ?']
+    quote_string(literal)
   end
 
   defp expr({:constant, _, [literal]}, _sources, _params, _query) when is_number(literal) do
@@ -832,7 +834,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp expr({:json_extract_path, _, [expr, path]}, sources, params, query) do
     path =
       Enum.map(path, fn
-        bin when is_binary(bin) -> [?., json_path_key(bin)]
+        bin when is_binary(bin) -> [?., quote_name(bin)]
         int when is_integer(int) -> [?[, Integer.to_string(int), ?]]
       end)
 
@@ -887,7 +889,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp expr(false, _sources, _params, _query), do: "0"
 
   defp expr(literal, _sources, _params, _query) when is_binary(literal) do
-    [?', escape_string(literal), ?']
+    quote_string(literal)
   end
 
   defp expr(literal, _sources, _params, _query) when is_integer(literal) do
@@ -1029,26 +1031,28 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
-  def quote_name(name, quoter \\ ?")
-  def quote_name(nil, _), do: []
+  def quote_name(nil), do: []
 
-  def quote_name(names, quoter) when is_list(names) do
+  def quote_name(name) do
+    name
+    |> name_to_iodata()
+    |> IO.iodata_to_binary()
+    |> quote_with(?")
+  end
+
+  @doc false
+  def quote_string(value) when is_binary(value) do
+    quote_with(value, ?')
+  end
+
+  defp name_to_iodata(names) when is_list(names) do
     names
     |> Enum.reject(&is_nil/1)
-    |> intersperse_map(?., &quote_name(&1, nil))
-    |> escape_quoted(quoter)
-    |> wrap_in(quoter)
+    |> intersperse_map(?., &name_to_iodata/1)
   end
 
-  def quote_name(name, quoter) when is_atom(name) do
-    name |> Atom.to_string() |> quote_name(quoter)
-  end
-
-  def quote_name(name, quoter) do
-    name
-    |> escape_quoted(quoter)
-    |> wrap_in(quoter)
-  end
+  defp name_to_iodata(name) when is_atom(name), do: Atom.to_string(name)
+  defp name_to_iodata(name) when is_binary(name), do: name
 
   defp quote_qualified_name(name, sources, ix) do
     {_, source, _} = elem(sources, ix)
@@ -1064,34 +1068,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def quote_table(nil, name), do: quote_name(name)
   def quote_table(prefix, name), do: [quote_name(prefix), ?., quote_name(name)]
 
-  defp wrap_in(value, nil), do: value
-  defp wrap_in(value, wrapper), do: [wrapper, value, wrapper]
+  defp quote_with(value, quoter) when is_binary(value) and quoter in [?', ?\"] do
+    [quoter, escape_quoted(value, quoter), quoter]
+  end
 
-  defp escape_quoted(value, nil), do: value
-  defp escape_quoted(value, ?'), do: escape_string(IO.iodata_to_binary(value))
-
-  defp escape_quoted(value, quoter) when quoter in [?\", ?`] do
+  defp escape_quoted(value, quoter) when is_binary(value) and quoter in [?', ?\"] do
     # Neutralize existing escape sequences before escaping the active delimiter.
-    value
-    |> IO.iodata_to_binary()
-    |> :binary.replace("\\", "\\\\", [:global])
-    |> :binary.replace(<<quoter>>, "\\" <> <<quoter>>, [:global])
-  end
+    # ClickHouse accepts both '' and \'; emit SQL-style doubling canonically.
+    escaped_quoter = if quoter == ?', do: "''", else: <<?\\, quoter>>
 
-  @doc false
-  # TODO faster?
-  def escape_string(value) when is_binary(value) do
     value
-    |> :binary.replace("'", "''", [:global])
     |> :binary.replace("\\", "\\\\", [:global])
-  end
-
-  defp json_path_key(value) when is_binary(value) do
-    if Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, value) do
-      value
-    else
-      quote_name(value, ?`)
-    end
+    |> :binary.replace(<<quoter>>, escaped_quoter, [:global])
   end
 
   defp get_source(query, sources, params, ix, source) do
@@ -1156,7 +1144,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp inline_param(nil), do: "NULL"
   defp inline_param(true), do: "true"
   defp inline_param(false), do: "false"
-  defp inline_param(s) when is_binary(s), do: [?', escape_string(s), ?']
+  defp inline_param(s) when is_binary(s), do: quote_string(s)
 
   @max_uint128 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
   @max_uint64 0xFFFFFFFFFFFFFFFF
@@ -1181,21 +1169,27 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     naive = NaiveDateTime.to_string(naive)
 
     case microsecond do
-      {0, 0} -> [?', naive, "'::datetime"]
-      {_, precision} -> [?', naive, "'::DateTime64(", Integer.to_string(precision), ?)]
+      {0, 0} -> [quote_string(naive), "::datetime"]
+      {_, precision} -> [quote_string(naive), "::DateTime64(", Integer.to_string(precision), ?)]
     end
   end
 
   defp inline_param(%DateTime{microsecond: microsecond, time_zone: time_zone} = dt) do
-    time_zone = escape_string(time_zone)
     dt = NaiveDateTime.to_string(DateTime.to_naive(dt))
 
     case microsecond do
       {0, 0} ->
-        [?', dt, "'::DateTime('", time_zone, "')"]
+        [quote_string(dt), "::DateTime(", quote_string(time_zone), ?)]
 
       {_, precision} ->
-        [?', dt, "'::DateTime64(", Integer.to_string(precision), ",'", time_zone, "')"]
+        [
+          quote_string(dt),
+          "::DateTime64(",
+          Integer.to_string(precision),
+          ?,,
+          quote_string(time_zone),
+          ?)
+        ]
     end
   end
 
