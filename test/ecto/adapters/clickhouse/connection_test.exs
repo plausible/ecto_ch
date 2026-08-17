@@ -2406,6 +2406,8 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = insert("prefix", "schema", [], [[]], {:raise, [], []}, [])
     assert query == ~s{INSERT INTO "prefix"."schema"}
 
+    # Invoke dynamically because these tests intentionally exercise a path that the type checker
+    # knows always raises for a non-empty returning list.
     assert_raise ArgumentError,
                  "ClickHouse does not support RETURNING on INSERT statements",
                  fn ->
