@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.1 (2026-08-17)
 
 - Standardize escaping for single-quoted strings and double-quoted identifiers, including JSON path keys https://github.com/plausible/ecto_ch/pull/304
 - Use `Date32` for bound date parameters before 1970 or after 2148 https://github.com/plausible/ecto_ch/pull/307
