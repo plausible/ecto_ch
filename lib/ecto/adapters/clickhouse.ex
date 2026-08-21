@@ -29,6 +29,7 @@ defmodule Ecto.Adapters.ClickHouse do
   @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Storage
   @behaviour Ecto.Adapter.Structure
+  @behaviour Ecto.Adapter.Transaction
 
   @conn __MODULE__.Connection
   @driver :ch
@@ -158,6 +159,21 @@ defmodule Ecto.Adapters.ClickHouse do
   @impl Ecto.Adapter
   def checked_out?(meta) do
     Ecto.Adapters.SQL.checked_out?(meta)
+  end
+
+  @impl Ecto.Adapter.Transaction
+  def transaction(adapter_meta, opts, callback) do
+    Ecto.Adapters.SQL.transaction(adapter_meta, opts, callback)
+  end
+
+  @impl Ecto.Adapter.Transaction
+  def in_transaction?(%{pid: pool}) do
+    Ecto.Adapters.SQL.in_transaction?(%{pid: pool})
+  end
+
+  @impl Ecto.Adapter.Transaction
+  def rollback(adapter_meta, value) do
+    Ecto.Adapters.SQL.rollback(adapter_meta, value)
   end
 
   @impl Ecto.Adapter
