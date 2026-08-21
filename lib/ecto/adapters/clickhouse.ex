@@ -164,6 +164,7 @@ defmodule Ecto.Adapters.ClickHouse do
   def dumpers(:uuid, Ecto.UUID), do: [&__MODULE__.hex_uuid/1]
   def dumpers(:uuid, type), do: [type, &__MODULE__.hex_uuid/1]
   def dumpers(:binary_id, type), do: [type, &__MODULE__.hex_uuid/1]
+  def dumpers({:in, sub}, {:in, sub}), do: [{:array, sub}]
   def dumpers(_primitive, {:parameterized, {Ch, params}}), do: [dumper(params)]
   def dumpers({:parameterized, {Ch, params}}, type), do: [type, dumper(params)]
   def dumpers(_primitive, type), do: [type]
