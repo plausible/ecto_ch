@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fix structure dumps starting with ClickHouse 26.8, where `X-ClickHouse-Format` takes precedence over `SELECT ... FORMAT` output clauses
+- Fix structure dumps starting with ClickHouse 26.8, where `X-ClickHouse-Format` takes precedence over `SELECT ... FORMAT` output clauses https://github.com/plausible/ecto_ch/pull/312
 
 ## 0.11.1 (2026-08-17)
 
