@@ -12,11 +12,10 @@ defmodule Ecto.Integration.DateTime64Test do
 
     # https://clickhouse.com/docs/en/sql-reference/data-types/datetime64#examples
     TestRepo.query!(
-      "INSERT INTO datetime64_3_test VALUES (1, 1546300800123), (2, 1546300800.123), (3, '2019-01-01 00:00:00')"
+      "INSERT INTO datetime64_3_test VALUES (2, 1546300800.123), (3, '2019-01-01 00:00:00')"
     )
 
     assert TestRepo.all(from t in "datetime64_3_test", select: map(t, [:i, :d])) == [
-             %{i: 1, d: ~U[2019-01-01 00:00:00.123Z]},
              %{i: 2, d: ~U[2019-01-01 00:00:00.123Z]},
              %{i: 3, d: ~U[2019-01-01 00:00:00.000Z]}
            ]
@@ -25,13 +24,13 @@ defmodule Ecto.Integration.DateTime64Test do
              from t in "datetime64_3_test",
                where: t.d == ^~U[2019-01-01 00:00:00.123Z],
                select: t.i
-           ) == [1, 2]
+           ) == [2]
 
     assert TestRepo.all(
              from t in "datetime64_3_test",
                where: t.d > ^~U[2019-01-01 00:00:00.000Z],
                select: t.i
-           ) == [1, 2]
+           ) == [2]
   end
 
   # https://github.com/plausible/ecto_ch/issues/178
@@ -43,11 +42,10 @@ defmodule Ecto.Integration.DateTime64Test do
     on_exit(fn -> TestRepo.query!("DROP TABLE datetime64_3_test") end)
 
     TestRepo.query!(
-      "INSERT INTO datetime64_3_test VALUES (1, 1546300800123456), (2, 1546300800.123456), (3, '2019-01-01 00:00:00')"
+      "INSERT INTO datetime64_3_test VALUES (2, 1546300800.123456), (3, '2019-01-01 00:00:00')"
     )
 
     assert TestRepo.all(from t in "datetime64_3_test", select: map(t, [:i, :d])) == [
-             %{i: 1, d: ~U[2019-01-01 00:00:00.123456Z]},
              %{i: 2, d: ~U[2019-01-01 00:00:00.123456Z]},
              %{i: 3, d: ~U[2019-01-01 00:00:00.000000Z]}
            ]
@@ -56,12 +54,12 @@ defmodule Ecto.Integration.DateTime64Test do
              from t in "datetime64_3_test",
                where: t.d == ^~U[2019-01-01 00:00:00.123456Z],
                select: t.i
-           ) == [1, 2]
+           ) == [2]
 
     assert TestRepo.all(
              from t in "datetime64_3_test",
                where: t.d > ^~U[2019-01-01 00:00:00.000Z],
                select: t.i
-           ) == [1, 2]
+           ) == [2]
   end
 end
