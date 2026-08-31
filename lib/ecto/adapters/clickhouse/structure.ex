@@ -215,9 +215,9 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
 
   defp dump_versions(conn, database, table) do
     table = @conn.quote_table(database, table)
-    stmt = "SELECT * FROM #{table} FORMAT Values"
+    stmt = "SELECT * FROM #{table}"
 
-    with {:ok, %{rows: rows}, conn} <- exec(conn, stmt) do
+    with {:ok, %{rows: rows}, conn} <- exec(conn, stmt, [], format: "Values") do
       versions =
         case IO.iodata_to_binary(rows) do
           "" ->
@@ -233,11 +233,11 @@ defmodule Ecto.Adapters.ClickHouse.Structure do
   end
 
   def exec(conn, sql, params \\ [], opts \\ []) do
-    query = Query.build(sql)
-    params = DBConnection.Query.encode(query, params, [])
+    query = Query.build(sql, opts)
+    params = DBConnection.Query.encode(query, params, opts)
 
     case Conn.handle_execute(query, params, opts, conn) do
-      {:ok, query, result, conn} -> {:ok, DBConnection.Query.decode(query, result, []), conn}
+      {:ok, query, result, conn} -> {:ok, DBConnection.Query.decode(query, result, opts), conn}
       {:disconnect, reason, _conn} -> {:error, reason}
       {:error, reason, _conn} -> {:error, reason}
     end

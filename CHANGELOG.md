@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix structure dumps starting with ClickHouse 26.8, where `X-ClickHouse-Format` takes precedence over `SELECT ... FORMAT` output clauses
+
 ## 0.11.1 (2026-08-17)
 
 - Standardize escaping for single-quoted strings and double-quoted identifiers, including JSON path keys https://github.com/plausible/ecto_ch/pull/304

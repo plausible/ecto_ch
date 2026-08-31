@@ -139,6 +139,16 @@ CREATE TABLE `posts` (
 
 ## Caveats
 
+#### FORMAT clauses in SELECT queries
+
+Starting with [ClickHouse 26.8](https://github.com/ClickHouse/ClickHouse/pull/105249), the `X-ClickHouse-Format` request header takes precedence over a `FORMAT` clause in a `SELECT` query. Since Ch always sends this header, use the `:format` query option to request a custom response format instead of including `FORMAT` in the SQL:
+
+```elixir
+Repo.query!("SELECT * FROM events", [], format: "JSONCompact")
+```
+
+This does not affect `INSERT ... FORMAT ...` input formats.
+
 #### [ALTER TABLE ... UPDATE](https://clickhouse.com/docs/en/sql-reference/statements/alter/update)
 
 ClickHouse doesn't support `UPDATE` statements as of now, so `Repo.update/2` and `Repo.update_all/3` raise when called. But `Repo.alter_update_all/3` -- which executes `ALTER TABLE ... UPDATE` -- can be used instead.
