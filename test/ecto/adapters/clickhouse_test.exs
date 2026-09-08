@@ -2,6 +2,8 @@ defmodule Ecto.Adapters.ClickHouseTest do
   use ExUnit.Case
 
   alias Ecto.Adapters.ClickHouse
+  alias Ecto.Integration.TestRepo
+  import ExUnit.CaptureLog
 
   describe "storage_up/1" do
     test "create database" do
@@ -61,4 +63,62 @@ defmodule Ecto.Adapters.ClickHouseTest do
       assert ClickHouse.storage_status(opts) == :up
     end
   end
+
+  describe "transaction callbacks" do
+    test "in_transaction?/1 is false for an idle checked out connection" do
+      TestRepo.checkout(fn ->
+        meta = Ecto.Adapter.lookup_meta(TestRepo.get_dynamic_repo())
+        refute ClickHouse.in_transaction?(meta)
+      end)
+    end
+
+    test "transaction/3 uses the checked out transactional connection" do
+      with_transaction_connection(fn meta ->
+        assert {:ok, :inside_transaction} =
+                 ClickHouse.transaction(meta, [], fn ->
+                   assert ClickHouse.in_transaction?(meta)
+                   :inside_transaction
+                 end)
+      end)
+    end
+
+    test "rollback/2 aborts the checked out transactional connection" do
+      capture_log(fn ->
+        with_transaction_connection(fn meta ->
+          assert {:error, :rolled_back} =
+                   ClickHouse.transaction(meta, [], fn ->
+                     assert ClickHouse.in_transaction?(meta)
+                     ClickHouse.rollback(meta, :rolled_back)
+                   end)
+        end)
+      end)
+    end
+
+    test "rollback/2 raises outside a transaction" do
+      TestRepo.checkout(fn ->
+        meta = Ecto.Adapter.lookup_meta(TestRepo.get_dynamic_repo())
+
+        assert_raise RuntimeError, "cannot call rollback outside of transaction", fn ->
+          ClickHouse.rollback(meta, :rolled_back)
+        end
+      end)
+    end
+  end
+
+  defp with_transaction_connection(fun) do
+    TestRepo.checkout(fn ->
+      meta = Ecto.Adapter.lookup_meta(TestRepo.get_dynamic_repo())
+      key = sql_conn_key(meta.pid)
+      conn = Process.get(key)
+      Process.put(key, %{conn | conn_mode: :transaction})
+
+      try do
+        fun.(meta)
+      after
+        Process.put(key, conn)
+      end
+    end)
+  end
+
+  defp sql_conn_key(pool), do: {Ecto.Adapters.SQL, pool}
 end
