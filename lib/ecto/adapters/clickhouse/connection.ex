@@ -689,6 +689,10 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp expr({:in, _, [_, {:^, _, [_ix, 0]}]}, _sources, _params, _query), do: "0"
 
+  defp expr({:in, _, [left, {:^, _, [ix, len]}]}, sources, params, query) when len > 0 do
+    [expr(left, sources, params, query), " IN ", build_in_param(ix, Enum.at(params, ix))]
+  end
+
   defp expr({:in, _, [left, right]}, sources, params, query) do
     [expr(left, sources, params, query), " IN ", expr(right, sources, params, query)]
   end
@@ -1149,8 +1153,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @max_uint128 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
   @max_uint64 0xFFFFFFFFFFFFFFFF
   @max_int64 0x7FFFFFFFFFFFFFFF
+  @max_int128 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+  @max_int256 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
   @min_int128 -0x80000000000000000000000000000000
   @min_int64 -0x8000000000000000
+  @min_int256 -0x8000000000000000000000000000000000000000000000000000000000000000
 
   defp inline_param(i) when is_integer(i) do
     # we add explicit casting to large integers to avoid scientific notation
@@ -1302,6 +1309,236 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
       [] ->
         "Map(Nothing,Nothing)"
+    end
+  end
+
+  # `x in ^list` sends the whole right-hand side as a single Array(...) param
+  # instead of one param per element, so the element type has to describe every
+  # value in the list, not just the first one.
+  #
+  # `param_type/1` infers a list's element type from its head, which is correct
+  # for real Array columns (homogeneous by construction) but not for `in` lists,
+  # which are just whatever values the caller happened to pass. Inferring from
+  # the head there silently corrupts data: `[1, 18446744073709551616]` wraps
+  # around inside Array(Int64), `[Decimal.new("1.0"), Decimal.new("2.12345")]`
+  # rounds to 2.1 inside Array(Decimal(2,1)), and a `nil` becomes the element
+  # type's default (`""` for Array(String)) instead of NULL.
+  #
+  # So here the types of all elements are unified into one type wide enough for
+  # every value. Lists whose types cannot be unified raise instead of being
+  # silently coerced.
+  defp build_in_param(ix, {@inline_tag, _} = param), do: build_param(ix, param)
+
+  defp build_in_param(ix, values) when is_list(values) do
+    ["{$", Integer.to_string(ix), ?:, in_param_type(values), ?}]
+  end
+
+  defp build_in_param(ix, param), do: build_param(ix, param)
+
+  @doc false
+  def in_param_type(values) when is_list(values) do
+    ["Array(", values |> unify_in_types() |> render_in_type(), ?)]
+  end
+
+  defp unify_in_types(values) do
+    Enum.reduce(values, :nothing, fn value, acc -> unify_in_type(acc, in_type(value)) end)
+  end
+
+  # `:nothing` means "no information yet" (an empty list, or the seed of the
+  # fold) and `:null` means "a nil was seen", mirroring ClickHouse's `Nothing`
+  # and `Nullable(Nothing)`.
+  defp in_type(nil), do: :null
+  defp in_type(s) when is_binary(s), do: :string
+  defp in_type(b) when is_boolean(b), do: :bool
+
+  # tracked as a range so the narrowest ClickHouse type covering every value in
+  # the list can be picked in render_in_type/1
+  defp in_type(i) when is_integer(i), do: {:int, i, i}
+
+  defp in_type(f) when is_float(f), do: :float
+
+  # TODO DateTime timezone?
+  defp in_type(%s{microsecond: microsecond}) when s in [NaiveDateTime, DateTime] do
+    case microsecond do
+      {_val, precision} when precision > 0 -> {:datetime, precision}
+      _ -> {:datetime, 0}
+    end
+  end
+
+  # tracked as a year range so Date vs Date32 can be decided over the whole list
+  defp in_type(%Date{year: year}), do: {:date, year, year}
+
+  defp in_type(%Time{microsecond: {_value, precision}}), do: {:time, precision}
+
+  defp in_type(%Decimal{} = decimal) do
+    {precision, scale} = decimal_precision_and_scale!(decimal)
+    {:decimal, precision, scale}
+  end
+
+  defp in_type(values) when is_list(values), do: {:array, unify_in_types(values)}
+
+  defp in_type(%s{}) do
+    raise ArgumentError, "struct #{inspect(s)} is not supported in params"
+  end
+
+  defp in_type(m) when is_map(m) do
+    {keys, values} =
+      Enum.reduce(m, {:nothing, :nothing}, fn {k, v}, {keys, values} ->
+        {unify_in_type(keys, in_type(k)), unify_in_type(values, in_type(v))}
+      end)
+
+    {:map, keys, values}
+  end
+
+  defp unify_in_type(type, type), do: type
+  defp unify_in_type(:nothing, type), do: type
+  defp unify_in_type(type, :nothing), do: type
+
+  defp unify_in_type(:null, type), do: nullable_in_type(type)
+  defp unify_in_type(type, :null), do: nullable_in_type(type)
+
+  defp unify_in_type({:nullable, left}, right), do: nullable_in_type(unify_in_type(left, right))
+  defp unify_in_type(left, {:nullable, right}), do: nullable_in_type(unify_in_type(left, right))
+
+  defp unify_in_type({:int, min1, max1}, {:int, min2, max2}) do
+    {:int, min(min1, min2), max(max1, max2)}
+  end
+
+  defp unify_in_type({:int, min, max}, :float) when min >= @min_int64 and max <= @max_int64 do
+    :float
+  end
+
+  defp unify_in_type(:float, {:int, _, _} = int), do: unify_in_type(int, :float)
+
+  defp unify_in_type({:decimal, precision1, scale1}, {:decimal, precision2, scale2}) do
+    scale = max(scale1, scale2)
+    precision = max(precision1 - scale1, precision2 - scale2) + scale
+
+    if precision > @max_decimal_precision do
+      raise ArgumentError,
+            "ClickHouse Decimal precision #{precision} exceeds maximum #{@max_decimal_precision}"
+    end
+
+    {:decimal, precision, scale}
+  end
+
+  defp unify_in_type({:datetime, precision1}, {:datetime, precision2}) do
+    {:datetime, max(precision1, precision2)}
+  end
+
+  defp unify_in_type({:date, min1, max1}, {:date, min2, max2}) do
+    {:date, min(min1, min2), max(max1, max2)}
+  end
+
+  # DateTime spans 1970..2106 and DateTime64 spans 1900..2299, so a Date only
+  # folds into one of them when every value in the list is in range
+  defp unify_in_type({:date, min_year, max_year}, {:datetime, 0} = datetime)
+       when min_year >= 1970 and max_year <= 2106 do
+    datetime
+  end
+
+  defp unify_in_type({:date, min_year, max_year}, {:datetime, precision} = datetime)
+       when precision > 0 and min_year >= 1900 and max_year <= 2299 do
+    datetime
+  end
+
+  defp unify_in_type({:datetime, _} = datetime, {:date, _, _} = date) do
+    unify_in_type(date, datetime)
+  end
+
+  defp unify_in_type({:time, precision1}, {:time, precision2}) do
+    {:time, max(precision1, precision2)}
+  end
+
+  defp unify_in_type({:array, left}, {:array, right}), do: {:array, unify_in_type(left, right)}
+
+  defp unify_in_type({:map, keys1, values1}, {:map, keys2, values2}) do
+    {:map, unify_in_type(keys1, keys2), unify_in_type(values1, values2)}
+  end
+
+  defp unify_in_type(left, right) do
+    raise ArgumentError, """
+    ClickHouse sends the right-hand side of `in` as a single \
+    Array(...) parameter, so every element needs to share one type, but \
+    #{IO.iodata_to_binary(render_in_type(left))} and \
+    #{IO.iodata_to_binary(render_in_type(right))} have no common type.
+
+    Consider splitting the query, or casting the list with \
+    `type(^values, {:array, :some_type})`.\
+    """
+  end
+
+  # Nullable(Array(...)) and Nullable(Map(...)) are not valid ClickHouse types
+  defp nullable_in_type({:array, _} = type) do
+    raise ArgumentError,
+          "ClickHouse cannot put #{IO.iodata_to_binary(render_in_type(type))} inside Nullable, " <>
+            "so a list mixing nil with arrays cannot be used with `in`"
+  end
+
+  defp nullable_in_type({:map, _, _} = type) do
+    raise ArgumentError,
+          "ClickHouse cannot put #{IO.iodata_to_binary(render_in_type(type))} inside Nullable, " <>
+            "so a list mixing nil with maps cannot be used with `in`"
+  end
+
+  defp nullable_in_type({:nullable, _} = type), do: type
+  defp nullable_in_type(:null), do: :null
+  defp nullable_in_type(:nothing), do: :null
+  defp nullable_in_type(type), do: {:nullable, type}
+
+  defp render_in_type(:nothing), do: "Nothing"
+  defp render_in_type(:null), do: "Nullable(Nothing)"
+  defp render_in_type({:nullable, type}), do: ["Nullable(", render_in_type(type), ?)]
+  defp render_in_type(:string), do: "String"
+  defp render_in_type(:bool), do: "Bool"
+  defp render_in_type(:float), do: "Float64"
+  defp render_in_type({:time, 0}), do: "Time"
+  defp render_in_type({:time, precision}), do: ["Time64(", Integer.to_string(precision), ?)]
+
+  # https://clickhouse.com/docs/en/sql-reference/data-types/date32
+  defp render_in_type({:date, min_year, max_year}) do
+    if min_year < 1970 or max_year > 2148, do: "Date32", else: "Date"
+  end
+
+  defp render_in_type({:datetime, 0}), do: "DateTime"
+
+  defp render_in_type({:datetime, precision}) do
+    ["DateTime64(", Integer.to_string(precision), ?)]
+  end
+
+  defp render_in_type({:decimal, precision, scale}) do
+    ["Decimal(", Integer.to_string(precision), ?,, Integer.to_string(scale), ?)]
+  end
+
+  defp render_in_type({:array, type}), do: ["Array(", render_in_type(type), ?)]
+
+  defp render_in_type({:map, keys, values}) do
+    ["Map(", render_in_type(keys), ?,, render_in_type(values), ?)]
+  end
+
+  # https://clickhouse.com/docs/en/sql-reference/data-types/int-uint
+  defp render_in_type({:int, min, max}) do
+    cond do
+      min >= 0 and max > @max_uint128 ->
+        "UInt256"
+
+      min >= 0 and max > @max_uint64 ->
+        "UInt128"
+
+      min >= 0 and max > @max_int64 ->
+        "UInt64"
+
+      min >= @min_int64 and max <= @max_int64 ->
+        "Int64"
+
+      min >= @min_int128 and max <= @max_int128 ->
+        "Int128"
+
+      min >= @min_int256 and max <= @max_int256 ->
+        "Int256"
+
+      true ->
+        raise ArgumentError, "integers #{min}..#{max} do not fit in a single ClickHouse type"
     end
   end
 
