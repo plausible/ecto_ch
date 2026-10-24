@@ -72,6 +72,47 @@ Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others
 
 [`ecto.ch.schema`](https://hexdocs.pm/ecto_ch/Mix.Tasks.Ecto.Ch.Schema.html) mix task can be used to generate a schema from an existing ClickHouse table.
 
+#### UTF-8 text and binary data
+
+ClickHouse [`String`](https://clickhouse.com/docs/reference/data-types/string#encodings) columns store arbitrary bytes. For UTF-8 text, define a custom [`Ecto.Type`](https://hexdocs.pm/ecto/Ecto.Type.html) (Elixir 1.16+):
+
+```elixir
+defmodule MyApp.UTF8String do
+  use Ecto.Type
+
+  @impl true
+  def type, do: :string
+
+  @impl true
+  def cast(value), do: Ecto.Type.cast(:string, value)
+
+  @impl true
+  def dump(value), do: Ecto.Type.dump(:string, value)
+
+  @impl true
+  def load(value) when is_binary(value), do: {:ok, String.replace_invalid(value)}
+  def load(_value), do: :error
+end
+```
+
+Use `MyApp.UTF8String` for text and `:binary` for payloads:
+
+```elixir
+defmodule MyApp.Event do
+  use Ecto.Schema
+
+  @primary_key false
+  schema "events" do
+    field :message, MyApp.UTF8String
+    field :payload, :binary
+  end
+end
+```
+
+Ch 0.9.x sanitizes all `String` columns, including `:binary` fields. This behavior will be removed in Ch 1.0.
+
+See the [UTF-8 round-trip test](test/ecto/integration/type_test.exs).
+
 #### Schemaless inserts
 
 For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided:
