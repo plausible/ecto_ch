@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve named tuple types in streamed insert headers and document the schema insert workaround https://github.com/plausible/ecto_ch/pull/236
 - Fix structure dumps starting with ClickHouse 26.8, where `X-ClickHouse-Format` takes precedence over `SELECT ... FORMAT` output clauses https://github.com/plausible/ecto_ch/pull/312
 
 ## 0.11.1 (2026-08-17)

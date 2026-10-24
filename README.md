@@ -167,6 +167,28 @@ For `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [c
 
 [See Ch for more details and an example.](https://github.com/plausible/ch#null-in-rowbinary)
 
+#### Named tuples
+
+Named ClickHouse tuples use positional Elixir tuples, for example `{"hello", 42}` for `Tuple(name String, count UInt64)`.
+
+Ch currently discards tuple element names when initializing `Ch` schema fields. For schema inserts with `insert/2`, `insert_all/3`, or `insert_stream/3`, disable [input type header validation](https://clickhouse.com/docs/interfaces/formats/RowBinaryWithNamesAndTypes) for named tuple columns, including tuples nested in arrays:
+
+```elixir
+MyApp.Repo.insert_all(MyApp.Example, rows,
+  settings: [input_format_with_types_use_header: 0]
+)
+```
+
+The tuple values must follow the element order and types in the ClickHouse table.
+
+Schemaless inserts preserve names supplied as ClickHouse type strings in `:types`, so header validation can stay enabled:
+
+```elixir
+MyApp.Repo.insert_stream("example", [%{value: {"hello", 42}}],
+  types: [value: "Tuple(name String, count UInt64)"]
+)
+```
+
 ## Benchmarks
 
 [See Ch for benchmarks.](https://github.com/plausible/ch#benchmarks)
