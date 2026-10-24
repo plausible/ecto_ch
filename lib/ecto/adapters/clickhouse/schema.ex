@@ -214,6 +214,79 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     {num_rows, nil}
   end
 
+  def update(adapter_meta, schema_meta, fields, params, returning, opts) do
+    %{source: source, prefix: prefix, schema: schema} = schema_meta
+    all_fields = fields ++ params
+    values = Keyword.values(all_fields)
+    types = schema |> extract_types(Keyword.keys(all_fields)) |> Enum.map(&update_param_type/1)
+    types = Enum.zip_with(types, values, &update_param_type/2)
+    all_params = Enum.zip_with(types, values, &update_param_value/2)
+    sql = @conn.update(prefix, source, fields, params, returning, types)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, all_params, opts)
+    {:ok, []}
+  end
+
+  defp update_param_type({:low_cardinality, type}), do: update_param_type(type)
+  defp update_param_type({:simple_aggregate_function, _name, type}), do: update_param_type(type)
+  defp update_param_type({:nullable, type}), do: {:nullable, update_param_type(type)}
+  defp update_param_type({:array, type}), do: {:array, update_param_type(type)}
+  defp update_param_type({:tuple, types}), do: {:tuple, Enum.map(types, &update_param_type/1)}
+
+  defp update_param_type({:map, key_type, value_type}),
+    do: {:map, update_param_type(key_type), update_param_type(value_type)}
+
+  defp update_param_type(type), do: type
+
+  defp update_param_type(:dynamic, _value), do: nil
+  defp update_param_type({:variant, _types}, nil), do: nil
+
+  defp update_param_type({:variant, types} = type, value) do
+    # A single-member Variant preserves its type when cast to the full column type.
+    case Enum.find(types, fn candidate -> match?({:ok, ^value}, Ch.cast(value, candidate)) end) do
+      nil -> type
+      candidate -> {:variant, [candidate]}
+    end
+  end
+
+  defp update_param_type(type, _value), do: type
+
+  defp update_param_value(_type, nil), do: nil
+  defp update_param_value({:nullable, type}, value), do: update_param_value(type, value)
+  defp update_param_value({:variant, [type]}, value), do: update_param_value(type, value)
+  defp update_param_value(:json, value), do: Jason.encode!(value)
+
+  defp update_param_value({enum, mappings}, value)
+       when enum in [:enum8, :enum16] and is_integer(value) do
+    case List.keyfind(mappings, value, 1) do
+      {label, ^value} ->
+        label
+
+      nil ->
+        raise ArgumentError,
+              "enum value #{inspect(value)} not found in mapping: #{inspect(mappings)}"
+    end
+  end
+
+  defp update_param_value(type, value) when type in [:ipv4, :ipv6] and is_tuple(value),
+    do: value |> :inet.ntoa() |> to_string()
+
+  defp update_param_value({:array, type}, values),
+    do: Enum.map(values, &update_param_value(type, &1))
+
+  defp update_param_value({:tuple, types}, values) when is_tuple(values),
+    do: update_param_value({:tuple, types}, Tuple.to_list(values))
+
+  defp update_param_value({:tuple, types}, values),
+    do: types |> Enum.zip_with(values, &update_param_value/2) |> List.to_tuple()
+
+  defp update_param_value({:map, key_type, value_type}, values) do
+    Map.new(values, fn {key, value} ->
+      {update_param_value(key_type, key), update_param_value(value_type, value)}
+    end)
+  end
+
+  defp update_param_value(_type, value), do: value
+
   def delete(adapter_meta, schema_meta, params, opts) do
     %{source: source, prefix: prefix} = schema_meta
     filter_values = Keyword.values(params)
