@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Honor explicit `type/2` types in parameter placeholders and infer array parameter types from every element, preserving integer ranges, decimal and timestamp precision, nested arrays, and nullability. Incompatible arrays now raise with guidance to supply an explicit type.
 - Fix structure dumps starting with ClickHouse 26.8, where `X-ClickHouse-Format` takes precedence over `SELECT ... FORMAT` output clauses https://github.com/plausible/ecto_ch/pull/312
 
 ## 0.11.1 (2026-08-17)

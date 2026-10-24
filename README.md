@@ -87,6 +87,19 @@ types = [
 MyApp.Repo.insert_all("example", rows, types: types)
 ```
 
+#### Array parameters
+
+Arrays passed as a single parameter, such as `fragment("?", ^values)`, are inferred from every element. This accounts for integer ranges, decimal and timestamp precision, nested arrays, and nullable scalar elements.
+
+Mixtures such as `[1, 0.5]` or dates with datetimes require an explicit type. Apply `type/2` directly to the pinned parameter so ClickHouse parses the values using the requested type:
+
+```elixir
+array_type = Ecto.ParameterizedType.init(Ch, type: "Array(UInt128)")
+values = [1, 18_446_744_073_709_551_616]
+
+from e in "events", select: type(^values, ^array_type)
+```
+
 #### Settings
 
 `:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweight [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) global [FINAL](https://clickhouse.com/docs/en/operations/settings/settings#final) modifier, and [more:](https://clickhouse.com/docs/en/operations/settings/settings)

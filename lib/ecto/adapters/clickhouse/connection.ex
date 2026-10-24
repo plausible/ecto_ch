@@ -8,6 +8,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   alias Ecto.Query.{QueryExpr, ByExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
 
   @parent_as __MODULE__
+  @inline_tag :__ecto_ch_inline__
 
   @impl true
   def child_spec(opts) do
@@ -879,6 +880,15 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     expr(value, sources, params, query)
   end
 
+  defp expr(%Tagged{tag: tag, type: type, value: {:^, _, [ix]}}, _sources, params, query) do
+    db_type = ecto_to_db(tag, type, query)
+
+    case Enum.at(params, ix) do
+      {@inline_tag, param} -> ["CAST(", inline_param(param), " AS ", db_type, ?)]
+      _param -> ["{$", Integer.to_string(ix), ?:, db_type, ?}]
+    end
+  end
+
   defp expr(%Tagged{tag: tag, type: type, value: value}, sources, params, query) do
     ["CAST(", expr(value, sources, params, query), " AS ", ecto_to_db(tag, type, query), ?)]
   end
@@ -1006,8 +1016,6 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     intersperse_reduce(rest, separator, user_acc, reducer, [acc, elem, separator])
   end
 
-  @inline_tag :__ecto_ch_inline__
-
   @max_decimal_precision 76
   @max_decimal_coefficient Integer.pow(10, @max_decimal_precision)
 
@@ -1110,6 +1118,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   defp ecto_to_db({:parameterized, {Ch, type}}, _type, _query), do: Ch.Types.encode(type)
+
+  defp ecto_to_db({:array, tag}, {:array, type}, query) do
+    ["Array(", ecto_to_db(tag, type, query), ?)]
+  end
+
   defp ecto_to_db(_tag, type, query), do: ecto_to_db(type, query)
 
   # when ecto migrator queries for versions in schema_versions it uses type(version, :integer)
@@ -1275,17 +1288,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ["Decimal(", Integer.to_string(precision), ?,, Integer.to_string(scale), ?)]
   end
 
-  # context: https://github.com/plausible/analytics/pull/6049#issuecomment-3850062609
-  defp param_type([]), do: "Array(Nothing)"
-
-  defp param_type([v | vs]) do
-    param_type = param_type(v)
-
-    if param_type != "Array(Nothing)" or vs == [] do
-      ["Array(", param_type, ?)]
-    else
-      param_type(vs)
-    end
+  defp param_type(values) when is_list(values) do
+    ["Array(", values |> array_element_type() |> array_type_sql(), ?)]
   end
 
   defp param_type(%s{}) do
@@ -1303,6 +1307,152 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       [] ->
         "Map(Nothing,Nothing)"
     end
+  end
+
+  # Keep ranges and precision until all elements have been visited. Rendering an
+  # intermediate SQL type would discard information needed by later elements.
+  defp array_element_type(values) do
+    Enum.reduce(values, :nothing, fn value, type ->
+      merge_array_types(type, array_value_type(value))
+    end)
+  end
+
+  defp array_value_type(nil), do: {:nullable, :nothing}
+  defp array_value_type(i) when is_integer(i), do: {:integer, i, i}
+
+  defp array_value_type(%Decimal{} = value) do
+    {precision, scale} = decimal_precision_and_scale!(value)
+    digits = if value.coef == 0, do: 0, else: precision - scale
+    {:decimal, digits, scale}
+  end
+
+  defp array_value_type(%Date{year: year} = value) do
+    if year < 1900 or year > 2299, do: array_type_error!("date outside the Date32 range")
+    {:date, param_type(value)}
+  end
+
+  defp array_value_type(%s{microsecond: {_, precision}} = value)
+       when s in [DateTime, NaiveDateTime] do
+    naive =
+      case value do
+        %DateTime{} -> value |> DateTime.shift_zone!("Etc/UTC") |> DateTime.to_naive()
+        %NaiveDateTime{} -> value
+      end
+
+    if naive.year < 1900 or naive.year > 2299,
+      do: array_type_error!("datetime outside the DateTime64 range")
+
+    extended? =
+      NaiveDateTime.compare(naive, ~N[1970-01-01 00:00:00]) == :lt or
+        NaiveDateTime.compare(naive, ~N[2106-02-07 06:28:15]) == :gt
+
+    {:datetime, precision, extended?}
+  end
+
+  defp array_value_type(%Time{microsecond: {_, precision}}), do: {:time, precision}
+  defp array_value_type(values) when is_list(values), do: {:array, array_element_type(values)}
+
+  defp array_value_type(%s{}) do
+    raise ArgumentError, "struct #{inspect(s)} is not supported in params"
+  end
+
+  defp array_value_type(value) when is_map(value) do
+    {:map, array_element_type(Map.keys(value)), array_element_type(Map.values(value))}
+  end
+
+  defp array_value_type(value), do: {:scalar, param_type(value)}
+
+  defp merge_array_types(:nothing, type), do: type
+  defp merge_array_types(type, :nothing), do: type
+  defp merge_array_types(type, type), do: type
+
+  defp merge_array_types({:nullable, left}, {:nullable, right}) do
+    {:nullable, merge_array_types(left, right)}
+  end
+
+  defp merge_array_types({:nullable, left}, right),
+    do: {:nullable, merge_array_types(left, right)}
+
+  defp merge_array_types(left, {:nullable, right}),
+    do: {:nullable, merge_array_types(left, right)}
+
+  defp merge_array_types({:integer, min1, max1}, {:integer, min2, max2}) do
+    {:integer, min(min1, min2), max(max1, max2)}
+  end
+
+  defp merge_array_types({:decimal, digits1, scale1}, {:decimal, digits2, scale2}) do
+    {:decimal, max(digits1, digits2), max(scale1, scale2)}
+  end
+
+  defp merge_array_types({:integer, low, high}, {:decimal, _, _} = decimal) do
+    magnitude = max(abs(low), abs(high))
+    digits = if magnitude == 0, do: 0, else: byte_size(Integer.to_string(magnitude))
+    merge_array_types({:decimal, digits, 0}, decimal)
+  end
+
+  defp merge_array_types({:decimal, _, _} = decimal, {:integer, _, _} = integer),
+    do: merge_array_types(integer, decimal)
+
+  defp merge_array_types({:date, _}, {:date, _}), do: {:date, "Date32"}
+
+  defp merge_array_types({:datetime, p1, extended1}, {:datetime, p2, extended2}),
+    do: {:datetime, max(p1, p2), extended1 or extended2}
+
+  defp merge_array_types({:time, p1}, {:time, p2}), do: {:time, max(p1, p2)}
+
+  defp merge_array_types({:array, left}, {:array, right}),
+    do: {:array, merge_array_types(left, right)}
+
+  defp merge_array_types({:map, k1, v1}, {:map, k2, v2}),
+    do: {:map, merge_array_types(k1, k2), merge_array_types(v1, v2)}
+
+  defp merge_array_types(_left, _right), do: array_type_error!("incompatible element types")
+
+  defp array_type_sql(:nothing), do: "Nothing"
+  defp array_type_sql({:scalar, type}), do: type
+  defp array_type_sql({:date, type}), do: type
+  defp array_type_sql({:datetime, 0, false}), do: "DateTime"
+  defp array_type_sql({:datetime, precision, _}), do: ["DateTime64(", to_string(precision), ?)]
+  defp array_type_sql({:time, 0}), do: "Time"
+  defp array_type_sql({:time, precision}), do: ["Time64(", to_string(precision), ?)]
+  defp array_type_sql({:array, type}), do: ["Array(", array_type_sql(type), ?)]
+
+  defp array_type_sql({:nullable, type}) do
+    case type do
+      {:array, _} -> array_type_error!("ClickHouse cannot make Array elements nullable")
+      {:map, _, _} -> array_type_error!("ClickHouse cannot make Map elements nullable")
+      _ -> ["Nullable(", array_type_sql(type), ?)]
+    end
+  end
+
+  defp array_type_sql({:map, {:nullable, _}, _}),
+    do: array_type_error!("ClickHouse Map keys cannot be nullable")
+
+  defp array_type_sql({:map, keys, values}),
+    do: ["Map(", array_type_sql(keys), ?,, array_type_sql(values), ?)]
+
+  defp array_type_sql({:integer, low, high}) do
+    cond do
+      low >= 0 and high < Integer.pow(2, 256) -> param_type(high)
+      low >= @min_int64 and high <= @max_int64 -> "Int64"
+      low >= @min_int128 and high < Integer.pow(2, 127) -> "Int128"
+      low >= -Integer.pow(2, 255) and high < Integer.pow(2, 255) -> "Int256"
+      true -> array_type_error!("integers do not fit a common ClickHouse integer type")
+    end
+  end
+
+  defp array_type_sql({:decimal, digits, scale}) do
+    precision = max(1, digits + scale)
+
+    if precision > @max_decimal_precision,
+      do: array_type_error!("decimal precision exceeds maximum #{@max_decimal_precision}")
+
+    ["Decimal(", to_string(precision), ?,, to_string(scale), ?)]
+  end
+
+  defp array_type_error!(reason) do
+    raise ArgumentError,
+          "cannot infer an array parameter type: #{reason}; supply an explicit type/2"
   end
 
   defp decimal_to_string(%Decimal{coef: coef}) when coef in [:NaN, :inf] do
