@@ -8,6 +8,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   alias Ecto.Query.{QueryExpr, ByExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
 
   @parent_as __MODULE__
+  @update_statement {__MODULE__, :update_statement}
 
   @impl true
   def child_spec(opts) do
@@ -86,7 +87,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   @impl true
   # https://clickhouse.com/docs/sql-reference/statements/update
   def update_all(query, params \\ []) do
-    validate_update_all!(query, "UPDATE")
+    query = validate_update_all!(query, "UPDATE")
 
     %{sources: sources} = query
     {table, _schema, prefix} = elem(sources, 0)
@@ -105,7 +106,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # https://clickhouse.com/docs/en/guides/developer/mutations#updating-data
   def alter_update_all(query, params \\ []) do
     # TODO link to https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse#updating-and-deleting-using-joins
-    validate_update_all!(query, "ALTER TABLE ... UPDATE")
+    query = validate_update_all!(query, "ALTER TABLE ... UPDATE")
 
     %{sources: sources} = query
     {table, _schema, prefix} = elem(sources, 0)
@@ -138,6 +139,8 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
         query: query,
         message: "Ecto.Adapters.ClickHouse does not support CTEs in #{statement} statements"
     end
+
+    put_in(query.aliases[@update_statement], statement)
   end
 
   defp update_fields(%{updates: updates} = query, sources, params) do
@@ -289,6 +292,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   defp update_param(idx, value, types) do
     case elem(types, idx) do
       nil -> build_param(idx, value)
+      {:expression, expression} -> expression
       type -> ["{$", Integer.to_string(idx), ?:, Ch.Types.encode(type), ?}]
     end
   end
@@ -1077,6 +1081,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
+  def infer_param_type(value) do
+    value |> param_type() |> IO.iodata_to_binary() |> Ch.Types.decode()
+  end
+
+  @doc false
   def quote_name(nil), do: []
 
   def quote_name(name) do
@@ -1135,8 +1144,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp get_parent_sources_ix(query, as) do
     case query.aliases[@parent_as] do
-      {%{aliases: %{^as => ix}}, sources} -> {ix, sources}
-      {%{} = parent, _sources} -> get_parent_sources_ix(parent, as)
+      {%{aliases: %{^as => ix} = aliases} = parent, sources} ->
+        if statement = aliases[@update_statement] do
+          raise Ecto.QueryError,
+            query: parent,
+            message:
+              "ClickHouse does not support correlated subqueries referencing the target table in #{statement} statements"
+        end
+
+        {ix, sources}
+
+      {%{} = parent, _sources} ->
+        get_parent_sources_ix(parent, as)
     end
   end
 
@@ -1325,14 +1344,24 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # context: https://github.com/plausible/analytics/pull/6049#issuecomment-3850062609
   defp param_type([]), do: "Array(Nothing)"
 
-  defp param_type([v | vs]) do
-    param_type = param_type(v)
+  defp param_type(values) when is_list(values) do
+    non_null_values = Enum.reject(values, &is_nil/1)
 
-    if param_type != "Array(Nothing)" or vs == [] do
-      ["Array(", param_type, ?)]
-    else
-      param_type(vs)
-    end
+    element_type =
+      case non_null_values do
+        [] -> "Nothing"
+        [value | _] when is_list(value) -> param_type(Enum.concat(non_null_values))
+        [value | _] -> param_type(value)
+      end
+
+    element_type =
+      if length(non_null_values) < length(values) do
+        ["Nullable(", element_type, ?)]
+      else
+        element_type
+      end
+
+    ["Array(", element_type, ?)]
   end
 
   defp param_type(%s{}) do

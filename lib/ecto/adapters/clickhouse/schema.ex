@@ -219,15 +219,24 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     all_fields = fields ++ params
     values = Keyword.values(all_fields)
     types = schema |> extract_types(Keyword.keys(all_fields)) |> Enum.map(&update_param_type/1)
-    types = Enum.zip_with(types, values, &update_param_type/2)
-    all_params = Enum.zip_with(types, values, &update_param_value/2)
-    sql = @conn.update(prefix, source, fields, params, returning, types)
+
+    {expressions, {_count, all_params}} =
+      Enum.map_reduce(Enum.zip(types, values), {0, []}, fn {type, value}, acc ->
+        {expression, acc} = update_param(type, value, acc)
+        {{:expression, expression}, acc}
+      end)
+
+    sql = @conn.update(prefix, source, fields, params, returning, expressions)
+    all_params = Enum.reverse(all_params)
     Ecto.Adapters.SQL.query!(adapter_meta, sql, all_params, opts)
     {:ok, []}
   end
 
   defp update_param_type({:low_cardinality, type}), do: update_param_type(type)
   defp update_param_type({:simple_aggregate_function, _name, type}), do: update_param_type(type)
+  # Assignment casts need clock text; Time64 constants can render as fractional seconds.
+  defp update_param_type(:time), do: :string
+  defp update_param_type({:time64, _precision}), do: :string
   defp update_param_type({:nullable, type}), do: {:nullable, update_param_type(type)}
   defp update_param_type({:array, type}), do: {:array, update_param_type(type)}
   defp update_param_type({:tuple, types}), do: {:tuple, Enum.map(types, &update_param_type/1)}
@@ -237,23 +246,130 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp update_param_type(type), do: type
 
-  defp update_param_type(:dynamic, _value), do: nil
-  defp update_param_type({:variant, _types}, nil), do: nil
+  defp update_param(type, nil, acc)
+       when type == :dynamic or (is_tuple(type) and elem(type, 0) == :variant) do
+    {expression, acc} = bind_update_param({:nullable, :nothing}, nil, acc)
+    {cast_update_param(expression, type), acc}
+  end
 
-  defp update_param_type({:variant, types} = type, value) do
-    # A single-member Variant preserves its type when cast to the full column type.
-    case Enum.find(types, fn candidate -> match?({:ok, ^value}, Ch.cast(value, candidate)) end) do
-      nil -> type
-      candidate -> {:variant, [candidate]}
+  defp update_param(:dynamic, [], acc), do: {cast_update_param("[]", :dynamic), acc}
+
+  defp update_param(:dynamic, value, acc) do
+    type = @conn.infer_param_type(value)
+    {expression, acc} = bind_update_param({:variant, [type]}, value, acc)
+    {cast_update_param(expression, :dynamic), acc}
+  end
+
+  defp update_param({:variant, types} = type, value, acc) do
+    candidate =
+      Enum.find(types, fn candidate -> match?({:ok, ^value}, Ch.cast(value, candidate)) end) ||
+        raise ArgumentError, "value #{inspect(value)} does not match #{inspect(type)}"
+
+    {expression, acc} =
+      if nested_dynamic_type?(candidate) do
+        update_param(candidate, value, acc)
+      else
+        # A single-member Variant preserves its member across assignment casts.
+        bind_update_param({:variant, [candidate]}, value, acc)
+      end
+
+    {cast_update_param(expression, type), acc}
+  end
+
+  defp update_param({:array, type} = array, values, acc) when is_list(values) do
+    if nested_dynamic_type?(type) do
+      {expressions, acc} = Enum.map_reduce(values, acc, &update_param(type, &1, &2))
+      expression = [?[, Enum.intersperse(expressions, ?,), ?]]
+
+      expression =
+        if values == [],
+          do: cast_update_param(expression, empty_update_param_type(array)),
+          else: expression
+
+      {cast_update_param(expression, array), acc}
+    else
+      bind_update_param(array, values, acc)
     end
   end
 
-  defp update_param_type(type, _value), do: type
+  defp update_param({:tuple, types} = tuple, values, acc) when is_tuple(values) do
+    if nested_dynamic_type?(tuple) do
+      {expressions, acc} =
+        Enum.map_reduce(Enum.zip(types, Tuple.to_list(values)), acc, fn {type, value}, acc ->
+          update_param(type, value, acc)
+        end)
+
+      expression = ["tuple(", Enum.intersperse(expressions, ?,), ?)]
+      {cast_update_param(expression, tuple), acc}
+    else
+      bind_update_param(tuple, values, acc)
+    end
+  end
+
+  defp update_param({:map, key_type, value_type} = map, values, acc) when is_map(values) do
+    if nested_dynamic_type?(map) do
+      {expressions, acc} =
+        Enum.map_reduce(values, acc, fn {key, value}, acc ->
+          {key_expression, acc} = update_param(key_type, key, acc)
+          {value_expression, acc} = update_param(value_type, value, acc)
+          {[key_expression, ?,, value_expression], acc}
+        end)
+
+      expression = ["map(", Enum.intersperse(expressions, ?,), ?)]
+
+      expression =
+        if map_size(values) == 0,
+          do: cast_update_param(expression, empty_update_param_type(map)),
+          else: expression
+
+      {cast_update_param(expression, map), acc}
+    else
+      bind_update_param(map, values, acc)
+    end
+  end
+
+  defp update_param(type, value, acc), do: bind_update_param(type, value, acc)
+
+  defp bind_update_param(type, value, {idx, params}) do
+    expression = ["{$", Integer.to_string(idx), ?:, Ch.Types.encode(type), ?}]
+    {expression, {idx + 1, [update_param_value(type, value) | params]}}
+  end
+
+  defp cast_update_param(expression, type) do
+    type = type |> Ch.Types.encode() |> IO.iodata_to_binary()
+    ["CAST(", expression, " AS ", type, ?)]
+  end
+
+  defp nested_dynamic_type?(:dynamic), do: true
+  defp nested_dynamic_type?({:variant, _types}), do: true
+  defp nested_dynamic_type?({:array, type}), do: nested_dynamic_type?(type)
+  defp nested_dynamic_type?({:nullable, type}), do: nested_dynamic_type?(type)
+  defp nested_dynamic_type?({:tuple, types}), do: Enum.any?(types, &nested_dynamic_type?/1)
+
+  defp nested_dynamic_type?({:map, key_type, value_type}),
+    do: nested_dynamic_type?(key_type) or nested_dynamic_type?(value_type)
+
+  defp nested_dynamic_type?(_type), do: false
+
+  # Empty Dynamic containers need a concrete source type for ClickHouse's assignment cast.
+  defp empty_update_param_type(:dynamic), do: :string
+
+  defp empty_update_param_type({kind, type}) when kind in [:array, :nullable],
+    do: {kind, empty_update_param_type(type)}
+
+  defp empty_update_param_type({:tuple, types}),
+    do: {:tuple, Enum.map(types, &empty_update_param_type/1)}
+
+  defp empty_update_param_type({:map, key, value}),
+    do: {:map, empty_update_param_type(key), empty_update_param_type(value)}
+
+  defp empty_update_param_type(type), do: type
 
   defp update_param_value(_type, nil), do: nil
   defp update_param_value({:nullable, type}, value), do: update_param_value(type, value)
   defp update_param_value({:variant, [type]}, value), do: update_param_value(type, value)
   defp update_param_value(:json, value), do: Jason.encode!(value)
+  defp update_param_value(_type, %Time{} = value), do: Time.to_iso8601(value)
 
   defp update_param_value({enum, mappings}, value)
        when enum in [:enum8, :enum16] and is_integer(value) do

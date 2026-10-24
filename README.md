@@ -163,6 +163,8 @@ Lightweight updates are intended for small updates. For large, infrequent update
 
 Returning updated rows through `:returning` or a query `select` is not supported.
 
+Both update forms reject correlated subqueries that reference the update target through `parent_as/1`. Use an uncorrelated subquery selecting the keys to update instead.
+
 For examples, see [update_test.exs](./test/ecto/integration/update_test.exs) and [clickhouse_alter_update_test.exs](./test/ecto/integration/clickhouse_alter_update_test.exs).
 
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)

@@ -1446,6 +1446,80 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
              ~s[ALTER TABLE "schema" UPDATE "y"="x" WHERE ("x" IN (SELECT ss0."z" FROM "schema2" AS ss0 WHERE (ss0."z" > {$0:Int64})))]
   end
 
+  test "update statements reject correlated references to their target table" do
+    matches =
+      from other in Schema,
+        where: other.id == parent_as(:outer).id and other.id == 1,
+        select: 1
+
+    query =
+      from row in Schema,
+        as: :outer,
+        where: exists(subquery(matches)),
+        update: [set: [x: 1]]
+
+    assert_raise Ecto.QueryError,
+                 ~r/correlated subqueries referencing the target table in UPDATE statements/,
+                 fn -> update_all(query) end
+
+    assert_raise Ecto.QueryError,
+                 ~r/correlated subqueries referencing the target table in ALTER TABLE .* UPDATE statements/,
+                 fn -> alter_update_all(query) end
+  end
+
+  test "update statements allow correlations between nested SELECT queries" do
+    matches =
+      from other in Schema2,
+        where: other.z == parent_as(:middle).x,
+        select: 1
+
+    ids =
+      from row in Schema,
+        as: :middle,
+        where: exists(subquery(matches)),
+        select: row.x
+
+    query = from row in Schema, where: row.x in subquery(ids), update: [set: [y: 1]]
+
+    assert update_all(query) ==
+             ~s[UPDATE "schema" SET "y"=1 WHERE ("x" IN (SELECT ss0."x" FROM "schema" AS ss0 WHERE (exists(SELECT 1 FROM "schema2" AS sss0 WHERE (sss0."z" = ss0."x")))))]
+
+    assert alter_update_all(query) ==
+             ~s[ALTER TABLE "schema" UPDATE "y"=1 WHERE ("x" IN (SELECT ss0."x" FROM "schema" AS ss0 WHERE (exists(SELECT 1 FROM "schema2" AS sss0 WHERE (sss0."z" = ss0."x")))))]
+  end
+
+  test "update statements infer nullable array elements regardless of nil position" do
+    for labels <- [["after", nil], [nil, "after", nil]] do
+      query = from row in "nullable_arrays", update: [set: [labels: ^labels]]
+
+      assert update_all(query) ==
+               ~s[UPDATE "nullable_arrays" SET "labels"={$0:Array(Nullable(String))} WHERE 1]
+
+      assert alter_update_all(query) ==
+               ~s[ALTER TABLE "nullable_arrays" UPDATE "labels"={$0:Array(Nullable(String))} WHERE 1]
+    end
+  end
+
+  test "update statements infer nullable elements across nested and empty arrays" do
+    labels = [[], ["after"], [nil]]
+    query = from row in "nullable_arrays", update: [set: [labels: ^labels]]
+
+    assert update_all(query) ==
+             ~s[UPDATE "nullable_arrays" SET "labels"={$0:Array(Array(Nullable(String)))} WHERE 1]
+
+    assert alter_update_all(query) ==
+             ~s[ALTER TABLE "nullable_arrays" UPDATE "labels"={$0:Array(Array(Nullable(String)))} WHERE 1]
+
+    labels = [nil, nil]
+    query = from row in "nullable_arrays", update: [set: [labels: ^labels]]
+
+    assert update_all(query) ==
+             ~s[UPDATE "nullable_arrays" SET "labels"={$0:Array(Nullable(Nothing))} WHERE 1]
+
+    assert alter_update_all(query) ==
+             ~s[ALTER TABLE "nullable_arrays" UPDATE "labels"={$0:Array(Nullable(Nothing))} WHERE 1]
+  end
+
   test "update_all with prefix" do
     query =
       (m in Schema)
