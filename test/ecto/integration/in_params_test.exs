@@ -26,7 +26,8 @@ defmodule Ecto.Integration.InParamsTest do
     query =
       from fragment("system.one"),
         select:
-          {fragment("toTime('12:00:00')") in ^values, fragment("toTime('14:00:00')") in ^values}
+          {fragment("CAST('12:00:00' AS Time)") in ^values,
+           fragment("CAST('14:00:00' AS Time)") in ^values}
 
     assert TestRepo.all(query) == [{1, 0}]
   end
