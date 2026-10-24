@@ -519,7 +519,6 @@ defmodule Ecto.Integration.TypeTest do
     assert Decimal.equal?(decimal, cost)
   end
 
-  @tag skip: true
   test "unions with literals" do
     TestRepo.insert!(%Post{})
     TestRepo.insert!(%Post{})
@@ -527,20 +526,20 @@ defmodule Ecto.Integration.TypeTest do
     query1 = from(p in Post, select: %{n: 1})
     query2 = from(p in Post, select: %{n: 2})
 
-    assert TestRepo.all(union_all(query1, ^query2)) ==
-             [%{n: 1}, %{n: 1}, %{n: 2}, %{n: 2}]
+    assert Enum.sort(TestRepo.all(union_all(query1, ^query2))) ==
+             Enum.sort([%{n: 1}, %{n: 1}, %{n: 2}, %{n: 2}])
 
     query1 = from(p in Post, select: %{n: 1.0})
     query2 = from(p in Post, select: %{n: 2.0})
 
-    assert TestRepo.all(union_all(query1, ^query2)) ==
-             [%{n: 1.0}, %{n: 1.0}, %{n: 2.0}, %{n: 2.0}]
+    assert Enum.sort(TestRepo.all(union_all(query1, ^query2))) ==
+             Enum.sort([%{n: 1.0}, %{n: 1.0}, %{n: 2.0}, %{n: 2.0}])
 
     query1 = from(p in Post, select: %{n: "foo"})
     query2 = from(p in Post, select: %{n: "bar"})
 
-    assert TestRepo.all(union_all(query1, ^query2)) ==
-             [%{n: "foo"}, %{n: "foo"}, %{n: "bar"}, %{n: "bar"}]
+    assert Enum.sort(TestRepo.all(union_all(query1, ^query2))) ==
+             Enum.sort([%{n: "foo"}, %{n: "foo"}, %{n: "bar"}, %{n: "bar"}])
   end
 
   test "schemaless types" do
@@ -548,23 +547,25 @@ defmodule Ecto.Integration.TypeTest do
     assert [123] = TestRepo.all(from p in "posts", select: type(p.visits, :integer))
   end
 
-  @tag skip: true
   test "schemaless calendar types" do
     datetime = ~N[2014-01-16 20:26:51]
-    assert {1, _} = TestRepo.insert_all("posts", [[inserted_at: datetime]])
-    # assert {1, _} = TestRepo.update_all("posts", set: [inserted_at: datetime])
 
-    assert [_] =
+    assert {1, nil} =
+             TestRepo.insert_all("posts", [[inserted_at: datetime]],
+               types: [inserted_at: :datetime]
+             )
+
+    assert [^datetime] =
              TestRepo.all(
                from p in "posts", where: p.inserted_at >= ^datetime, select: p.inserted_at
              )
 
-    assert [_] =
+    assert [^datetime] =
              TestRepo.all(
                from p in "posts", where: p.inserted_at in [^datetime], select: p.inserted_at
              )
 
-    assert [_] =
+    assert [^datetime] =
              TestRepo.all(
                from p in "posts", where: p.inserted_at in ^[datetime], select: p.inserted_at
              )

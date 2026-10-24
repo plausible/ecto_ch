@@ -198,7 +198,6 @@ defmodule Ecto.Integration.SQLTest do
     assert [] == TestRepo.all(Post)
   end
 
-  @tag skip: true
   test "load" do
     inserted_at = ~N[2016-01-01 09:00:00]
     TestRepo.insert!(%Post{title: "title1", inserted_at: inserted_at, public: false})
