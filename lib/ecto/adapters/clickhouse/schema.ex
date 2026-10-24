@@ -215,12 +215,49 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   end
 
   def update(adapter_meta, schema_meta, fields, params, returning, opts) do
-    %{source: source, prefix: prefix} = schema_meta
-    sql = @conn.update(prefix, source, fields, params, returning)
-    all_params = Keyword.values(fields) ++ Keyword.values(params)
+    %{source: source, prefix: prefix, schema: schema} = schema_meta
+    all_fields = fields ++ params
+    types = schema |> extract_types(Keyword.keys(all_fields)) |> Enum.map(&update_param_type/1)
+    all_params = Enum.zip_with(types, Keyword.values(all_fields), &update_param_value/2)
+    sql = @conn.update(prefix, source, fields, params, returning, types)
     Ecto.Adapters.SQL.query!(adapter_meta, sql, all_params, opts)
     {:ok, []}
   end
+
+  defp update_param_type({:low_cardinality, type}), do: update_param_type(type)
+  defp update_param_type({:simple_aggregate_function, _name, type}), do: update_param_type(type)
+  defp update_param_type({:nullable, type}), do: {:nullable, update_param_type(type)}
+  defp update_param_type({:array, type}), do: {:array, update_param_type(type)}
+  defp update_param_type({:tuple, types}), do: {:tuple, Enum.map(types, &update_param_type/1)}
+
+  defp update_param_type({:map, key_type, value_type}),
+    do: {:map, update_param_type(key_type), update_param_type(value_type)}
+
+  defp update_param_type(type), do: type
+
+  defp update_param_value(_type, nil), do: nil
+  defp update_param_value({:nullable, type}, value), do: update_param_value(type, value)
+  defp update_param_value(:json, value), do: Jason.encode!(value)
+
+  defp update_param_value(type, value) when type in [:ipv4, :ipv6] and is_tuple(value),
+    do: value |> :inet.ntoa() |> to_string()
+
+  defp update_param_value({:array, type}, values),
+    do: Enum.map(values, &update_param_value(type, &1))
+
+  defp update_param_value({:tuple, types}, values) when is_tuple(values),
+    do: update_param_value({:tuple, types}, Tuple.to_list(values))
+
+  defp update_param_value({:tuple, types}, values),
+    do: types |> Enum.zip_with(values, &update_param_value/2) |> List.to_tuple()
+
+  defp update_param_value({:map, key_type, value_type}, values) do
+    Map.new(values, fn {key, value} ->
+      {update_param_value(key_type, key), update_param_value(value_type, value)}
+    end)
+  end
+
+  defp update_param_value(_type, value), do: value
 
   def delete(adapter_meta, schema_meta, params, opts) do
     %{source: source, prefix: prefix} = schema_meta

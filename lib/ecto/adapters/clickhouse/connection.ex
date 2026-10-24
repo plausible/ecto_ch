@@ -90,7 +90,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
     %{sources: sources} = query
     {table, _schema, prefix} = elem(sources, 0)
-    fields = update_fields(query, sources, params)
+    fields = update_fields(query, {{nil, nil, nil}, []}, params)
 
     where =
       case query.wheres do
@@ -109,7 +109,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
     %{sources: sources} = query
     {table, _schema, prefix} = elem(sources, 0)
-    fields = update_fields(query, sources, params)
+    fields = update_fields(query, {{nil, nil, nil}, []}, params)
 
     where =
       case query.wheres do
@@ -252,18 +252,22 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def update(prefix, table, fields, filters, returning) do
+  def update(prefix, table, fields, filters, returning),
+    do: update(prefix, table, fields, filters, returning, nil)
+
+  def update(prefix, table, fields, filters, returning, types) do
     unless returning == [] do
       raise ArgumentError, "ClickHouse does not support RETURNING on UPDATE statements"
     end
 
     field_count = length(fields)
+    types = if types, do: List.to_tuple(types)
 
     fields =
       fields
       |> Enum.with_index()
       |> intersperse_map(?,, fn {{field, value}, idx} ->
-        [quote_name(field), ?=, build_param(idx, value)]
+        [quote_name(field), ?=, update_param(idx, value, types)]
       end)
 
     filters =
@@ -274,11 +278,16 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
           ["isNull(", quote_name(field), ?)]
 
         {{field, value}, idx} ->
-          [quote_name(field), ?=, build_param(idx, value)]
+          [quote_name(field), ?=, update_param(idx, value, types)]
       end)
 
     ["UPDATE ", quote_table(prefix, table), " SET ", fields, " WHERE ", filters]
   end
+
+  defp update_param(idx, value, nil), do: build_param(idx, value)
+
+  defp update_param(idx, _value, types),
+    do: ["{$", Integer.to_string(idx), ?:, Ch.Types.encode(elem(types, idx)), ?}]
 
   @impl true
   # https://clickhouse.com/docs/en/sql-reference/statements/delete

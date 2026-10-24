@@ -18,6 +18,23 @@ defmodule Ecto.Integration.UpdateTest do
     end
   end
 
+  defmodule TypedProfile do
+    use Ecto.Schema
+
+    @primary_key {:id, Ch, type: "UInt64"}
+    schema "lightweight_update_typed_profiles" do
+      field :labels, Ch, type: "Array(Nullable(String))", source: :tags
+      field :pair, Ch, type: "Tuple(String, Int16)"
+      field :point, Ch, type: "Point"
+      field :address, Ch, type: "IPv4"
+      field :addresses, Ch, type: "Array(IPv6)"
+      field :payload, Ch, type: "JSON"
+      field :uuid, Ecto.UUID
+      field :recorded_at, :naive_datetime_usec
+      field :amount, Ch, type: "Decimal(18, 4)"
+    end
+  end
+
   test "to_sql/2 generates a lightweight UPDATE" do
     query =
       "events"
@@ -126,6 +143,101 @@ defmodule Ecto.Integration.UpdateTest do
 
     assert {:ok, %Profile{name: nil, score: 2}} = TestRepo.update(changeset, @update_opts)
     assert %Profile{name: nil, score: 2} = TestRepo.get!(Profile, profile.id)
+  end
+
+  test "update_all supports schema field expressions and subquery filters" do
+    create_table(
+      "lightweight_update_profiles",
+      "id UInt64, name Nullable(String), score UInt8",
+      "id"
+    )
+
+    TestRepo.insert_all(Profile, [
+      %{id: 1, name: "before", score: 2},
+      %{id: 2, name: "unchanged", score: 4}
+    ])
+
+    ids = from(p in Profile, where: p.score < ^3, select: p.id)
+
+    query =
+      from p in Profile,
+        where: p.id in subquery(ids),
+        update: [set: [name: fragment("concat(?, ?)", p.name, ^" after")], inc: [score: p.score]]
+
+    assert {0, nil} = TestRepo.update_all(query, [], @update_opts)
+    assert %Profile{name: "before after", score: 4} = TestRepo.get!(Profile, 1)
+    assert %Profile{name: "unchanged", score: 4} = TestRepo.get!(Profile, 2)
+  end
+
+  test "Repo.update handles nil filters without shifting subsequent parameters" do
+    create_table(
+      "lightweight_update_profiles",
+      "id UInt64, name Nullable(String), score UInt8",
+      "id"
+    )
+
+    profile = TestRepo.insert!(%Profile{id: 1, name: nil, score: 1})
+    changeset = Ecto.Changeset.change(profile, score: 2)
+    changeset = %{changeset | filters: %{name: nil}}
+
+    assert {:ok, %Profile{score: 2}} = TestRepo.update(changeset, @update_opts)
+    assert %Profile{name: nil, score: 2} = TestRepo.get!(Profile, profile.id)
+  end
+
+  test "Repo.update preserves schema types and field sources" do
+    create_table(
+      "lightweight_update_typed_profiles",
+      """
+      id UInt64,
+      tags Array(Nullable(String)),
+      pair Tuple(String, Int16),
+      point Point,
+      address IPv4,
+      addresses Array(IPv6),
+      payload JSON,
+      uuid UUID,
+      recorded_at DateTime64(6),
+      amount Decimal(18, 4)
+      """,
+      "id"
+    )
+
+    profile =
+      TestRepo.insert!(%TypedProfile{
+        id: 1,
+        labels: ["before"],
+        pair: {"before", 1},
+        point: {1.0, 2.0},
+        address: {127, 0, 0, 1},
+        addresses: [{0, 0, 0, 0, 0, 0, 0, 1}],
+        payload: %{name: "before"},
+        uuid: Ecto.UUID.generate(),
+        recorded_at: ~N[2026-01-01 00:00:00.000000],
+        amount: Decimal.new("1.0000")
+      })
+
+    changes = [
+      labels: [nil, "after", nil],
+      pair: {"after", 2},
+      point: {3.0, 4.0},
+      address: {127, 0, 0, 2},
+      addresses: [{0, 0, 0, 0, 0, 0, 0, 2}],
+      payload: %{name: "after", count: 2},
+      uuid: Ecto.UUID.generate(),
+      recorded_at: ~N[2026-01-02 03:04:05.123456],
+      amount: Decimal.new("2.3456")
+    ]
+
+    assert {:ok, %TypedProfile{}} =
+             profile |> Ecto.Changeset.change(changes) |> TestRepo.update(@update_opts)
+
+    updated = TestRepo.get!(TypedProfile, profile.id)
+
+    for {field, value} <- Keyword.delete(changes, :payload) do
+      assert Map.fetch!(updated, field) == value
+    end
+
+    assert updated.payload == %{"name" => "after", "count" => 2}
   end
 
   defp create_table(name, columns, order_by \\ "tuple()") do

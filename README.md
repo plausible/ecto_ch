@@ -161,6 +161,8 @@ On ClickHouse releases where lightweight updates are disabled by default, pass `
 
 Lightweight updates are intended for small updates. For large, infrequent updates, `Repo.alter_update_all/3` executes the heavyweight `ALTER TABLE ... UPDATE` mutation instead. ClickHouse does not report an affected-row count for either form, so this adapter returns `{0, nil}` from update-all operations and cannot detect stale rows in `Repo.update/2`.
 
+Returning updated rows through `:returning` or a query `select` is not supported.
+
 For examples, see [update_test.exs](./test/ecto/integration/update_test.exs) and [clickhouse_alter_update_test.exs](./test/ecto/integration/clickhouse_alter_update_test.exs).
 
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)

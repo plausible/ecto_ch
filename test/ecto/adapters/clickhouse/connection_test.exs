@@ -1418,6 +1418,34 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     end
   end
 
+  test "update statements reference schema fields without aliases" do
+    query =
+      from row in Schema,
+        where: row.z == ^11,
+        update: [set: [x: row.y], inc: [z: row.x]]
+
+    assert update_all(query) ==
+             ~s[UPDATE "schema" SET "x"="y","z"="z"+"x" WHERE ("z" = {$0:Int64})]
+
+    assert alter_update_all(query) ==
+             ~s[ALTER TABLE "schema" UPDATE "x"="y","z"="z"+"x" WHERE ("z" = {$0:Int64})]
+  end
+
+  test "update statements combine schema field assignments and subquery filters" do
+    ids = from other in Schema2, where: other.z > ^10, select: other.z
+
+    query =
+      from row in Schema,
+        where: row.x in subquery(ids),
+        update: [set: [y: row.x]]
+
+    assert update_all(query) ==
+             ~s[UPDATE "schema" SET "y"="x" WHERE ("x" IN (SELECT ss0."z" FROM "schema2" AS ss0 WHERE (ss0."z" > {$0:Int64})))]
+
+    assert alter_update_all(query) ==
+             ~s[ALTER TABLE "schema" UPDATE "y"="x" WHERE ("x" IN (SELECT ss0."z" FROM "schema2" AS ss0 WHERE (ss0."z" > {$0:Int64})))]
+  end
+
   test "update_all with prefix" do
     query =
       (m in Schema)
