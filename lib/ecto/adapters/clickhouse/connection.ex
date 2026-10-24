@@ -8,6 +8,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   alias Ecto.Query.{QueryExpr, ByExpr, JoinExpr, BooleanExpr, WithExpr, Tagged}
 
   @parent_as __MODULE__
+  @update_statement {__MODULE__, :update_statement}
 
   @impl true
   def child_spec(opts) do
@@ -83,43 +84,33 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
     ]
   end
 
-  @dialyzer {:no_return, update_all: 1, update_all: 2}
   @impl true
-  def update_all(query, _prefix \\ nil) do
-    raise Ecto.QueryError,
-      query: query,
-      message:
-        "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
+  # https://clickhouse.com/docs/sql-reference/statements/update
+  def update_all(query, params \\ []) do
+    query = validate_update_all!(query, "UPDATE")
+
+    %{sources: sources} = query
+    {table, _schema, prefix} = elem(sources, 0)
+    fields = update_fields(query, {{nil, nil, nil}, []}, params)
+
+    where =
+      case query.wheres do
+        [] -> " WHERE 1"
+        _ -> where(query, {{nil, nil, nil}, []}, params)
+      end
+
+    ["UPDATE ", quote_table(prefix, table), " SET ", fields, where]
   end
 
   # https://clickhouse.com/docs/en/sql-reference/statements/alter/update
   # https://clickhouse.com/docs/en/guides/developer/mutations#updating-data
   def alter_update_all(query, params \\ []) do
     # TODO link to https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse#updating-and-deleting-using-joins
-    unless query.joins == [] do
-      raise Ecto.QueryError,
-        query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support JOIN in ALTER TABLE ... UPDATE statements"
-    end
-
-    if query.select do
-      raise Ecto.QueryError,
-        query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support RETURNING in ALTER TABLE ... UPDATE statements"
-    end
-
-    if query.with_ctes do
-      raise Ecto.QueryError,
-        query: query,
-        message:
-          "Ecto.Adapters.ClickHouse does not support CTEs in ALTER TABLE ... UPDATE statements"
-    end
+    query = validate_update_all!(query, "ALTER TABLE ... UPDATE")
 
     %{sources: sources} = query
     {table, _schema, prefix} = elem(sources, 0)
-    fields = update_fields(query, sources, params)
+    fields = update_fields(query, {{nil, nil, nil}, []}, params)
 
     where =
       case query.wheres do
@@ -128,6 +119,28 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
       end
 
     ["ALTER TABLE ", quote_table(prefix, table), " UPDATE ", fields, where]
+  end
+
+  defp validate_update_all!(query, statement) do
+    unless query.joins == [] do
+      raise Ecto.QueryError,
+        query: query,
+        message: "Ecto.Adapters.ClickHouse does not support JOIN in #{statement} statements"
+    end
+
+    if query.select do
+      raise Ecto.QueryError,
+        query: query,
+        message: "Ecto.Adapters.ClickHouse does not support RETURNING in #{statement} statements"
+    end
+
+    if query.with_ctes do
+      raise Ecto.QueryError,
+        query: query,
+        message: "Ecto.Adapters.ClickHouse does not support CTEs in #{statement} statements"
+    end
+
+    put_in(query.aliases[@update_statement], statement)
   end
 
   defp update_fields(%{updates: updates} = query, sources, params) do
@@ -242,9 +255,46 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
-  def update(_prefix, _table, _fields, _filters, _returning) do
-    raise ArgumentError,
-          "ClickHouse does not support UPDATE statements -- use ALTER TABLE ... UPDATE instead"
+  def update(prefix, table, fields, filters, returning),
+    do: update(prefix, table, fields, filters, returning, nil)
+
+  def update(prefix, table, fields, filters, returning, types) do
+    unless returning == [] do
+      raise ArgumentError, "ClickHouse does not support RETURNING on UPDATE statements"
+    end
+
+    field_count = length(fields)
+    types = if types, do: List.to_tuple(types)
+
+    fields =
+      fields
+      |> Enum.with_index()
+      |> intersperse_map(?,, fn {{field, value}, idx} ->
+        [quote_name(field), ?=, update_param(idx, value, types)]
+      end)
+
+    filters =
+      filters
+      |> Enum.with_index(field_count)
+      |> intersperse_map(" AND ", fn
+        {{field, nil}, _idx} ->
+          ["isNull(", quote_name(field), ?)]
+
+        {{field, value}, idx} ->
+          [quote_name(field), ?=, update_param(idx, value, types)]
+      end)
+
+    ["UPDATE ", quote_table(prefix, table), " SET ", fields, " WHERE ", filters]
+  end
+
+  defp update_param(idx, value, nil), do: build_param(idx, value)
+
+  defp update_param(idx, value, types) do
+    case elem(types, idx) do
+      nil -> build_param(idx, value)
+      {:expression, expression} -> expression
+      type -> ["{$", Integer.to_string(idx), ?:, Ch.Types.encode(type), ?}]
+    end
   end
 
   @impl true
@@ -1031,6 +1081,11 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   def build_params(_ix, _len = 0, _params), do: []
 
   @doc false
+  def infer_param_type(value) do
+    value |> param_type() |> IO.iodata_to_binary() |> Ch.Types.decode()
+  end
+
+  @doc false
   def quote_name(nil), do: []
 
   def quote_name(name) do
@@ -1089,8 +1144,18 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp get_parent_sources_ix(query, as) do
     case query.aliases[@parent_as] do
-      {%{aliases: %{^as => ix}}, sources} -> {ix, sources}
-      {%{} = parent, _sources} -> get_parent_sources_ix(parent, as)
+      {%{aliases: %{^as => ix} = aliases} = parent, sources} ->
+        if statement = aliases[@update_statement] do
+          raise Ecto.QueryError,
+            query: parent,
+            message:
+              "ClickHouse does not support correlated subqueries referencing the target table in #{statement} statements"
+        end
+
+        {ix, sources}
+
+      {%{} = parent, _sources} ->
+        get_parent_sources_ix(parent, as)
     end
   end
 
@@ -1249,6 +1314,7 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp param_type(f) when is_float(f), do: "Float64"
   defp param_type(b) when is_boolean(b), do: "Bool"
+  defp param_type(nil), do: "Nullable(Nothing)"
 
   # TODO DateTime timezone?
   defp param_type(%s{microsecond: microsecond}) when s in [NaiveDateTime, DateTime] do
@@ -1278,14 +1344,24 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   # context: https://github.com/plausible/analytics/pull/6049#issuecomment-3850062609
   defp param_type([]), do: "Array(Nothing)"
 
-  defp param_type([v | vs]) do
-    param_type = param_type(v)
+  defp param_type(values) when is_list(values) do
+    non_null_values = Enum.reject(values, &is_nil/1)
 
-    if param_type != "Array(Nothing)" or vs == [] do
-      ["Array(", param_type, ?)]
-    else
-      param_type(vs)
-    end
+    element_type =
+      case non_null_values do
+        [] -> "Nothing"
+        [value | _] when is_list(value) -> param_type(Enum.concat(non_null_values))
+        [value | _] -> param_type(value)
+      end
+
+    element_type =
+      if length(non_null_values) < length(values) do
+        ["Nullable(", element_type, ?)]
+      else
+        element_type
+      end
+
+    ["Array(", element_type, ?)]
   end
 
   defp param_type(%s{}) do

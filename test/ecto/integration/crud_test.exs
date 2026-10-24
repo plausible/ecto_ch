@@ -91,20 +91,33 @@ defmodule Ecto.Integration.CrudTest do
   end
 
   describe "update" do
+    @describetag :update
+    @update_opts [settings: [allow_experimental_lightweight_update: 1]]
+
+    setup do
+      for table <- ["users", "accounts"] do
+        TestRepo.query!("""
+        ALTER TABLE #{table} MODIFY SETTING
+          enable_block_number_column = true,
+          enable_block_offset_column = true
+        """)
+      end
+
+      :ok
+    end
+
     test "updates user" do
       {:ok, user} = TestRepo.insert(%User{id: 1, name: "John"}, [])
       changeset = User.changeset(user, %{name: "Bob"})
 
-      assert_raise ArgumentError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update(changeset)
-      end
+      assert {:ok, updated_user} = TestRepo.update(changeset, @update_opts)
+      assert updated_user.name == "Bob"
+      assert TestRepo.get(User, user.id).name == "Bob"
     end
 
     test "update_all returns correct rows format" do
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        # update with no return value should have nil rows
-        TestRepo.update_all(User, set: [name: "WOW"])
-      end
+      # ClickHouse does not report how many rows were updated.
+      assert {0, nil} = TestRepo.update_all(User, [set: [name: "WOW"]], @update_opts)
 
       {:ok, _lj} = TestRepo.insert(%User{name: "Lebron James"}, [])
 
@@ -116,8 +129,8 @@ defmodule Ecto.Integration.CrudTest do
           select: %{name: u.name}
         )
 
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(no_match_query, set: [name: "G.O.A.T"])
+      assert_raise Ecto.QueryError, ~r/does not support RETURNING in UPDATE statements/, fn ->
+        TestRepo.update_all(no_match_query, [set: [name: "G.O.A.T"]], @update_opts)
       end
 
       # update with returning that updates something should return resulting RETURNING clause correctly
@@ -128,18 +141,20 @@ defmodule Ecto.Integration.CrudTest do
           select: %{name: u.name}
         )
 
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(match_query, set: [name: "G.O.A.T"])
+      assert_raise Ecto.QueryError, ~r/does not support RETURNING in UPDATE statements/, fn ->
+        TestRepo.update_all(match_query, [set: [name: "G.O.A.T"]], @update_opts)
       end
     end
 
-    test "update_all handles null<->nil conversion correctly" do
-      _account = TestRepo.insert!(%Account{name: "hello"})
+    test "update_all updates matching rows" do
+      account = TestRepo.insert!(%Account{id: 1, name: "hello"})
 
-      assert_raise Ecto.QueryError, ~r/ClickHouse does not support UPDATE statements/, fn ->
-        TestRepo.update_all(Account, set: [name: nil])
-        # assert %Account{name: nil} = TestRepo.reload(account)
-      end
+      assert {0, nil} =
+               Account
+               |> where([a], a.id == ^account.id)
+               |> TestRepo.update_all([set: [name: "updated"]], @update_opts)
+
+      assert %Account{name: "updated"} = TestRepo.reload(account)
     end
   end
 
