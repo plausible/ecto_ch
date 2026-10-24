@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.ClickHouseAlterUpdateTest do
+defmodule Ecto.Adapters.ClickHouse.AlterUpdateTest do
   use Ecto.Integration.Case, async: true
   import Ecto.Query
   alias Ecto.Integration.TestRepo

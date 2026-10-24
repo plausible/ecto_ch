@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.MathTest do
+defmodule Ecto.Adapters.ClickHouse.MathTest do
   use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo

@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.InlineSQLTest do
+defmodule Ecto.Adapters.ClickHouse.InlineSQLTest do
   use Ecto.Integration.Case, async: true
   import Ecto.Query
   alias Ecto.Integration.TestRepo

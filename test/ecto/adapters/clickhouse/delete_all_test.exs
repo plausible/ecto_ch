@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.DeleteAllTest do
+defmodule Ecto.Adapters.ClickHouse.DeleteAllTest do
   use Ecto.Integration.Case
   import Ecto.Query
   alias Ecto.Integration.TestRepo

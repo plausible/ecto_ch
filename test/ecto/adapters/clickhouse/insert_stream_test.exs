@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.InsertStreamTest do
+defmodule Ecto.Adapters.ClickHouse.InsertStreamTest do
   use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo

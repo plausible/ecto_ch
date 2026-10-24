@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.AggregateFunctionTypeTest do
+defmodule Ecto.Adapters.ClickHouse.AggregateFunctionTypeTest do
   use Ecto.Integration.Case, async: true
   import Ecto.Query
   import Ecto.Adapters.ClickHouse.API, only: [input: 1]

@@ -155,11 +155,11 @@ ClickHouse doesn't support `UPDATE` statements as of now, so `Repo.update/2` and
 
 Note that `ALTER TABLE ... UPDATE` is considered an admin operation and comes with a performance cost. Please read https://clickhouse.com/blog/handling-updates-and-deletes-in-clickhouse for more information.
 
-For examples, please see [clickhouse_alter_update_test.exs.](./test/ecto/integration/clickhouse_alter_update_test.exs)
+For examples, please see [alter_update_test.exs.](./test/ecto/adapters/clickhouse/alter_update_test.exs)
 
 #### [ARRAY JOIN](https://clickhouse.com/docs/en/sql-reference/statements/select/array-join)
 
-For `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [clickhouse_joins_test.exs.](./test/ecto/integration/clickhouse_joins_test.exs)
+For `ARRAY JOIN` examples and other ClickHouse-specific JOIN types please see [joins_test.exs.](./test/ecto/adapters/clickhouse/joins_test.exs)
 
 #### NULL
 
