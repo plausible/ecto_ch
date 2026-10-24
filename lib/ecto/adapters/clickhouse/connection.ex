@@ -286,8 +286,12 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
 
   defp update_param(idx, value, nil), do: build_param(idx, value)
 
-  defp update_param(idx, _value, types),
-    do: ["{$", Integer.to_string(idx), ?:, Ch.Types.encode(elem(types, idx)), ?}]
+  defp update_param(idx, value, types) do
+    case elem(types, idx) do
+      nil -> build_param(idx, value)
+      type -> ["{$", Integer.to_string(idx), ?:, Ch.Types.encode(type), ?}]
+    end
+  end
 
   @impl true
   # https://clickhouse.com/docs/en/sql-reference/statements/delete

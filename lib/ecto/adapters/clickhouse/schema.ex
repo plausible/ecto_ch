@@ -217,8 +217,10 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   def update(adapter_meta, schema_meta, fields, params, returning, opts) do
     %{source: source, prefix: prefix, schema: schema} = schema_meta
     all_fields = fields ++ params
+    values = Keyword.values(all_fields)
     types = schema |> extract_types(Keyword.keys(all_fields)) |> Enum.map(&update_param_type/1)
-    all_params = Enum.zip_with(types, Keyword.values(all_fields), &update_param_value/2)
+    types = Enum.zip_with(types, values, &update_param_type/2)
+    all_params = Enum.zip_with(types, values, &update_param_value/2)
     sql = @conn.update(prefix, source, fields, params, returning, types)
     Ecto.Adapters.SQL.query!(adapter_meta, sql, all_params, opts)
     {:ok, []}
@@ -235,9 +237,35 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
   defp update_param_type(type), do: type
 
+  defp update_param_type(:dynamic, _value), do: nil
+  defp update_param_type({:variant, _types}, nil), do: nil
+
+  defp update_param_type({:variant, types} = type, value) do
+    # A single-member Variant preserves its type when cast to the full column type.
+    case Enum.find(types, fn candidate -> match?({:ok, ^value}, Ch.cast(value, candidate)) end) do
+      nil -> type
+      candidate -> {:variant, [candidate]}
+    end
+  end
+
+  defp update_param_type(type, _value), do: type
+
   defp update_param_value(_type, nil), do: nil
   defp update_param_value({:nullable, type}, value), do: update_param_value(type, value)
+  defp update_param_value({:variant, [type]}, value), do: update_param_value(type, value)
   defp update_param_value(:json, value), do: Jason.encode!(value)
+
+  defp update_param_value({enum, mappings}, value)
+       when enum in [:enum8, :enum16] and is_integer(value) do
+    case List.keyfind(mappings, value, 1) do
+      {label, ^value} ->
+        label
+
+      nil ->
+        raise ArgumentError,
+              "enum value #{inspect(value)} not found in mapping: #{inspect(mappings)}"
+    end
+  end
 
   defp update_param_value(type, value) when type in [:ipv4, :ipv6] and is_tuple(value),
     do: value |> :inet.ntoa() |> to_string()

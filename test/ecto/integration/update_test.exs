@@ -32,6 +32,10 @@ defmodule Ecto.Integration.UpdateTest do
       field :uuid, Ecto.UUID
       field :recorded_at, :naive_datetime_usec
       field :amount, Ch, type: "Decimal(18, 4)"
+      field :status, Ch, type: "Enum8('before' = 1, 'after' = 2)"
+      field :dynamic_value, Ch, type: "Dynamic"
+      field :variant_value, Ch, type: "Variant(String, Int64)"
+      field :tuple_variant, Ch, type: "Variant(String, Tuple(String, Int16))"
     end
   end
 
@@ -197,7 +201,11 @@ defmodule Ecto.Integration.UpdateTest do
       payload JSON,
       uuid UUID,
       recorded_at DateTime64(6),
-      amount Decimal(18, 4)
+      amount Decimal(18, 4),
+      status Enum8('before' = 1, 'after' = 2),
+      dynamic_value Dynamic,
+      variant_value Variant(String, Int64),
+      tuple_variant Variant(String, Tuple(String, Int16))
       """,
       "id"
     )
@@ -213,7 +221,11 @@ defmodule Ecto.Integration.UpdateTest do
         payload: %{name: "before"},
         uuid: Ecto.UUID.generate(),
         recorded_at: ~N[2026-01-01 00:00:00.000000],
-        amount: Decimal.new("1.0000")
+        amount: Decimal.new("1.0000"),
+        status: "before",
+        dynamic_value: 1,
+        variant_value: 1,
+        tuple_variant: {"before", 1}
       })
 
     changes = [
@@ -225,7 +237,11 @@ defmodule Ecto.Integration.UpdateTest do
       payload: %{name: "after", count: 2},
       uuid: Ecto.UUID.generate(),
       recorded_at: ~N[2026-01-02 03:04:05.123456],
-      amount: Decimal.new("2.3456")
+      amount: Decimal.new("2.3456"),
+      status: 2,
+      dynamic_value: "123",
+      variant_value: "123",
+      tuple_variant: {"after", 2}
     ]
 
     assert {:ok, %TypedProfile{}} =
@@ -233,11 +249,13 @@ defmodule Ecto.Integration.UpdateTest do
 
     updated = TestRepo.get!(TypedProfile, profile.id)
 
-    for {field, value} <- Keyword.delete(changes, :payload) do
-      assert Map.fetch!(updated, field) == value
+    for {field, value} <- Keyword.drop(changes, [:payload, :status]) do
+      value = if field == :recorded_at, do: to_clickhouse_naive(value), else: value
+      assert {field, Map.fetch!(updated, field)} == {field, value}
     end
 
     assert updated.payload == %{"name" => "after", "count" => 2}
+    assert updated.status == "after"
   end
 
   defp create_table(name, columns, order_by \\ "tuple()") do
