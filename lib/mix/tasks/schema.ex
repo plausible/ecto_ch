@@ -118,8 +118,9 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
     end
   end
 
-  defp elixir_literal(value),
-    do: inspect(value, limit: :infinity, printable_limit: :infinity)
+  defp elixir_literal(value) do
+    inspect(value, limit: :infinity, printable_limit: :infinity)
+  end
 
   defp ecto_type({:array, type}), do: {:array, ecto_type(type)}
   defp ecto_type(type) when type in [:string, :date, :boolean], do: type
