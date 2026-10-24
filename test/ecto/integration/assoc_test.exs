@@ -22,7 +22,6 @@ defmodule Ecto.Integration.AssocTest do
     assert c3.id == cid3
   end
 
-  @tag skip: true
   test "has_one assoc" do
     p1 = TestRepo.insert!(%Post{title: "1"})
     p2 = TestRepo.insert!(%Post{title: "2"})
@@ -32,7 +31,7 @@ defmodule Ecto.Integration.AssocTest do
     %Permalink{} = TestRepo.insert!(%Permalink{url: "2"})
     %Permalink{id: lid3} = TestRepo.insert!(%Permalink{url: "3", post_id: p2.id})
 
-    [l1, l3] = TestRepo.all(Ecto.assoc([p1, p2], :permalink))
+    [l1, l3] = TestRepo.all(Ecto.assoc([p1, p2], :permalink)) |> Enum.sort_by(& &1.id)
     assert l1.id == lid1
     assert l3.id == lid3
   end

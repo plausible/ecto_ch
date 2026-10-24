@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.JsonTest do
+defmodule Ecto.Adapters.ClickHouse.JsonTest do
   use Ecto.Integration.Case
   import Ecto.Query
 

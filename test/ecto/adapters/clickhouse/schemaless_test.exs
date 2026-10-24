@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.SchemalessTest do
+defmodule Ecto.Adapters.ClickHouse.SchemalessTest do
   use Ecto.Integration.Case
   alias Ecto.Integration.TestRepo
 

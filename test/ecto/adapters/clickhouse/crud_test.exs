@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.CrudTest do
+defmodule Ecto.Adapters.ClickHouse.CrudTest do
   use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo
@@ -394,7 +394,7 @@ defmodule Ecto.Integration.CrudTest do
     end
 
     @tag :skip
-    # ** (Ecto.NoPrimaryKeyFieldError) schema `Ecto.Integration.CrudTest.Issue90` has no primary key
+    # ** (Ecto.NoPrimaryKeyFieldError) schema `Ecto.Adapters.ClickHouse.CrudTest.Issue90` has no primary key
     test "can delete" do
       inserted = insert_uuids()
       assert {:ok, deleted} = TestRepo.delete(inserted)

@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.UUIDTest do
+defmodule Ecto.Adapters.ClickHouse.UUIDTest do
   use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo

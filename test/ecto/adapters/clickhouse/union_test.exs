@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.UnionTest do
+defmodule Ecto.Adapters.ClickHouse.UnionTest do
   use Ecto.Integration.Case
   import Ecto.Query
 

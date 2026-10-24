@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.InParamsTest do
+defmodule Ecto.Adapters.ClickHouse.InParamsTest do
   use Ecto.Integration.Case, async: true
 
   import Ecto.Query

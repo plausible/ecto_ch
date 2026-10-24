@@ -198,7 +198,6 @@ defmodule Ecto.Integration.SQLTest do
     assert [] == TestRepo.all(Post)
   end
 
-  @tag skip: true
   test "load" do
     inserted_at = ~N[2016-01-01 09:00:00]
     TestRepo.insert!(%Post{title: "title1", inserted_at: inserted_at, public: false})
@@ -219,6 +218,16 @@ defmodule Ecto.Integration.SQLTest do
   @tag skip: true
   test "returns result as a formatted table"
 
-  @tag skip: true
-  test "format_table edge cases"
+  test "format_table edge cases" do
+    assert Ecto.Adapters.SQL.format_table(nil) == ""
+    assert Ecto.Adapters.SQL.format_table(%{columns: nil, rows: nil}) == ""
+    assert Ecto.Adapters.SQL.format_table(%{columns: [], rows: []}) == ""
+    assert Ecto.Adapters.SQL.format_table(%{columns: [], rows: [["test"]]}) == ""
+
+    assert Ecto.Adapters.SQL.format_table(%{columns: ["test"], rows: []}) ==
+             "+------+\n| test |\n+------+\n+------+"
+
+    assert Ecto.Adapters.SQL.format_table(%{columns: ["test"], rows: nil}) ==
+             "+------+\n| test |\n+------+\n+------+"
+  end
 end

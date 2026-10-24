@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.SpliceTest do
+defmodule Ecto.Adapters.ClickHouse.SpliceTest do
   use Ecto.Integration.Case, async: true
   import Ecto.Query
   alias Ecto.Integration.TestRepo

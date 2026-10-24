@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.TimestampsTest do
+defmodule Ecto.Adapters.ClickHouse.TimestampsTest do
   use Ecto.Integration.Case
 
   alias Ecto.Integration.TestRepo

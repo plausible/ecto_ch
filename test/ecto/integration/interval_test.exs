@@ -233,7 +233,6 @@ defmodule Ecto.Integration.IntervalTest do
     #        TestRepo.all(from p in Post, select: datetime_add(p.inserted_at, ^dec, "second"))
   end
 
-  @tag skip: true
   test "datetime_add with millisecond" do
     # dec = Decimal.new(1500)
     assert [~N[2014-01-01 02:00:01]] =
@@ -263,7 +262,6 @@ defmodule Ecto.Integration.IntervalTest do
   @tag skip: true
   test "datetime_add with negative interval"
 
-  @tag skip: true
   test "from_now" do
     current = DateTime.utc_now().year
     # dec = Decimal.new(5)
@@ -282,7 +280,6 @@ defmodule Ecto.Integration.IntervalTest do
   @tag skip: true
   test "ago"
 
-  @tag skip: true
   test "datetime_add with utc_datetime" do
     {:ok, datetime} = DateTime.from_naive(@inserted_at, "Etc/UTC")
     TestRepo.insert!(%User{inserted_at: datetime})

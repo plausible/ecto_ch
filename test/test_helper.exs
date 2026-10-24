@@ -20,6 +20,9 @@ end
 Logger.configure(level: :info)
 Calendar.put_time_zone_database(Tz.TimeZoneDatabase)
 
+# Shared upstream tests must run serially because cleanup truncates shared tables.
+Application.put_env(:ecto, :async_integration_tests, false)
+
 Code.require_file("test/support/ecto_schemas.exs")
 Code.require_file("test/support/schemas.exs")
 
@@ -50,7 +53,7 @@ env =
 
 Application.put_env(:ecto_ch, TestRepo, env)
 
-exclude =
+version_exclude =
   if ch_version >= "25" do
     []
   else
@@ -66,4 +69,6 @@ _ = Ecto.Adapters.ClickHouse.storage_down(TestRepo.config())
 {:ok, _} = TestRepo.start_link()
 :ok = Ecto.Migrator.up(TestRepo, 0, EctoClickHouse.Integration.Migration, log: false)
 
-ExUnit.start(exclude: exclude)
+# ClickHouse does not support correlated subqueries in these clauses.
+exclude = [:subquery_in_order_by, :subquery_in_distinct, :subquery_in_group_by]
+ExUnit.start(exclude: exclude ++ version_exclude)

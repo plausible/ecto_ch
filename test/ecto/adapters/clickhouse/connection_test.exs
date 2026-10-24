@@ -130,18 +130,13 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT s0."x" FROM "schema" AS s0 INDEXED BY FOO INDEXED BY BAR]
   end
 
-  # TODO merge with test above once ecto 3.10.4 is released
-  @tag :skip
   test "from with unsafe hints" do
-    # # With unsafe fragment
-    # hint = "USE INDEX BAR"
-    # query = Schema |> from(hints: unsafe_fragment(^hint)) |> select([r], r.x)
-    # assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX BAR}
+    hint = "USE INDEX BAR"
+    query = Schema |> from(hints: unsafe_fragment(^hint)) |> select([r], r.x)
+    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX BAR}
 
-    # # With list of string and unsafe fragment
-    # hint = "USE INDEX BAR"
-    # query = Schema |> from(hints: ["USE INDEX FOO", unsafe_fragment(^hint)]) |> select([r], r.x)
-    # assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX FOO USE INDEX BAR}
+    query = Schema |> from(hints: ["USE INDEX FOO", unsafe_fragment(^hint)]) |> select([r], r.x)
+    assert all(query) == ~s{SELECT s0."x" FROM "schema" AS s0 USE INDEX FOO USE INDEX BAR}
   end
 
   test "from without schema" do
@@ -3387,19 +3382,20 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
            ]
   end
 
-  @tag skip: true
-  test "create exclusion constraint" do
+  test "create exclusion constraint is unsupported" do
     create =
       {:create,
        constraint(:products, "price_must_be_positive",
-         exclude: ~s|gist (int4range("from", "to", '[]') WITH &&)|
+         exclude: ~s|gist (int4range("from", "to", '[]') WITH &&)|,
+         validate: false
        )}
 
-    assert execute_ddl(create) == []
+    assert_raise RuntimeError, "ClickHouse does not support exclusion constraints", fn ->
+      execute_ddl(create)
+    end
   end
 
-  @tag skip: true
-  test "create constraint with comment" do
+  test "create constraint with comment is unsupported" do
     create =
       {:create,
        constraint(:products, "price_must_be_positive",
@@ -3408,7 +3404,9 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
          comment: "comment"
        )}
 
-    assert execute_ddl(create) == []
+    assert_raise RuntimeError, "ClickHouse does not support comments on constraints", fn ->
+      execute_ddl(create)
+    end
   end
 
   test "rename table" do

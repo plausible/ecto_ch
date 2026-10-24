@@ -1,4 +1,4 @@
-defmodule Ecto.Integration.DateTime64Test do
+defmodule Ecto.Adapters.ClickHouse.DateTime64Test do
   use Ecto.Integration.Case, async: true
   import Ecto.Query
   alias Ecto.Integration.TestRepo

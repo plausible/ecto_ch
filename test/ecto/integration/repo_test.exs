@@ -78,14 +78,11 @@ defmodule Ecto.Integration.RepoTest do
     assert catch_error(TestRepo.all("posts", prefix: "oops"))
   end
 
-  # TODO why tx
-  @tag skip: true
-  test "insert, update and delete" do
-    post = %Post{title: "insert, update, delete", visits: 1}
+  test "insert and delete" do
+    post = %Post{title: "insert and delete", visits: 1}
     meta = post.__meta__
 
     assert %Post{} = inserted = TestRepo.insert!(post)
-    # assert %Post{} = updated = TestRepo.update!(Ecto.Changeset.change(inserted, visits: 2))
 
     deleted_meta = put_in(meta.state, :deleted)
 
@@ -96,6 +93,8 @@ defmodule Ecto.Integration.RepoTest do
                  mutations_sync: 1
                ]
              )
+
+    refute TestRepo.get(Post, inserted.id)
 
     loaded_meta = put_in(meta.state, :loaded)
     assert %Post{__meta__: ^loaded_meta} = TestRepo.insert!(post)
@@ -194,16 +193,12 @@ defmodule Ecto.Integration.RepoTest do
     assert %Post{} = TestRepo.insert!(%Post{})
   end
 
-  @tag skip: true
-  test "insert and update with user-assigned primary key in changeset" do
+  test "insert with user-assigned primary key in changeset" do
     changeset = Ecto.Changeset.cast(%Post{}, %{"id" => "13"}, ~w(id)a)
-    assert %Post{} = _post = TestRepo.insert!(changeset)
-
-    # changeset = Ecto.Changeset.cast(post, %{"id" => "15"}, ~w(id)a)
-    # assert %Post{5} = TestRepo.update!(changeset)
+    assert %Post{id: 13} = TestRepo.insert!(changeset)
+    assert %Post{id: 13} = TestRepo.get!(Post, 13)
   end
 
-  @tag skip: true
   test "insert and fetch a schema with utc timestamps" do
     datetime = DateTime.from_unix!(System.os_time(:second), :second)
     TestRepo.insert!(%User{inserted_at: datetime})
