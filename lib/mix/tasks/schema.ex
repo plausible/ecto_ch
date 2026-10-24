@@ -70,7 +70,7 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
         schema = [
           """
           @primary_key false
-          schema "#{table}" do
+          schema #{elixir_literal(table)} do
           """,
           Enum.map(rows, fn [_db, name, type] -> ["  ", build_field(name, type), ?\n] end),
           "end"
@@ -107,15 +107,19 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
 
     ecto_type = ecto_type(type)
     clickhouse_type = clickhouse_type(type)
-    name = Code.format_string!(":#{name}")
+    name = name |> String.to_atom() |> elixir_literal()
 
     case {ecto_type, clickhouse_type} do
       {ecto_type, nil} ->
-        ~s[field #{name}, #{inspect(ecto_type)}]
+        ~s[field #{name}, #{elixir_literal(ecto_type)}]
 
       {ecto_type, clickhouse_type} ->
-        ~s[field #{name}, #{inspect(ecto_type)}, type: "#{clickhouse_type}"]
+        ~s[field #{name}, #{elixir_literal(ecto_type)}, type: #{elixir_literal(clickhouse_type)}]
     end
+  end
+
+  defp elixir_literal(value) do
+    inspect(value, limit: :infinity, printable_limit: :infinity)
   end
 
   defp ecto_type({:array, type}), do: {:array, ecto_type(type)}
@@ -125,7 +129,7 @@ defmodule Mix.Tasks.Ecto.Ch.Schema do
 
   defp clickhouse_type({:array, type}), do: clickhouse_type(type)
   defp clickhouse_type(type) when type in [:uuid, :string, :date, :boolean], do: nil
-  defp clickhouse_type(type), do: Ch.Types.encode(type)
+  defp clickhouse_type(type), do: type |> Ch.Types.encode() |> IO.iodata_to_binary()
 
   defp ensure_single_table!(rows) do
     rows
