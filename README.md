@@ -68,6 +68,9 @@ end
 MyApp.Repo.insert_all(MyApp.Example, rows)
 ```
 
+For batching, streaming, asynchronous inserts, and application-side buffering,
+see the [fast inserts guide](guides/fast-inserts.md).
+
 Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others like `:decimal`, `:integer` are ambiguous and should not be used.
 
 [`ecto.ch.schema`](https://hexdocs.pm/ecto_ch/Mix.Tasks.Ecto.Ch.Schema.html) mix task can be used to generate a schema from an existing ClickHouse table.
@@ -92,7 +95,9 @@ MyApp.Repo.insert_all("example", rows, types: types)
 `:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweight [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) global [FINAL](https://clickhouse.com/docs/en/operations/settings/settings#final) modifier, and [more:](https://clickhouse.com/docs/en/operations/settings/settings)
 
 ```elixir
-MyApp.Repo.insert_all(MyApp.Example, rows, settings: [async_insert: 1])
+MyApp.Repo.insert_all(MyApp.Example, rows,
+  settings: [async_insert: 1, wait_for_async_insert: 1]
+)
 MyApp.Repo.delete_all("example", settings: [allow_experimental_lightweight_delete: 1])
 MyApp.Repo.all(MyApp.AggregatedExample, settings: [final: 1])
 ```
