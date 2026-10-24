@@ -148,14 +148,44 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = "posts" |> select([r], r.x)
     assert all(query) == ~s[SELECT p0."x" FROM "posts" AS p0]
 
-    # query = "posts" |> select([r], fragment("?", r))
-    # assert all(query) == ~s[SELECT p0 FROM "posts" AS p0]
-
     query = "Posts" |> select([r], r.x)
     assert all(query) == ~s[SELECT P0."x" FROM "Posts" AS P0]
 
     query = "0posts" |> select([:x])
     assert all(query) == ~s{SELECT t0."x" FROM "0posts" AS t0}
+  end
+
+  test "selecting a whole source requires a schema" do
+    query = from(p in "posts", select: p)
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "p0" but none was given/,
+                 fn -> all(query) end
+
+    query = from(p in "posts", join: c in "comments", on: p.id == c.post_id, select: {p.id, c})
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "c1" but none was given/,
+                 fn -> all(query) end
+
+    query = from(p in fragment("numbers(10)"), select: p)
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "f0" but none was given/,
+                 fn -> all(query) end
+  end
+
+  test "selecting explicit fields without a schema" do
+    assert all(from(p in "posts", select: map(p, [:x, :y]))) ==
+             ~s{SELECT p0."x",p0."y" FROM "posts" AS p0}
+
+    assert all(from(p in fragment("numbers(10)"), select: p.number)) ==
+             ~s{SELECT f0."number" FROM numbers(10) AS f0}
+  end
+
+  test "selecting a whole schema expands its fields" do
+    assert all(from(s in Schema, select: s)) ==
+             ~s{SELECT s0."id",s0."x",s0."y",s0."z",s0."meta" FROM "schema" AS s0}
   end
 
   test "from with subquery" do
@@ -963,7 +993,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     assert all(query) == ~s[SELECT lcase(s0."x", {$0:Int64}) FROM "schema" AS s0]
 
     assert_raise Ecto.QueryError,
-                 ~r/ClickHouse adapter does not support keyword or interpolated fragments/,
+                 ~r/Ecto.Adapters.ClickHouse does not support keyword or interpolated fragments/,
                  fn ->
                    Schema
                    |> select([], fragment(title: 2))
@@ -1863,12 +1893,23 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   @tag :capture_log
   test "array join" do
+    query =
+      from at in "arrays_test",
+        join: a in "arr",
+        on: true,
+        hints: "ARRAY",
+        select: [at.s, a]
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given/,
+                 fn -> all(query) end
+
     assert all(
              from at in "arrays_test",
                join: a in "arr",
                on: true,
                hints: "ARRAY",
-               select: [at.s, a]
+               select: [at.s, fragment("?", a)]
            ) ==
              """
              SELECT a0."s",a1 FROM "arrays_test" AS a0 ARRAY JOIN "arr" AS a1\
@@ -1877,12 +1918,23 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   @tag :capture_log
   test "left array join" do
+    query =
+      from at in "arrays_test",
+        left_join: a in "arr",
+        on: true,
+        hints: "ARRAY",
+        select: [at.s, a]
+
+    assert_raise Ecto.QueryError,
+                 ~r/Ecto.Adapters.ClickHouse requires a schema module when using selector "a1" but none was given/,
+                 fn -> all(query) end
+
     assert all(
              from at in "arrays_test",
                left_join: a in "arr",
                on: true,
                hints: "ARRAY",
-               select: [at.s, a]
+               select: [at.s, fragment("?", a)]
            ) ==
              """
              SELECT a0."s",a1 FROM "arrays_test" AS a0 LEFT ARRAY JOIN "arr" AS a1\
