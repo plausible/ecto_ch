@@ -72,6 +72,68 @@ Some Ecto types like `:string`, `:date`, and `Ecto.UUID` would also work. Others
 
 [`ecto.ch.schema`](https://hexdocs.pm/ecto_ch/Mix.Tasks.Ecto.Ch.Schema.html) mix task can be used to generate a schema from an existing ClickHouse table.
 
+#### UTF-8 text and binary data
+
+ClickHouse `String` columns can store arbitrary bytes. To replace invalid UTF-8 when loading text into an Ecto schema, define a custom type in your application:
+
+```elixir
+defmodule MyApp.Utf8String do
+  use Ecto.Type
+
+  @impl true
+  def type, do: :string
+
+  @impl true
+  def cast(value), do: Ecto.Type.cast(:string, value)
+
+  @impl true
+  def dump(value), do: Ecto.Type.dump(:string, value)
+
+  @impl true
+  def load(value) when is_binary(value) do
+    sanitized =
+      value
+      |> String.chunk(:valid)
+      |> Enum.map_join(fn chunk ->
+        if String.valid?(chunk), do: chunk, else: "�"
+      end)
+
+    {:ok, sanitized}
+  end
+
+  def load(_value), do: :error
+end
+```
+
+This replaces each consecutive run of invalid bytes with one `�`, matching Ch's current sanitizer. It uses public Elixir functions available on Elixir 1.15 and does not depend on Ch's sanitization helper. On Elixir 1.16+, [`String.replace_invalid/1`](https://hexdocs.pm/elixir/String.html#replace_invalid/2) is a shorter alternative, although it can produce a different number of replacement characters.
+
+Use this type for text and `:binary` for payloads such as protobufs:
+
+```elixir
+defmodule MyApp.Event do
+  use Ecto.Schema
+
+  @primary_key false
+  schema "events" do
+    field :message, MyApp.Utf8String
+    field :payload, :binary
+  end
+end
+```
+
+Ecto invokes the custom type's `load/1` even though its underlying type is `:string`. Built-in `:string` fields accept any binary without UTF-8 validation. The custom type above sanitizes reads; its `cast/1` and `dump/1` leave bytes unchanged.
+
+Ch 0.9.x currently sanitizes `String` columns before Ecto loads them, including fields declared as `:binary`. To preserve payload bytes with these versions, explicitly select raw decoding for every result column:
+
+```elixir
+import Ecto.Query
+
+query = from e in MyApp.Event, select: {e.message, e.payload}
+MyApp.Repo.all(query, types: [:binary, :binary])
+```
+
+Here Ch preserves both values, then `MyApp.Utf8String` sanitizes only `message`. The `:types` list must match every selected SQL column in order; this override is for buffered queries, not `Repo.stream/2`. The custom type will continue to sanitize text if Ch switches to preserving raw bytes by default. See [issue #177](https://github.com/plausible/ecto_ch/issues/177).
+
 #### Schemaless inserts
 
 For schemaless inserts `:types` option with a mapping of `field->type` needs to be provided:
