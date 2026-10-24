@@ -214,6 +214,14 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     {num_rows, nil}
   end
 
+  def update(adapter_meta, schema_meta, fields, params, returning, opts) do
+    %{source: source, prefix: prefix} = schema_meta
+    sql = @conn.update(prefix, source, fields, params, returning)
+    all_params = Keyword.values(fields) ++ Keyword.values(params)
+    Ecto.Adapters.SQL.query!(adapter_meta, sql, all_params, opts)
+    {:ok, []}
+  end
+
   def delete(adapter_meta, schema_meta, params, opts) do
     %{source: source, prefix: prefix} = schema_meta
     filter_values = Keyword.values(params)
