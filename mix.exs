@@ -55,13 +55,14 @@ defmodule EctoCh.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md"],
+      extras: ["README.md", "guides/fast-inserts.md", "CHANGELOG.md"],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
     ]
   end
 
   defp package do
     [
+      files: ~w(lib .formatter.exs mix.exs README.md CHANGELOG.md LICENSE guides),
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url}
     ]
