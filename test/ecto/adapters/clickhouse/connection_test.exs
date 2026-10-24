@@ -1033,7 +1033,12 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
 
   test "tagged type" do
     query = Schema |> select([], type(^"601d74e4-a8d3-4b6e-8365-eddb4c893327", Ecto.UUID))
-    assert all(query) == ~s[SELECT CAST({$0:String} AS UUID) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT {$0:UUID} FROM "schema" AS s0]
+
+    {query, params} = plan(query, :all)
+
+    assert query |> Connection.all(Enum.map(params, &Connection.mark_inline/1)) |> to_string() ==
+             ~s[SELECT CAST('601d74e4-a8d3-4b6e-8365-eddb4c893327' AS UUID) FROM "schema" AS s0]
   end
 
   test "tagged :any type doesn't add CAST(...) call" do
@@ -1068,22 +1073,22 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = from e in "events", select: type(^naive_datetime, :naive_datetime)
 
     assert all(query) ==
-             ~s[SELECT CAST({$0:DateTime} AS DateTime) FROM "events" AS e0]
+             ~s[SELECT {$0:DateTime} FROM "events" AS e0]
 
     query = from e in "events", select: type(^naive_datetime_usec, :naive_datetime_usec)
 
     assert all(query) ==
-             ~s[SELECT CAST({$0:DateTime64(6)} AS DateTime64(6)) FROM "events" AS e0]
+             ~s[SELECT {$0:DateTime64(6)} FROM "events" AS e0]
 
     query = from e in "events", select: type(^utc_datetime, :utc_datetime)
 
     assert all(query) ==
-             ~s[SELECT CAST({$0:DateTime} AS DateTime) FROM "events" AS e0]
+             ~s[SELECT {$0:DateTime} FROM "events" AS e0]
 
     query = from e in "events", select: type(^utc_datetime_usec, :utc_datetime_usec)
 
     assert all(query) ==
-             ~s[SELECT CAST({$0:DateTime64(6)} AS DateTime64(6)) FROM "events" AS e0]
+             ~s[SELECT {$0:DateTime64(6)} FROM "events" AS e0]
   end
 
   test "tagged binary_id type" do
@@ -1091,7 +1096,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
     query = from e in "events", select: type(^binary_id, :binary_id)
 
     assert all(query) ==
-             ~s[SELECT CAST({$0:String} AS String) FROM "events" AS e0]
+             ~s[SELECT {$0:String} FROM "events" AS e0]
   end
 
   test "tagged unknown type" do
@@ -1105,7 +1110,7 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
   # TODO tautology?
   test "string type" do
     query = Schema |> select([], type(^"test", :string))
-    assert all(query) == ~s[SELECT CAST({$0:String} AS String) FROM "schema" AS s0]
+    assert all(query) == ~s[SELECT {$0:String} FROM "schema" AS s0]
   end
 
   test "json_extract_path" do
