@@ -1584,6 +1584,19 @@ defmodule Ecto.Adapters.ClickHouse.ConnectionTest do
                  fn -> delete_all(query) end
   end
 
+  # https://github.com/plausible/ecto_ch/issues/228
+  test "delete_all with empty IN lists" do
+    query = from(e in Schema, where: e.x == ^123 and e.y in [])
+
+    assert delete_all(query) ==
+             ~s|DELETE FROM "schema" WHERE (("x" = {$0:Int64}) AND (0))|
+
+    query = from(e in Schema, where: e.x == ^123 and e.y in ^[])
+
+    assert delete_all(query) ==
+             ~s|DELETE FROM "schema" WHERE (("x" = {$0:Int64}) AND (0))|
+  end
+
   test "delete all with returning" do
     query = Post |> Ecto.Queryable.to_query() |> select([m], m)
 
