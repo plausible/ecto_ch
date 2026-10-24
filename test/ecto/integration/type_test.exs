@@ -129,6 +129,49 @@ defmodule Ecto.Integration.TypeTest do
     assert ["a�b"] = TestRepo.all(from p in "posts", select: p.title)
   end
 
+  if Version.match?(System.version(), ">= 1.16.0") do
+    defmodule UTF8String do
+      use Ecto.Type
+
+      @impl true
+      def type, do: :string
+
+      @impl true
+      def cast(value), do: Ecto.Type.cast(:string, value)
+
+      @impl true
+      def dump(value), do: Ecto.Type.dump(:string, value)
+
+      @impl true
+      def load(value) when is_binary(value), do: {:ok, String.replace_invalid(value)}
+      def load(_value), do: :error
+    end
+
+    defmodule UTF8Post do
+      use Ecto.Schema
+
+      @primary_key false
+      schema "posts" do
+        field :title, UTF8String
+        field :blob, :binary
+      end
+    end
+
+    test "custom UTF-8 strings round trip through ClickHouse" do
+      title = "héllo" <> <<0xFF>>
+      blob = <<0, 1, 2>>
+
+      assert %UTF8Post{title: "héllo�"} = TestRepo.load(UTF8Post, %{title: title})
+      assert %UTF8Post{title: ^title} = TestRepo.insert!(%UTF8Post{title: title, blob: blob})
+
+      assert TestRepo.one!(from p in UTF8Post, select: fragment("hex(?)", p.title)) ==
+               Base.encode16(title)
+
+      assert %UTF8Post{title: "héllo�", blob: ^blob} = TestRepo.one!(UTF8Post)
+      assert ["héllo�"] = TestRepo.all(from p in UTF8Post, select: p.title)
+    end
+  end
+
   # TODO find a way to not process :binary as utf8
   @tag skip: true
   test "non utf8 binary" do
