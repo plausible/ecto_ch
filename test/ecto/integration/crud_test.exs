@@ -88,6 +88,36 @@ defmodule Ecto.Integration.CrudTest do
       assert {0, nil} = TestRepo.delete_all(where(Product, name: "hello"), @delete_opts)
       assert TestRepo.aggregate(Product, :count) == 1
     end
+
+    # https://github.com/plausible/ecto_ch/issues/228
+    test "delete_all with empty IN lists preserves all products" do
+      TestRepo.insert!(%Product{id: 1, account_id: 123, name: "first"})
+      TestRepo.insert!(%Product{id: 2, account_id: 123, name: "second"})
+      TestRepo.insert!(%Product{id: 3, account_id: 456, name: "first"})
+
+      account_id = 123
+      products = from p in Product, order_by: p.id, select: {p.account_id, p.name}
+      all_products = [{123, "first"}, {123, "second"}, {456, "first"}]
+      assert TestRepo.all(products) == all_products
+
+      query = from p in Product, where: p.account_id == ^account_id and p.name in []
+      TestRepo.delete_all(query, @delete_opts)
+      assert TestRepo.all(products) == all_products
+
+      delete_products = fn names ->
+        query = from p in Product, where: p.account_id == ^account_id and p.name in ^names
+        TestRepo.delete_all(query, @delete_opts)
+      end
+
+      delete_products.([])
+      assert TestRepo.all(products) == all_products
+
+      delete_products.(["first"])
+      assert TestRepo.all(products) == [{123, "second"}, {456, "first"}]
+
+      delete_products.([])
+      assert TestRepo.all(products) == [{123, "second"}, {456, "first"}]
+    end
   end
 
   describe "update" do
