@@ -1,6 +1,52 @@
 defmodule Ecto.Integration.SchemalessTest do
   use Ecto.Integration.Case
+  import Ecto.Query
   alias Ecto.Integration.TestRepo
+
+  describe "all/1" do
+    test "requires explicit fields when selecting a schemaless binding" do
+      assert_raise Ecto.QueryError, ~r/need to explicitly pass a :select clause/, fn ->
+        TestRepo.all("accounts")
+      end
+
+      assert_raise Ecto.QueryError, ~r/requires a schema module/, fn ->
+        TestRepo.all(from a in "accounts", select: a)
+      end
+
+      assert_raise Ecto.QueryError, ~r/requires a schema module/, fn ->
+        TestRepo.all(
+          from a in "accounts",
+            join: other in "accounts",
+            on: a.id == other.id,
+            select: other
+        )
+      end
+    end
+
+    test "selects explicit fields from a schemaless binding" do
+      assert {1, nil} =
+               TestRepo.insert_all("accounts", [%{id: 1, name: "John"}],
+                 types: [id: :u64, name: :string]
+               )
+
+      assert TestRepo.all(from a in "accounts", select: [:id, :name]) ==
+               [%{id: 1, name: "John"}]
+    end
+
+    test "requires a fragment when selecting an array joined binding" do
+      query =
+        from n in fragment("numbers(1)"),
+          join: a in fragment("?", [1, 2]),
+          hints: "ARRAY",
+          on: true
+
+      assert_raise Ecto.QueryError, ~r/requires a schema module/, fn ->
+        TestRepo.all(select(query, [_, a], a))
+      end
+
+      assert TestRepo.all(select(query, [_, a], fragment("?", a))) == [1, 2]
+    end
+  end
 
   describe "insert_stream/3" do
     setup do

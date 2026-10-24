@@ -87,6 +87,26 @@ types = [
 MyApp.Repo.insert_all("example", rows, types: types)
 ```
 
+#### Schemaless queries
+
+Select fields explicitly when querying without a schema:
+
+```elixir
+MyApp.Repo.all(from e in "example", select: %{number: e.number, name: e.name})
+```
+
+Selecting a whole table binding, such as `select: e`, requires a schema module. For scalar values from `ARRAY JOIN`, use `fragment("?", binding)`:
+
+```elixir
+MyApp.Repo.all(
+  from e in "example",
+    join: value in "ipv4s",
+    on: true,
+    hints: "ARRAY",
+    select: [e.number, fragment("?", value)]
+)
+```
+
 #### Settings
 
 `:settings` option can be used to enable [asynchronous inserts,](https://clickhouse.com/docs/en/optimize/asynchronous-inserts) lightweight [deletes,](https://clickhouse.com/docs/en/guides/developer/lightweght-delete) global [FINAL](https://clickhouse.com/docs/en/operations/settings/settings#final) modifier, and [more:](https://clickhouse.com/docs/en/operations/settings/settings)
