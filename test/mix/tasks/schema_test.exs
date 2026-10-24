@@ -2,6 +2,9 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
   use ExUnit.Case
   import ExUnit.CaptureIO
 
+  alias Ecto.Adapters.ClickHouse.Connection
+  alias Ecto.Integration.TestRepo
+
   test "run/1 help" do
     help =
       capture_io(fn ->
@@ -60,6 +63,59 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
                field :updated_at, Ch, type: "DateTime"
              end
              """
+    end
+
+    test "generated schemas preserve quoted identifiers and type literals" do
+      table = ~S|ecto_ch schema "quotes" \ #{raise "table interpolation"}|
+
+      names = [
+        "with space",
+        "with-hyphen",
+        ~S|double"quote|,
+        ~S|back\slash|,
+        ~S|#{raise "field interpolation"}|,
+        "日本語"
+      ]
+
+      enum_label = ~S|say "hello" #{raise "type interpolation"}|
+      enum_type = IO.iodata_to_binary(["Enum8(", Connection.quote_string(enum_label), " = 1)"])
+      quoted_table = Connection.quote_name(table)
+
+      TestRepo.query!([
+        "CREATE TABLE ",
+        quoted_table,
+        " (",
+        Enum.map(names, &[Connection.quote_name(&1), " String,"]),
+        "\"enum label\" ",
+        enum_type,
+        ") ENGINE Memory"
+      ])
+
+      on_exit(fn -> TestRepo.query!(["DROP TABLE IF EXISTS ", quoted_table]) end)
+
+      source = capture_io(fn -> Mix.Tasks.Ecto.Ch.Schema.run([table]) end)
+      schema = compile_schema(source)
+
+      assert schema.__schema__(:source) == table
+
+      for name <- names do
+        field = String.to_atom(name)
+        assert schema.__schema__(:field_source, field) == field
+        assert schema.__schema__(:type, field) == :string
+      end
+
+      assert schema.__schema__(:type, :"enum label") ==
+               Ecto.ParameterizedType.init(Ch, type: enum_type)
+
+      values = Map.new(names, &{String.to_atom(&1), &1}) |> Map.put(:"enum label", enum_label)
+      TestRepo.insert!(struct!(schema, values))
+      assert Map.take(TestRepo.one!(schema), Map.keys(values)) == values
+    end
+
+    test "reports a missing table" do
+      assert_raise RuntimeError, "table not found", fn ->
+        Mix.Tasks.Ecto.Ch.Schema.run(["ecto_ch_schema_missing_table"])
+      end
     end
 
     @tag :time
@@ -249,6 +305,42 @@ defmodule Mix.Tasks.Ecto.Ch.SchemaTest do
 
     assert build_field("metric", "Array(Tuple(String, UInt64))") ==
              ~s[field :metric, {:array, Ch}, type: "Tuple(String, UInt64)"]
+  end
+
+  test "generated type literals preserve escaping and long labels" do
+    label = ~S|literal "quotes" \\ #{raise "type interpolation"}| <> String.duplicate("x", 5000)
+    field = Mix.Tasks.Ecto.Ch.Schema.build_field("value", "Enum8('#{label}' = 1)")
+
+    schema =
+      compile_schema("""
+      @primary_key false
+      schema "generated_type_literals" do
+        #{field}
+      end
+      """)
+
+    assert {:parameterized, {Ch, {:enum8, [{^label, 1}]}}} = schema.__schema__(:type, :value)
+  end
+
+  defp compile_schema(source) do
+    module = Module.concat(__MODULE__, "Generated#{System.unique_integer([:positive])}")
+
+    {:module, ^module, _bytecode, _result} =
+      Module.create(
+        module,
+        quote do
+          use Ecto.Schema
+          unquote(Code.string_to_quoted!(source))
+        end,
+        Macro.Env.location(__ENV__)
+      )
+
+    on_exit(fn ->
+      :code.delete(module)
+      :code.purge(module)
+    end)
+
+    module
   end
 
   defp put_env_reset(app, key, value) do
