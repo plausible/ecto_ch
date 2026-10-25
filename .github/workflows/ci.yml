@@ -34,7 +34,7 @@ jobs:
           # - https://github.com/plausible/analytics/blob/master/.github/workflows/elixir.yml
           - elixir: "1.20.2"
             otp: "28.5.0.3"
-            clickhouse: "25.11.5.8"
+            clickhouse: "26.9.5.2"
 
     services:
       clickhouse:
