@@ -11,7 +11,8 @@ on:
 jobs:
   test:
     name: "test @ elixir:${{ matrix.elixir }} otp:${{ matrix.otp }} clickhouse:${{ matrix.clickhouse }} ${{ matrix.dialyzer && ' +dialyzer' || '' }}${{ matrix.lint && ' +lint' || '' }}"
-    runs-on: ubuntu-latest
+    # OTP 25 builds are unavailable on Ubuntu 26.04.
+    runs-on: ubuntu-24.04
 
     strategy:
       matrix:
