@@ -269,6 +269,13 @@ defmodule Ecto.Adapters.ClickHouse.Connection do
   end
 
   @impl true
+  def explain_query(conn, {operation, %Ecto.Query{} = query}, params, opts) do
+    # This adapter prepares SQL at execution time, so Ecto SQL hands us the
+    # planned query rather than a statement when invoking this callback.
+    statement = Ecto.Adapters.ClickHouse.prepare_sql(operation, query, params)
+    explain_query(conn, statement, params, opts)
+  end
+
   def explain_query(conn, query, params, opts) do
     explain =
       case Keyword.get(opts, :type, :plan) do

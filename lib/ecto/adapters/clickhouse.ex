@@ -307,10 +307,18 @@ defmodule Ecto.Adapters.ClickHouse do
   end
 
   @impl Ecto.Adapter.Queryable
-  def prepare(operation, query), do: {:nocache, {operation, query}}
+  # Ecto SQL's diagnostic helpers unwrap the outer identifier, so retain the
+  # operation alongside the planned query in the prepared value as well.
+  def prepare(operation, query), do: {:nocache, {__MODULE__, {operation, query}}}
 
   @impl Ecto.Adapter.Queryable
-  def execute(adapter_meta, query_meta, {:nocache, {operation, query}}, params, opts) do
+  def execute(
+        adapter_meta,
+        query_meta,
+        {:nocache, {__MODULE__, {operation, query}}},
+        params,
+        opts
+      ) do
     sql = prepare_sql(operation, query, params)
 
     opts =
