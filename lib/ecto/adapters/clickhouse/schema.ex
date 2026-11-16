@@ -4,8 +4,8 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   @dialyzer :no_improper_lists
 
   # ignores passing stream into Ecto.Adapters.SQL.query!
-  @dialyzer {:no_fail_call, do_insert_stream: 7}
-  @dialyzer {:no_return, insert_stream: 4, do_insert_stream: 7}
+  @dialyzer {:no_fail_call, do_insert_stream: 8}
+  @dialyzer {:no_return, insert_stream: 4, do_insert_stream: 8}
 
   def insert_all(
         adapter_meta,
@@ -55,7 +55,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
     %{repo: repo, adapter: adapter} = adapter_meta
     %{source: source, prefix: prefix} = schema_meta
 
-    types =
+    input_types =
       case query.from.source do
         {:fragment, [{:input, types}], _fragment} ->
           types
@@ -106,7 +106,7 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
 
         # TODO might need more work
         %Ecto.Query.SelectExpr{expr: {:merge, _, [{:&, _, [_]}, {:%{}, _, args}]}} ->
-          fields = Keyword.keys(types)
+          fields = Keyword.keys(input_types)
           merged = Enum.map(args, &elem(&1, 0))
           Enum.uniq(fields ++ merged)
 
@@ -136,10 +136,13 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
       | " FORMAT RowBinaryWithNamesAndTypes"
     ]
 
-    names = prepare_names(header)
-    types = prepare_types(_schema = nil, header, types: types)
+    # SELECT names describe the destination; the binary payload still contains
+    # every field from the input declaration, before projection or renaming.
+    input_header = Keyword.keys(input_types)
+    names = prepare_names(input_header)
+    types = prepare_types(_schema = nil, input_header, types: input_types)
     opts = [{:names, names}, {:types, types} | opts]
-    rows = unzip_rows(rows, header)
+    rows = unzip_rows(rows, input_header)
 
     Ecto.Adapters.SQL.query!(adapter_meta, sql, rows, opts)
   end
@@ -158,44 +161,37 @@ defmodule Ecto.Adapters.ClickHouse.Schema do
   end
 
   def insert_stream(repo, schema, rows, opts) when is_atom(schema) do
-    header = schema.__schema__(:fields)
-
-    do_insert_stream(
-      repo,
-      schema.__schema__(:prefix),
-      schema.__schema__(:source),
-      header,
-      extract_types(schema, header),
-      rows,
-      opts
-    )
+    insert_stream(repo, {schema.__schema__(:source), schema}, rows, opts)
   end
 
   def insert_stream(repo, table, rows, opts) when is_binary(table) do
     types = Keyword.fetch!(opts, :types)
     {header, types} = Enum.unzip(types)
-    do_insert_stream(repo, nil, table, header, types, rows, opts)
+    do_insert_stream(repo, nil, table, header, header, types, rows, opts)
   end
 
   def insert_stream(repo, {source, schema}, rows, opts) when is_atom(schema) do
     header = schema.__schema__(:fields)
+    # Rows use schema field names, while the binary header uses database columns.
+    names = Enum.map(header, &schema.__schema__(:field_source, &1))
 
     do_insert_stream(
       repo,
       schema.__schema__(:prefix),
       source,
       header,
+      names,
       extract_types(schema, header),
       rows,
       opts
     )
   end
 
-  defp do_insert_stream(repo, prefix, source, header, types, rows, opts) do
+  defp do_insert_stream(repo, prefix, source, header, names, types, rows, opts) do
     chunk_every = opts[:chunk_every] || 1000
 
     types = Ch.RowBinary.encoding_types(types)
-    names = prepare_names(header)
+    names = prepare_names(names)
     opts = [{:command, :insert}, {:encode, false} | opts]
     sql = [@conn.insert(prefix, source, [], []) | " FORMAT RowBinaryWithNamesAndTypes"]
 
